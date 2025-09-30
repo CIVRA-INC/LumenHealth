@@ -1,54 +1,70 @@
-import mongoose, { Document, Schema } from "mongoose";
-import bcrypt from "bcrypt";
+import mongoose, { Schema, Document } from 'mongoose';
 
-interface Staff extends Document {
+export const staffRoles = [
+  'SuperAdmin',
+  'Doctor',
+  'Nurse',
+  'Pharmacist',
+  'CHW',
+  'ClinicAdmin',
+] as const;
+
+export type StaffRole = (typeof staffRoles)[number];
+
+export interface IStaff extends Document {
   email: string;
-  password: string;
+  password?: string;
   firstName: string;
   lastName: string;
-  role:
-    | "SuperAdmin"
-    | "Doctor"
-    | "Nurse"
-    | "Pharmacist"
-    | "CHW"
-    | "ClinicAdmin";
+  role: StaffRole;
   isActive: boolean;
-  clinicId: Schema.Types.ObjectId | string;
-  comparePassword: (candidatePassword: string) => Promise<boolean>;
-  getPublicProfile(): Omit<Staff, "password">;
+  clinicId: mongoose.Schema.Types.ObjectId;
 }
 
-const staffSchema = new Schema<Staff>({
-  email: {
-    type: String,
-    required: [true, "Email is required"],
-    unique: true,
-    trim: true,
-    lowercase: true,
-    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Please fill a valid email address"],
+const StaffSchema: Schema = new Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    role: {
+      type: String,
+      required: true,
+      enum: staffRoles,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    clinicId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Clinic',
+    },
   },
-  password: { type: String, required: [true, "Password is required"] },
-  firstName: { type: String, required: [true, "First name is required"] },
-  lastName: { type: String, required: [true, "Last name is required"] },
-  role: {
-    type: String,
-    enum: ["SuperAdmin", "Doctor", "Nurse", "Pharmacist", "CHW", "ClinicAdmin"],
-    required: [true, "Role is required"],
-  },
-  isActive: { type: Boolean, default: true },
-  clinicId: { type: Schema.Types.ObjectId, ref: "Clinic" },
-});
+  {
+    timestamps: true,
+  }
+);
 
-staffSchema.methods.comparePassword = async function (
-  candidatePassword: string
-): Promise<boolean> {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
+const Staff = mongoose.model<IStaff>('Staff', StaffSchema);
 
-staffSchema.methods.getPublicProfile = function () {
-  const { password, ...publicProfile } = this.toObject();
-  return publicProfile;
-};
-
-export const Staff = mongoose.model<Staff>("Staff", staffSchema);
+export default Staff;
