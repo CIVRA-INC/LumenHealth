@@ -9,6 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "lucide-react": "^0.544.0",
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-hook-form": "^7.63.0",
+    "sonner": "^2.0.7",
+    "swr": "^2.3.6",
+    "zod": "^4.1.11"
     "next": "15.5.4",
     "next-auth": "^4.24.11",
     "react": "19.1.0",
