@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { configureAxios } from "@/config/axiosConfig";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/config/tanstackConfig";
+import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner"
 import { Inter } from 'next/font/google';
 import Providers from './providers';
@@ -12,6 +16,8 @@ export const metadata: Metadata = {
   description: 'AI-assisted EMR for underserved communities.',
 };
 
+configureAxios();
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -19,11 +25,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <QueryClientProvider client={queryClient}>
+        <Providers>
+          <AuthProvider>{children}</AuthProvider>
+          </Providers>
+         </QueryClientProvider>
         <Toaster position="top-right" richColors />
-      <body className={inter.className}>
-        <Providers>{children}</Providers>
       </body>
     </html>
   );
