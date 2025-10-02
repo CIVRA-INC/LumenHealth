@@ -1,8 +1,10 @@
-import express, { Express, Request, Response } from "express";
-import dotenv from "dotenv";
-import cors from "cors";
-import connectDB from "./config/database";
-import authRoutes from "./routes/auth.routes";
+import express, { Express, Request, Response } from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import connectDB from './config/database';
+import authRoutes from './routes/auth.routes';
+import patientRoutes from './routes/patient.routes';
+import { errorHandler } from './middleware';
 
 dotenv.config();
 
@@ -15,12 +17,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.use("/api/auth", authRoutes);
-app.get("/api/health", (req: Request, res: Response) => {
+app.use('/api/auth', authRoutes);
+app.use('/api/patient', patientRoutes);
+app.get('/api/health', (req: Request, res: Response) => {
   res
     .status(200)
-    .json({ status: "UP", message: "LumenHealth backend is running." });
+    .json({ status: 'UP', message: 'LumenHealth backend is running.' });
 });
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Backend server is running at http://localhost:${PORT}`);
