@@ -1,19 +1,18 @@
-import { NextFunction, Request, Response } from "express";
-import { catchAsync } from "../utils/catch-async";
-import { Staff } from "../models/staff.model";
-import { signToken } from "../utils/jwt";
+import { Request, Response, NextFunction } from 'express';
+import Staff from '../models/staff.model';
+import { signToken } from '../utils/jwt';
+import { catchAsync } from '../utils/catch-async';
 
 export const login = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email and password are required" });
+      return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const staff = await Staff.findOne({ email });
+    // Select password explicitly
+    const staff = await Staff.findOne({ email }).select('+password');
 
     if (!staff || !(await staff.comparePassword(password))) {
       return res.status(401).json({ message: "Invalid email or password" });

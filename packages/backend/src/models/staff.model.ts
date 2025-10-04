@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 export const staffRoles = [
   'SuperAdmin',
@@ -19,9 +20,12 @@ export interface IStaff extends Document {
   role: StaffRole;
   isActive: boolean;
   clinicId: mongoose.Schema.Types.ObjectId;
+
+  comparePassword(candidatePassword: string): Promise<boolean>;
+  getPublicProfile(): Record<string, any>;
 }
 
-const StaffSchema: Schema = new Schema(
+const StaffSchema: Schema<IStaff> = new Schema(
   {
     email: {
       type: String,
@@ -33,7 +37,7 @@ const StaffSchema: Schema = new Schema(
     password: {
       type: String,
       required: true,
-      select: false,
+      select: false, // don't return password by default
     },
     firstName: {
       type: String,
@@ -54,7 +58,6 @@ const StaffSchema: Schema = new Schema(
       type: Boolean,
       default: true,
     },
-
     clinicId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Clinic',
@@ -64,6 +67,35 @@ const StaffSchema: Schema = new Schema(
     timestamps: true,
   }
 );
+
+// --- Hash password before saving ---
+StaffSchema.pre<IStaff>('save', async function (next) {
+  if (!this.isModified('password')) return next();
+
+  const salt = await bcrypt.genSalt(12);
+  this.password = await bcrypt.hash(this.password!, salt);
+  next();
+});
+
+// --- Compare passwords method ---
+StaffSchema.methods.comparePassword = async function (candidatePassword: string) {
+  return bcrypt.compare(candidatePassword, this.password!);
+};
+
+// --- Return safe public profile ---
+StaffSchema.methods.getPublicProfile = function () {
+  return {
+    id: this._id,
+    firstName: this.firstName,
+    lastName: this.lastName,
+    email: this.email,
+    role: this.role,
+    clinicId: this.clinicId,
+    isActive: this.isActive,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt,
+  };
+};
 
 const Staff = mongoose.model<IStaff>('Staff', StaffSchema);
 
