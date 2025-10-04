@@ -1,27 +1,25 @@
-import Patient from '../models/patient.model';
+import Patient from '../models/patient.model.js';
 
-export const generateUniquePatientId = async (): Promise<string> => {
-  const currentYear = new Date().getFullYear();
-  const prefix = `LMN-${currentYear}`;
+/**
+ * Generates a unique, human-readable patient ID.
+ * Format: LMN-YYYY-NNNNN
+ * @returns {Promise<string>} The new unique patient ID.
+ */
+export const generateUPID = async () => {
+  const year = new Date().getFullYear();
+  
+  // --- CHANGE: Query using the 'UPID' field ---
+  const lastPatient = await Patient.findOne({ UPID: new RegExp(`^LMN-${year}-`) })
+    .sort({ UPID: -1 });
 
-  const latestPatient = await Patient.findOne({
-    UPID: { 
-      $gte: `${prefix}-00000`, 
-      $lt: `${prefix}-99999` 
-    },
-  })
-    .sort({ UPID: -1 })
-    .select('UPID')
-    .lean();
-
-  let nextNumber = 1;
-
-  if (latestPatient) {
-    const lastNumber = parseInt(latestPatient.UPID.split('-')[2]);
-    nextNumber = lastNumber + 1;
+  let nextSequence = 1;
+  if (lastPatient) {
+    // --- CHANGE: Parse the UPID field ---
+    const lastSequence = parseInt(lastPatient.UPID.split('-')[2], 10);
+    nextSequence = lastSequence + 1;
   }
-
-  const paddedNumber = nextNumber.toString().padStart(5, '0');
-
-  return `${prefix}-${paddedNumber}`;
+  
+  const sequenceString = String(nextSequence).padStart(5, '0');
+  
+  return `LMN-${year}-${sequenceString}`;
 };
