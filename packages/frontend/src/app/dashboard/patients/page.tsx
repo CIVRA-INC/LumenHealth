@@ -1,21 +1,35 @@
-type Patient = {
-  id: string;
-  upid: string;
-  fullName: string;
-  age: number;
-  gender: string;
-};
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { Plus } from "lucide-react"
 
-export default function PatientHeader({ patient }: { patient: Patient }) {
+export default function PatientsPage() {
   return (
-    <div className=&#39;bg-white rounded-2xl shadow p-6 flex flex-col md:flex-row md:items-center md:justify-between&#39;>
-      <div>
-        <h1 className=&#39;text-2xl font-semibold text-gray-900&#39;>{patient.fullName}</h1>
-        <p className=&#39;text-gray-600&#39;>UPID: {patient.upid}</p>
-        <p className=&#39;text-gray-600&#39;>
-          {patient.age} years old · {patient.gender}
-        </p>
+    <div className="container mx-auto py-8 px-4 max-w-6xl">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Patients</h1>
+          <p className="text-muted-foreground mt-2">Manage patient records and registrations</p>
+        </div>
+        <Link href="/dashboard/patients/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            New Patient
+          </Button>
+        </Link>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Patient List</CardTitle>
+          <CardDescription>View and manage all registered patients</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-center py-8">
+            No patients registered yet. Click "New Patient" to register your first patient.
+          </p>
+        </CardContent>
+      </Card>
     </div>
-  );
+  )
 }
