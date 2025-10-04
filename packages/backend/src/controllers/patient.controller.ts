@@ -2,7 +2,7 @@ import { Response, Request } from 'express';
 import { catchAsync } from '../utils/catch-async';
 import Patient from '../models/patient.model';
 import Staff from '../models/staff.model';
-import { generateUniquePatientId } from '../utils/uniquePatientIdGen';
+import { generateUPID } from '../utils/uniquePatientIdGen';
 import { JWTPayload } from '../middleware';
 import { PAGINATION } from '../config/pagination';
 import { PatientSearchQuery } from '../types';
@@ -50,7 +50,7 @@ export const createPatient = catchAsync(
       });
     }
 
-    const uniquePatientId = await generateUniquePatientId();
+    const uniquePatientId = await generateUPID();
 
     const patient = new Patient({
       UPID: uniquePatientId,
