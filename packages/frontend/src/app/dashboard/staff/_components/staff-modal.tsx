@@ -12,10 +12,18 @@ import { StaffForm } from './staff-form';
 import { StaffMember } from './staff-table';
 import { useRef } from 'react';
 
+interface StaffFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  password?: string;
+}
+
 interface StaffModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: StaffFormData) => void;
   staffData: StaffMember | null;
 }
 

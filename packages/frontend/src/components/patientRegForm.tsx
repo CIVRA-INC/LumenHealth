@@ -59,19 +59,12 @@ export function PatientRegistrationForm() {
         throw new Error(result.error || "Failed to register patient")
       }
 
-      toast({
-        title: "Success!",
-        description: `Patient ${data.firstName} ${data.lastName} registered successfully`,
-      })
+      toast.success(`Patient ${data.firstName} ${data.lastName} registered successfully`)
 
       // Redirect to patient profile page
       router.push(`/dashboard/patients/${result.id}`)
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Registration Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
-      })
+      toast.error(error instanceof Error ? error.message : "An unexpected error occurred. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -141,7 +134,7 @@ export function PatientRegistrationForm() {
                         onSelect={field.onChange}
                         disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                         initialFocus
-                        captionLayout="dropdown-buttons"
+                        captionLayout="dropdown"
                         fromYear={1900}
                         toYear={new Date().getFullYear()}
                       />

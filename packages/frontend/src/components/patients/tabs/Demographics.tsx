@@ -1,40 +1,70 @@
 type Patient = {
-  phone: string;
-  email: string;
-  address: string;
-  emergencyContact: {
-    name: string;
-    phone: string;
-  };
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string | Date;
+  gender?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
 };
 
 export default function Demographics({ patient }: { patient: Patient }) {
+  const formatDate = (date?: string | Date) => {
+    if (!date) return "N/A";
+    return new Date(date).toLocaleDateString();
+  };
+
   return (
-    <div className=&#39;bg-white rounded-2xl shadow p-6 space-y-4&#39;>
-      <div className=&#39;flex justify-between items-center&#39;>
-        <h2 className=&#39;text-lg font-semibold text-gray-900&#39;>Demographics</h2>
-        <button className=&#39;px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700&#39;>
+    <div className='bg-white rounded-2xl shadow p-6 space-y-4'>
+      <div className='flex justify-between items-center'>
+        <h2 className='text-lg font-semibold text-gray-900'>Demographics</h2>
+        <button className='px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700'>
           Edit
         </button>
       </div>
 
-      <dl className=&#39;grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4&#39;>
+      <dl className='grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4'>
         <div>
-          <dt className=&#39;text-sm font-medium text-gray-500&#39;>Phone</dt>
-          <dd className=&#39;mt-1 text-gray-900&#39;>{patient.phone}</dd>
+          <dt className='text-sm font-medium text-gray-500'>Full Name</dt>
+          <dd className='mt-1 text-gray-900'>{patient.firstName} {patient.lastName}</dd>
         </div>
         <div>
-          <dt className=&#39;text-sm font-medium text-gray-500&#39;>Email</dt>
-          <dd className=&#39;mt-1 text-gray-900&#39;>{patient.email}</dd>
+          <dt className='text-sm font-medium text-gray-500'>Date of Birth</dt>
+          <dd className='mt-1 text-gray-900'>{formatDate(patient.dateOfBirth)}</dd>
         </div>
         <div>
-          <dt className=&#39;text-sm font-medium text-gray-500&#39;>Address</dt>
-          <dd className=&#39;mt-1 text-gray-900&#39;>{patient.address}</dd>
+          <dt className='text-sm font-medium text-gray-500'>Gender</dt>
+          <dd className='mt-1 text-gray-900 capitalize'>{patient.gender || "N/A"}</dd>
         </div>
         <div>
-          <dt className=&#39;text-sm font-medium text-gray-500&#39;>Emergency Contact</dt>
-          <dd className=&#39;mt-1 text-gray-900&#39;>
-            {patient.emergencyContact.name} ({patient.emergencyContact.phone})
+          <dt className='text-sm font-medium text-gray-500'>Phone</dt>
+          <dd className='mt-1 text-gray-900'>{patient.phone || "N/A"}</dd>
+        </div>
+        <div>
+          <dt className='text-sm font-medium text-gray-500'>Email</dt>
+          <dd className='mt-1 text-gray-900'>{patient.email || "N/A"}</dd>
+        </div>
+        <div>
+          <dt className='text-sm font-medium text-gray-500'>Address</dt>
+          <dd className='mt-1 text-gray-900'>
+            {patient.address && patient.city && patient.state && patient.zipCode
+              ? `${patient.address}, ${patient.city}, ${patient.state} ${patient.zipCode}`
+              : patient.address || "N/A"}
+          </dd>
+        </div>
+        <div>
+          <dt className='text-sm font-medium text-gray-500'>Emergency Contact</dt>
+          <dd className='mt-1 text-gray-900'>
+            {patient.emergencyContactName
+              ? `${patient.emergencyContactName} (${patient.emergencyContactRelationship}) - ${patient.emergencyContactPhone}`
+              : "N/A"}
           </dd>
         </div>
       </dl>

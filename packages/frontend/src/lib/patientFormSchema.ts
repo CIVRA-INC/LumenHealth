@@ -17,8 +17,7 @@ export const patientFormSchema = z.object({
 
   dateOfBirth: z
     .date({
-      required_error: "Date of birth is required",
-      invalid_type_error: "Please enter a valid date",
+      message: "Date of birth is required",
     })
     .refine((date) => {
       const today = new Date()
@@ -27,7 +26,7 @@ export const patientFormSchema = z.object({
     }, "Please enter a valid date of birth"),
 
   gender: z.enum(["male", "female", "other", "prefer-not-to-say"], {
-    required_error: "Please select a gender",
+    message: "Please select a gender",
   }),
 
   email: z.string().email("Please enter a valid email address").optional().or(z.literal("")),
