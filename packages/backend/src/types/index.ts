@@ -9,3 +9,10 @@ export interface PatientSearchQuery {
   lastName?: { $regex: string; $options: string };
   UPID?: { $regex: string; $options: string };
 }
+
+import { Request } from 'express';
+import { JWTPayload } from '../middleware';
+
+export interface AuthenticatedRequest extends Request {
+  user?: JWTPayload;
+}

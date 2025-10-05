@@ -24,7 +24,7 @@ export const login = catchAsync(
       });
     }
 
-    const token = signToken(staff.id, staff.role, staff.clinicId as string);
+    const token = signToken(staff.id, staff.role, String(staff.clinicId));
 
     res.status(200).json({
       status: "success",
