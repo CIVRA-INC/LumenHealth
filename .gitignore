@@ -17,3 +17,4 @@ lerna-debug.log*
 packages/backend/coverage/
 packages/frontend/coverage/
 *.log
+packages/frontend/.next
