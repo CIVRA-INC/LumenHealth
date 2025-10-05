@@ -101,6 +101,8 @@ const seed = async () => {
           assessment: 'Healthy',
           plan: 'Routine follow-up',
         },
+        encounterType: 'Consultation',
+        encounterDate: new Date(),
       });
       await encounter.save();
       console.log('✅ Encounter created successfully with ID:', encounter._id);

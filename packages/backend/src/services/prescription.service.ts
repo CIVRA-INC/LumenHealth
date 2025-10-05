@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Prescription, IPrescription, PrescriptionStatus } from '../models/prescription.model';
+import { Prescription, IPrescription } from '../models/prescription.model';
 import Patient from '../models/patient.model';
 import Staff from '../models/staff.model';
 import Encounter from '../models/encounter.model';
@@ -57,7 +57,7 @@ export const getPatientPrescriptions = async (patientId: string, page = 1, limit
 export const getPharmacyQueue = async (page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
 
-  const prescriptions = await Prescription.find({ status: 'Prescribed' as PrescriptionStatus })
+  const prescriptions = await Prescription.find({ status: 'Prescribed' })
     .populate([
       { path: 'patient', select: 'firstName lastName UPID' },
       { path: 'prescribedBy', select: 'firstName lastName role' },
@@ -67,7 +67,7 @@ export const getPharmacyQueue = async (page = 1, limit = 20) => {
     .limit(limit)
     .lean();
 
-  const total = await Prescription.countDocuments({ status: 'Prescribed' as PrescriptionStatus });
+  const total = await Prescription.countDocuments({ status: 'Prescribed' });
 
   return { prescriptions, total, page, limit, totalPages: Math.ceil(total / limit) };
 };

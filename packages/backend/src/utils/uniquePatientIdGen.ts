@@ -1,4 +1,4 @@
-import Patient from '../models/patient.model.ts';
+import Patient from '../models/patient.model';
 
 /**
  * Generates a unique, human-readable patient ID.

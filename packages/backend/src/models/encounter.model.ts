@@ -14,12 +14,16 @@ export interface ISOAP {
   plan: string;
 }
 
+export const encounterTypes = ['Consultation', 'FollowUp', 'Emergency', 'Telemedicine'] as const;
+export type EncounterType = (typeof encounterTypes)[number];
+
 export interface IEncounter extends Document {
   patient: mongoose.Schema.Types.ObjectId;
   provider: mongoose.Schema.Types.ObjectId;
   vitals: IVitals;
   soap: ISOAP;
-  date: Date;
+  encounterDate: Date;
+  encounterType: EncounterType;
 }
 
 const VitalsSchema: Schema = new Schema(
@@ -48,13 +52,14 @@ const EncounterSchema: Schema = new Schema(
     provider: { type: Schema.Types.ObjectId, ref: 'Staff', required: true },
     vitals: { type: VitalsSchema, required: true },
     soap: { type: SOAPSchema, required: true },
-    date: { type: Date, default: Date.now },
+    encounterDate: { type: Date, default: Date.now },
+    encounterType: { type: String, enum: encounterTypes, default: 'Consultation' },
   },
   { timestamps: true }
 );
 
 // Index for querying by patient chronologically
-EncounterSchema.index({ patient: 1, date: -1 });
+EncounterSchema.index({ patient: 1, encounterDate: -1 });
 
 const Encounter = mongoose.model<IEncounter>('Encounter', EncounterSchema);
 
