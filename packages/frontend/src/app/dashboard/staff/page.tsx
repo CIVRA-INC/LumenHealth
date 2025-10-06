@@ -9,6 +9,14 @@ import { useState } from 'react';
 import { StaffModal } from './_components/staff-modal';
 import { toast } from "sonner"
 
+interface StaffFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  password?: string;
+}
+
 
 export default function StaffManagementPage() {
   const { data: staff, error, isLoading, mutate } = useSWR<StaffMember[]>('/staff', getStaff);
@@ -30,25 +38,25 @@ export default function StaffManagementPage() {
         await toggleStaffStatus(staffId);
         mutate(); // Re-fetch data
         toast.success("Staff status updated successfully!");
-    } catch (error: any) {
-        toast.error(error.message || "Failed to update staff status.");
+    } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update staff status.");
     }
   }
 
-  const handleSave = async (data: any) => {
+  const handleSave = async (data: StaffFormData) => {
      try {
         if (editingStaff) {
-            await updateStaff(editingStaff._id, data);
+            await updateStaff(editingStaff._id, data as unknown as Record<string, unknown>);
             toast.success("Staff member updated successfully!");
         } else {
-            await createStaff(data);
+            await createStaff(data as unknown as Record<string, unknown>);
             toast.success("New staff member added successfully!");
         }
         mutate(); // Re-fetch data
         setIsModalOpen(false);
         setEditingStaff(null);
-    } catch (error: any) {
-         toast.error(error.message || "Failed to save staff member.");
+    } catch (error) {
+         toast.error(error instanceof Error ? error.message : "Failed to save staff member.");
     }
   };
 

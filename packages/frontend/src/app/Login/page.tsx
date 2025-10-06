@@ -28,7 +28,7 @@ interface AuthResponse {
 
 // Simulated API client
 const apiClient = {
-  post: async (url: string, data: any): Promise<AuthResponse> => {
+  post: async (url: string, data: LoginFormData): Promise<AuthResponse> => {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
     
@@ -53,7 +53,7 @@ const apiClient = {
 
 // Auth state management (simplified - in production use Context/Redux)
 const authState = {
-  saveAuth: (token: string, user: any) => {
+  saveAuth: (token: string, user: AuthResponse['user']) => {
     // Note: In production, use secure storage methods
     sessionStorage.setItem('authToken', token);
     sessionStorage.setItem('user', JSON.stringify(user));
@@ -99,8 +99,8 @@ const LoginPage: React.FC = () => {
       // Redirect to appropriate dashboard
       authState.redirectToDashboard(response.user.role);
       
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during login. Please try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during login. Please try again.');
     } finally {
       setIsLoading(false);
     }
