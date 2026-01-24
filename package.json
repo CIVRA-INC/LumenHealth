@@ -1,24 +1,20 @@
 {
-  "name": "lumenhealth",
-  "version": "1.0.0",
-  "description": "AI-assisted EMR for underserved communities.",
+  "name": "lumen-health",
   "private": true,
+  "packageManager": "npm@10.9.2",
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\"",
-    "dev:frontend": "npm run dev --workspace=frontend",
-    "dev:backend": "npm run dev --workspace=backend"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint"
   },
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "concurrently": "^8.2.2"
-  },
-  "dependencies": {
-    "@tanstack/react-query": "^5.90.2",
-    "axios": "^1.12.2",
-    "react-toastify": "^11.0.5"
+    "turbo": "latest",
+    "typescript": "latest",
+    "@types/node": "latest"
   }
 }
