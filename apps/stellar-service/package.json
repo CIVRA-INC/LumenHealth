@@ -1,29 +1,21 @@
 {
-  "name": "@lumen/api",
+  "name": "@lumen/stellar",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx watch src/app.ts",
-    "build": "tsc",
-    "start": "node dist/app.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
     "@types/node": "^25.0.10",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@lumen/config": "^1.0.0",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "helmet": "^8.1.0",
-    "mongoose": "^9.1.5"
+    "@stellar/stellar-sdk": "^14.4.3"
   }
 }
