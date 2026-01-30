@@ -2,11 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import { config } from '@lumen/config';
 import { connectDB } from './config/db';
+import { paymentRoutes } from './modules/payments/payments.controller';
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+app.use("/api/v1/payments", paymentRoutes);
+
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
