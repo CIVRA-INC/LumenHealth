@@ -1,22 +1,24 @@
-import { config, getServerPublicKey, StellarNetwork } from './config';
+import { PlatformWalletService } from "./services/wallet.service";
 
-const startStellarService = async () => {
-  console.log('🚀 Stellar Service Starting...');
-  console.log(`🌍 Network: ${config.network}`);
+const run = async () => {
+  console.log("🚀 Starting Stellar Service Health Check...");
+  
+  const wallet = new PlatformWalletService();
 
   try {
-    const publicKey = getServerPublicKey();
-    console.log(`🔑 Server Wallet: ${publicKey}`);
+    const publicKey = wallet.getPublicKey();
+    console.log(`Checking balance for: ${publicKey}`);
 
-    if (config.network === StellarNetwork.TESTNET) {
-      console.log('🧪 Running in Test Mode');
+    const balance = await wallet.getNativeBalance();
+    console.log(`✅ Success! Balance: ${balance} XLM`);
+    
+    if (parseFloat(balance) < 5) {
+      console.warn("⚠️ Warning: Low balance. Please fund your testnet account.");
     }
 
-    console.log('✅ Service Initialized Successfully');
-  } catch (error) {
-    console.error('❌ Startup Failed:', error);
-    process.exit(1);
+  } catch (error: any) {
+    console.error("❌ Failed:", error.message);
   }
 };
 
-startStellarService();
+run();
