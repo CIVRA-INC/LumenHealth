@@ -8,4 +8,9 @@ export const loginSchema = z.object({
     .max(128, "Password must be at most 128 characters"),
 });
 
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(1, "Refresh token is required"),
+});
+
 export type LoginDto = z.infer<typeof loginSchema>;
+export type RefreshDto = z.infer<typeof refreshSchema>;
