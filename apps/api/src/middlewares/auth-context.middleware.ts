@@ -1,6 +1,7 @@
 import { RequestHandler } from "express";
 import { z } from "zod";
 import { AppRole } from "../types/express";
+import { verifyAccessToken } from "../modules/auth/token.service";
 
 const roleSchema = z.enum([
   "SUPER_ADMIN",
@@ -27,7 +28,32 @@ const getUserFromHeaders = (headers: Record<string, unknown>) => {
   return result.success ? result.data : null;
 };
 
+const getTokenFromAuthorizationHeader = (
+  authorization: unknown,
+): string | null => {
+  if (typeof authorization !== "string") {
+    return null;
+  }
+
+  const [scheme, token] = authorization.split(" ");
+  if (scheme !== "Bearer" || !token) {
+    return null;
+  }
+
+  return token;
+};
+
 export const requireAuthenticatedUser: RequestHandler = (req, res, next) => {
+  if (!req.user) {
+    const bearerToken = getTokenFromAuthorizationHeader(req.headers.authorization);
+    if (bearerToken) {
+      const tokenUser = verifyAccessToken(bearerToken);
+      if (tokenUser) {
+        req.user = tokenUser;
+      }
+    }
+  }
+
   if (!req.user) {
     const headerUser = getUserFromHeaders(req.headers as Record<string, unknown>);
     if (headerUser) {

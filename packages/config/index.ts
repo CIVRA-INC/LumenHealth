@@ -7,6 +7,11 @@ export const config = {
   port: process.env.API_PORT || 4000,
 
   mongoUri: process.env.MONGO_URI || '',
+  jwt: {
+    accessTokenSecret: process.env.JWT_ACCESS_TOKEN_SECRET || 'dev-access-secret',
+    refreshTokenSecret:
+      process.env.JWT_REFRESH_TOKEN_SECRET || 'dev-refresh-secret',
+  },
   stellar: {
     network: process.env.STELLAR_NETWORK || 'testnet',
     horizonUrl:
