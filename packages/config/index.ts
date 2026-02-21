@@ -11,5 +11,6 @@ export const config = {
     network: process.env.STELLAR_NETWORK || 'testnet',
     horizonUrl:
       process.env.STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org',
+    platformPublicKey: process.env.STELLAR_PLATFORM_PUBLIC_KEY || '',
   },
 };
