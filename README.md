@@ -1,8 +1,9 @@
-# LumenHealth 🩺✨
+# LumenHealth 
 
 **LumenHealth** is a lightweight, AI-assisted electronic medical record (EMR) system built for clinics, mobile health teams, and care providers operating in resource-constrained or low-connectivity environments. It prioritizes speed, clarity, and reliability over bloated hospital software.
 
 At its core, LumenHealth combines **AI-powered clinical intelligence** with **secure, blockchain-based payments** to support both care delivery and sustainability.
+
 
 ---
 
@@ -156,6 +157,8 @@ npm run dev -w apps/web       # Run only Frontend
 ```
 
 ---
+
+[UI design](https://www.figma.com/design/zKvGSIUGADZgYe1aKyJuUg/Qyou?node-id=0-1&t=O7feQUlPDaDLVIcK-1)
 
 ## Contributing
 
