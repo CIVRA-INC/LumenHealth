@@ -1,17 +1,15 @@
 import { Request, Response, Router } from "express";
-import {
-  requireAuthenticatedUser,
-  requireRole,
-} from "../../middlewares/auth-context.middleware";
+import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
 import { ClinicModel } from "./models/clinic.model";
 import { UpdateClinicDto, updateClinicSchema } from "./settings.validation";
 
 const router = Router();
+const ALL_ROLES: Roles[] = Object.values(Roles);
 
 type UpdateClinicRequest = Request<Record<string, string>, unknown, UpdateClinicDto>;
 
-router.get("/me", requireAuthenticatedUser, async (req: Request, res: Response) => {
+router.get("/me", authorize(ALL_ROLES), async (req: Request, res: Response) => {
   const clinicId = req.user?.clinicId;
 
   if (!clinicId) {
@@ -38,8 +36,7 @@ router.get("/me", requireAuthenticatedUser, async (req: Request, res: Response) 
 
 router.patch(
   "/me",
-  requireAuthenticatedUser,
-  requireRole(["CLINIC_ADMIN"]),
+  authorize([Roles.CLINIC_ADMIN]),
   validateRequest({ body: updateClinicSchema }),
   async (req: UpdateClinicRequest, res: Response) => {
     const clinicId = req.user?.clinicId;
