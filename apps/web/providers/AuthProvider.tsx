@@ -30,9 +30,26 @@ type LoginCredentials = {
   password: string;
 };
 
+export type AuthErrorCode =
+  | "INVALID_CREDENTIALS"
+  | "NETWORK"
+  | "SERVER"
+  | "UNKNOWN";
+
+export class AuthError extends Error {
+  code: AuthErrorCode;
+
+  constructor(code: AuthErrorCode, message: string) {
+    super(message);
+    this.code = code;
+    this.name = "AuthError";
+  }
+}
+
 type AuthContextValue = AuthState & {
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
+  startSession: (tokens: AuthTokens) => void;
   logout: () => void;
   refreshAccessToken: () => Promise<string | null>;
 };
@@ -130,19 +147,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(credentials),
+        });
+      } catch {
+        throw new AuthError(
+          "NETWORK",
+          "Network error. Please check your connection and try again.",
+        );
+      }
 
       if (!response.ok) {
-        throw new Error("Login failed");
+        if (response.status === 401) {
+          throw new AuthError(
+            "INVALID_CREDENTIALS",
+            "Invalid email or password.",
+          );
+        }
+
+        if (response.status >= 500) {
+          throw new AuthError("SERVER", "Server error. Please try again.");
+        }
+
+        throw new AuthError("UNKNOWN", "Unable to sign in. Please try again.");
       }
 
       const tokens = parseTokensFromResponse(await response.json());
       if (!tokens) {
-        throw new Error("Invalid login response");
+        throw new AuthError("UNKNOWN", "Invalid login response.");
       }
 
       applyTokens(tokens);
@@ -186,10 +222,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       ...state,
       isAuthenticated: Boolean(state.user && state.tokens),
       login,
+      startSession: applyTokens,
       logout,
       refreshAccessToken,
     }),
-    [login, logout, refreshAccessToken, state],
+    [applyTokens, login, logout, refreshAccessToken, state],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
