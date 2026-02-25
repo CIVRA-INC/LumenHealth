@@ -1,0 +1,86 @@
+{
+  "validRows": [
+    {
+      "line": 2,
+      "row": {
+        "name": "Dr Jane Doe",
+        "email": "jane.doe@clinic.org",
+        "role": "DOCTOR",
+        "isActive": true
+      }
+    },
+    {
+      "line": 3,
+      "row": {
+        "name": "Nurse Lee",
+        "email": "lee.nurse@clinic.org",
+        "role": "NURSE",
+        "isActive": true
+      }
+    },
+    {
+      "line": 6,
+      "row": {
+        "name": "Duplicate One",
+        "email": "duplicate@clinic.org",
+        "role": "READ_ONLY",
+        "isActive": false
+      }
+    }
+  ],
+  "invalidRows": [
+    {
+      "line": 4,
+      "row": {
+        "name": "Bad Email",
+        "email": "bad-email",
+        "role": "ASSISTANT",
+        "isActive": "true"
+      },
+      "reasons": [
+        "Email is invalid"
+      ]
+    },
+    {
+      "line": 5,
+      "row": {
+        "name": "Unknown Role",
+        "email": "role.user@clinic.org",
+        "role": "THERAPIST",
+        "isActive": "true"
+      },
+      "reasons": [
+        "Role is invalid"
+      ]
+    },
+    {
+      "line": 7,
+      "row": {
+        "name": "Duplicate Two",
+        "email": "duplicate@clinic.org",
+        "role": "DOCTOR",
+        "isActive": "true"
+      },
+      "reasons": [
+        "Duplicate email in file"
+      ]
+    },
+    {
+      "line": 8,
+      "row": {
+        "name": "Missing Active",
+        "email": "missing.active@clinic.org",
+        "role": "NURSE",
+        "isActive": ""
+      },
+      "reasons": [
+        "isActive must be true or false"
+      ]
+    }
+  ],
+  "summary": {
+    "totalRows": 7,
+    "validCount": 3,
+    "invalidCount": 4
+  }
+}
