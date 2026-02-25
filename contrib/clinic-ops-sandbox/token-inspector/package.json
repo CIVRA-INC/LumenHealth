@@ -1,0 +1,9 @@
+{
+  "name": "token-inspector",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "inspect": "node inspect.js"
+  }
+}
