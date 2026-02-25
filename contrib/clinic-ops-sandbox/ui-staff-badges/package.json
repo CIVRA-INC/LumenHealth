@@ -1,0 +1,13 @@
+{
+  "name": "ui-staff-badges",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone typed role/status badge components",
+  "scripts": {
+    "lint": "echo 'No build tooling configured. Use in a TS React sandbox.'"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
