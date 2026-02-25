@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-02-25T14:30:00.000Z",
+  "summary": {
+    "total": 4,
+    "verified": 2,
+    "mismatch": 1,
+    "expired": 1,
+    "pending": 0
+  },
+  "results": [
+    {
+      "intentId": "pi_001",
+      "clinicId": "clinic_alpha",
+      "status": "verified",
+      "reason": "Matching on-chain payment found before expiry",
+      "txHash": "tx_1001",
+      "memo": "memo-alpha-001",
+      "expectedAmount": "100.00",
+      "actualAmount": "100.00",
+      "expiresAt": "2026-02-25T14:00:00.000Z"
+    },
+    {
+      "intentId": "pi_002",
+      "clinicId": "clinic_beta",
+      "status": "mismatch",
+      "reason": "Amount mismatch for matching memo",
+      "txHash": "tx_1002",
+      "memo": "memo-beta-002",
+      "expectedAmount": "150.00",
+      "actualAmount": "149.99",
+      "expiresAt": "2026-02-25T13:00:00.000Z"
+    },
+    {
+      "intentId": "pi_003",
+      "clinicId": "clinic_gamma",
+      "status": "expired",
+      "reason": "No matching payment found before expiry",
+      "txHash": null,
+      "memo": "memo-gamma-003",
+      "expectedAmount": "75.00",
+      "actualAmount": null,
+      "expiresAt": "2026-02-25T12:30:00.000Z"
+    },
+    {
+      "intentId": "pi_004",
+      "clinicId": "clinic_delta",
+      "status": "verified",
+      "reason": "Matching on-chain payment found before expiry",
+      "txHash": "tx_1003",
+      "memo": "memo-delta-004",
+      "expectedAmount": "210.00",
+      "actualAmount": "210.00",
+      "expiresAt": "2026-02-25T15:30:00.000Z"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "txHash": "tx_1001",
+    "memo": "memo-alpha-001",
+    "amount": "100.00",
+    "asset": "XLM",
+    "confirmedAt": "2026-02-25T13:20:00.000Z"
+  },
+  {
+    "txHash": "tx_1002",
+    "memo": "memo-beta-002",
+    "amount": "149.99",
+    "asset": "XLM",
+    "confirmedAt": "2026-02-25T12:10:00.000Z"
+  },
+  {
+    "txHash": "tx_1003",
+    "memo": "memo-delta-004",
+    "amount": "210.00",
+    "asset": "XLM",
+    "confirmedAt": "2026-02-25T15:00:00.000Z"
+  }
+]
