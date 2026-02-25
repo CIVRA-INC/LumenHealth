@@ -1,0 +1,104 @@
+{
+  "roles": [
+    "SUPER_ADMIN",
+    "CLINIC_ADMIN",
+    "DOCTOR",
+    "NURSE",
+    "ASSISTANT",
+    "READ_ONLY"
+  ],
+  "actions": [
+    "clinic.settings.read",
+    "clinic.settings.update",
+    "patients.read",
+    "patients.create",
+    "patients.update",
+    "staff.read",
+    "staff.create",
+    "staff.deactivate",
+    "audit.read",
+    "billing.read",
+    "billing.pay",
+    "prescriptions.create",
+    "prescriptions.update",
+    "appointments.read",
+    "appointments.create",
+    "appointments.update",
+    "reports.read"
+  ],
+  "permissions": {
+    "SUPER_ADMIN": [
+      "clinic.settings.read",
+      "clinic.settings.update",
+      "patients.read",
+      "patients.create",
+      "patients.update",
+      "staff.read",
+      "staff.create",
+      "staff.deactivate",
+      "audit.read",
+      "billing.read",
+      "billing.pay",
+      "prescriptions.create",
+      "prescriptions.update",
+      "appointments.read",
+      "appointments.create",
+      "appointments.update",
+      "reports.read"
+    ],
+    "CLINIC_ADMIN": [
+      "clinic.settings.read",
+      "clinic.settings.update",
+      "patients.read",
+      "patients.create",
+      "patients.update",
+      "staff.read",
+      "staff.create",
+      "staff.deactivate",
+      "audit.read",
+      "billing.read",
+      "billing.pay",
+      "appointments.read",
+      "appointments.create",
+      "appointments.update",
+      "reports.read"
+    ],
+    "DOCTOR": [
+      "clinic.settings.read",
+      "patients.read",
+      "patients.create",
+      "patients.update",
+      "staff.read",
+      "prescriptions.create",
+      "prescriptions.update",
+      "appointments.read",
+      "appointments.create",
+      "appointments.update",
+      "reports.read"
+    ],
+    "NURSE": [
+      "clinic.settings.read",
+      "patients.read",
+      "patients.update",
+      "staff.read",
+      "appointments.read",
+      "appointments.create"
+    ],
+    "ASSISTANT": [
+      "clinic.settings.read",
+      "patients.read",
+      "staff.read",
+      "appointments.read",
+      "appointments.create"
+    ],
+    "READ_ONLY": [
+      "clinic.settings.read",
+      "patients.read",
+      "staff.read",
+      "audit.read",
+      "billing.read",
+      "appointments.read",
+      "reports.read"
+    ]
+  }
+}
