@@ -1,0 +1,13 @@
+{
+  "name": "ui-subscription-lock",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone subscription lock banner and action guard",
+  "scripts": {
+    "lint": "echo 'No build tooling configured. Use in a React sandbox.'"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
