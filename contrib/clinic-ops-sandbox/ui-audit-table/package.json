@@ -1,0 +1,13 @@
+{
+  "name": "ui-audit-table",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone high-density audit table component demo",
+  "scripts": {
+    "lint": "echo 'No build tooling configured. Open App.jsx in your local React sandbox.'"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
