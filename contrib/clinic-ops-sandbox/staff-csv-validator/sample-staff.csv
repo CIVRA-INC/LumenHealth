@@ -1,0 +1,8 @@
+name,email,role,isActive
+Dr Jane Doe,jane.doe@clinic.org,DOCTOR,true
+Nurse Lee,lee.nurse@clinic.org,NURSE,true
+Bad Email,bad-email,ASSISTANT,true
+Unknown Role,role.user@clinic.org,THERAPIST,true
+Duplicate One,duplicate@clinic.org,READ_ONLY,false
+Duplicate Two,duplicate@clinic.org,DOCTOR,true
+Missing Active,missing.active@clinic.org,NURSE,

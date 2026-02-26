@@ -1,0 +1,10 @@
+{
+  "name": "stellar-memo-guard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "check": "node memo-guard.js",
+    "test": "node --test memo-guard.test.js"
+  }
+}

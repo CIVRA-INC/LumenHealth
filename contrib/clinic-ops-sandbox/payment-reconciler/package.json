@@ -1,0 +1,9 @@
+{
+  "name": "payment-reconciler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "reconcile": "node reconcile.js"
+  }
+}
