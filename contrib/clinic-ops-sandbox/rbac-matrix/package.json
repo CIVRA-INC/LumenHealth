@@ -1,0 +1,10 @@
+{
+  "name": "rbac-matrix",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "check": "node rbac-matrix.js",
+    "test": "node --test rbac-matrix.test.js"
+  }
+}
