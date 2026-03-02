@@ -12,6 +12,7 @@ import { clinicOnboardingRoutes } from "./modules/clinics/onboarding.controller"
 import { clinicSettingsRoutes } from "./modules/clinics/settings.controller";
 import { paymentRoutes } from "./modules/payments/payments.controller";
 import { userRoutes } from "./modules/users/users.controller";
+import { notesRoutes } from "./modules/notes/notes.controller";
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use('/api/v1/clinics', clinicSettingsRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/patients', patientRoutes);
+app.use('/api/v1/notes', notesRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 
 
