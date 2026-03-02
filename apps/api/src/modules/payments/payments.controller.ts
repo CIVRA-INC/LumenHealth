@@ -1,30 +1,91 @@
 import { Router, Request, Response } from "express";
 import { PaymentIntentService } from "./intent.service";
+import { authorize, Roles } from "../../middlewares/rbac.middleware";
+import { validateRequest } from "../../middlewares/validate.middleware";
+import { PaymentRecordModel } from "./models/payment-record.model";
+import { ClinicModel } from "../clinics/models/clinic.model";
+import {
+  CreatePaymentIntentDto,
+  createPaymentIntentSchema,
+  PaymentIntentStatusParamsDto,
+  paymentIntentStatusParamsSchema,
+} from "./payments.validation";
 
 const router = Router();
+const ALL_ROLES: Roles[] = Object.values(Roles);
+type CreatePaymentIntentRequest = Request<Record<string, string>, unknown, CreatePaymentIntentDto>;
+type PaymentStatusRequest = Request<PaymentIntentStatusParamsDto>;
 
 /**
  * POST /api/v1/payments/intent
  * Body: { clinicId: string, amount: string }
  */
-router.post("/intent", (req: Request, res: Response) => {
-  try {
-    const { clinicId, amount } = req.body;
+router.post(
+  "/intent",
+  authorize(ALL_ROLES),
+  validateRequest({ body: createPaymentIntentSchema }),
+  async (req: CreatePaymentIntentRequest, res: Response) => {
+    try {
+      const { clinicId, amount } = req.body;
+      if (clinicId !== req.user?.clinicId && req.user?.role !== Roles.SUPER_ADMIN) {
+        return res.status(403).json({
+          error: "Forbidden",
+          message: "Cannot create payment intent for another clinic",
+        });
+      }
 
-    if (!clinicId || !amount) {
-      return res.status(400).json({ error: "Missing clinicId or amount" });
+      const intent = PaymentIntentService.createIntent(clinicId, amount);
+
+      await PaymentRecordModel.create({
+        intentId: intent.intentId,
+        clinicId,
+        amount: intent.amount,
+        destination: intent.destination,
+        memo: intent.memo,
+        status: "pending",
+      });
+
+      return res.json({
+        status: "success",
+        data: intent,
+      });
+    } catch (error: any) {
+      console.error("Payment Intent Error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.get(
+  "/status/:intentId",
+  authorize(ALL_ROLES),
+  validateRequest({ params: paymentIntentStatusParamsSchema }),
+  async (req: PaymentStatusRequest, res: Response) => {
+    const record = await PaymentRecordModel.findOne({
+      intentId: req.params.intentId,
+      clinicId: req.user?.clinicId,
+    }).lean();
+
+    if (!record) {
+      return res.status(404).json({
+        error: "NotFound",
+        message: "Payment intent not found",
+      });
     }
 
-    const intent = PaymentIntentService.createIntent(clinicId, amount);
+    const clinic = await ClinicModel.findById(record.clinicId)
+      .select({ subscriptionExpiryDate: 1 })
+      .lean();
 
-    res.json({
+    return res.json({
       status: "success",
-      data: intent,
+      data: {
+        intentId: record.intentId,
+        paymentStatus: record.status,
+        subscriptionExpiryDate: clinic?.subscriptionExpiryDate ?? null,
+      },
     });
-  } catch (error: any) {
-    console.error("Payment Intent Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+  },
+);
 
 export const paymentRoutes = router;
