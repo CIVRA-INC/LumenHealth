@@ -1,5 +1,6 @@
 import { CreatePatientDto } from "./patients.validation";
 import { PatientModel, PatientDocument } from "./models/patient.model";
+import { PatientCounterModel } from "./models/patient-counter.model";
 
 const normalize = (value: string) =>
   value
@@ -68,8 +69,13 @@ export const createPatient = async (input: {
   payload: CreatePatientDto;
   clinicId: string;
 }) => {
-  const totalPatients = await PatientModel.countDocuments({});
-  const systemId = buildSystemId(1000 + totalPatients);
+  const nextCounter = await PatientCounterModel.findByIdAndUpdate(
+    "patient_system_id_counter",
+    { $inc: { value: 1 } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  ).lean();
+
+  const systemId = buildSystemId(nextCounter?.value ?? 1000);
   const searchName = normalize(`${input.payload.firstName}${input.payload.lastName}`);
 
   const createdPatient = await PatientModel.create({
