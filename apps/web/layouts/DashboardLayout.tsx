@@ -7,7 +7,8 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", disabled: false },
-  { href: "#", label: "Patients", disabled: true },
+  { href: "/dashboard/encounters", label: "Encounters", disabled: false },
+  { href: "/dashboard/patients", label: "Patients", disabled: false },
   { href: "/dashboard/settings/staff", label: "Staff", disabled: false },
   { href: "/dashboard/audit", label: "Audit Logs", disabled: false },
   { href: "/dashboard/billing", label: "Billing", disabled: false },
