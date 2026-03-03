@@ -4,6 +4,7 @@ import { config } from '@lumen/config';
 import { connectDB } from './config/db';
 import { startPaymentVerificationWorker } from './modules/payments/worker';
 import { patientRoutes } from './modules/patients/patients.controller';
+import { patientHistoryRoutes } from "./modules/patients/history.controller";
 import { auditRoutes } from './modules/audit/audit.controller';
 import { auditMiddleware } from "./middlewares/audit.middleware";
 import { requireActiveSubscription } from "./middlewares/subscription.middleware";
@@ -26,6 +27,7 @@ app.use('/api/v1/clinics', clinicSettingsRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/patients', patientRoutes);
+app.use('/api/v1/patients', patientHistoryRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 
 
