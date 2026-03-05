@@ -18,6 +18,8 @@ export interface User {
   role: AppRole;
   clinicId: Types.ObjectId;
   isActive: boolean;
+  resetPasswordTokenHash?: string;
+  resetPasswordExpiresAt?: Date;
 }
 
 const userSchema = new Schema<User>(
@@ -52,6 +54,16 @@ const userSchema = new Schema<User>(
       type: Boolean,
       default: true,
       index: true,
+    },
+    resetPasswordTokenHash: {
+      type: String,
+      required: false,
+      select: false,
+    },
+    resetPasswordExpiresAt: {
+      type: Date,
+      required: false,
+      select: false,
     },
   },
   {
