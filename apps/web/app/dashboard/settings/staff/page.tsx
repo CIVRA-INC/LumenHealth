@@ -173,6 +173,21 @@ export default function StaffManagementPage() {
     }
   }, [page, pageCount]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      setActionMenuUserId(null);
+      setDeactivateTarget(null);
+      setIsCreateOpen(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const onCreateStaff = handleSubmit(async (values) => {
     setIsCreateSubmitting(true);
     setToast(null);
