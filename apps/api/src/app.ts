@@ -7,11 +7,13 @@ import { authRoutes } from './modules/auth/auth.controller';
 import { clinicOnboardingRoutes } from './modules/clinics/onboarding.controller';
 import { clinicSettingsRoutes } from './modules/clinics/settings.controller';
 import { userRoutes } from './modules/users/users.controller';
+import { auditMiddleware } from './middlewares/audit.middleware';
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(auditMiddleware);
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/clinics', clinicOnboardingRoutes);
