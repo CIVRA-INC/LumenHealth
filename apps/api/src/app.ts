@@ -7,6 +7,7 @@ import { authRoutes } from './modules/auth/auth.controller';
 import { clinicOnboardingRoutes } from './modules/clinics/onboarding.controller';
 import { clinicSettingsRoutes } from './modules/clinics/settings.controller';
 import { userRoutes } from './modules/users/users.controller';
+import { auditRoutes } from './modules/audit/audit.controller';
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use('/api/v1/clinics', clinicOnboardingRoutes);
 app.use('/api/v1/clinics', clinicSettingsRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/audit-logs', auditRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
