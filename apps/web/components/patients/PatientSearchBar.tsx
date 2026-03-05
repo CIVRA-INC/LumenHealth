@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import type { Patient } from "@lumen/types";
 
@@ -20,6 +20,7 @@ export const PatientSearchBar = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Patient[]>([]);
+  const latestRequestIdRef = useRef(0);
 
   const trimmedQuery = useMemo(() => query.trim(), [query]);
 
@@ -30,6 +31,8 @@ export const PatientSearchBar = () => {
       return;
     }
 
+    const requestId = latestRequestIdRef.current + 1;
+    latestRequestIdRef.current = requestId;
     const timer = window.setTimeout(async () => {
       setIsLoading(true);
       setError(null);
@@ -42,12 +45,20 @@ export const PatientSearchBar = () => {
         }
 
         const payload = (await response.json()) as { data?: Patient[] };
+        if (requestId !== latestRequestIdRef.current) {
+          return;
+        }
         setResults(payload.data ?? []);
       } catch {
+        if (requestId !== latestRequestIdRef.current) {
+          return;
+        }
         setError("Unable to fetch patients.");
         setResults([]);
       } finally {
-        setIsLoading(false);
+        if (requestId === latestRequestIdRef.current) {
+          setIsLoading(false);
+        }
       }
     }, 300);
 
