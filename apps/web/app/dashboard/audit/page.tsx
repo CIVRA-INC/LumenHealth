@@ -255,25 +255,26 @@ export default function AuditLogsPage() {
                   <th className="px-4 py-3">User</th>
                   <th className="px-4 py-3">Action</th>
                   <th className="px-4 py-3">Resource</th>
+                  <th className="px-4 py-3">Activity</th>
                   <th className="px-4 py-3">IP Address</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-800">
                 {isLoading ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-slate-500" colSpan={5}>
+                    <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
                       Loading audit logs...
                     </td>
                   </tr>
                 ) : errorMessage ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-red-600" colSpan={5}>
+                    <td className="px-4 py-8 text-center text-red-600" colSpan={6}>
                       {errorMessage}
                     </td>
                   </tr>
                 ) : logs.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-slate-500" colSpan={5}>
+                    <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
                       No logs found for the selected filters.
                     </td>
                   </tr>
@@ -296,6 +297,11 @@ export default function AuditLogsPage() {
                         {log.resourceId ? (
                           <span className="ml-1 text-xs text-slate-500">#{log.resourceId}</span>
                         ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {`${log.userId} [${log.action}] ${log.resource}${
+                          log.resourceId ? ` #${log.resourceId}` : ""
+                        } at ${formatTimestamp(log.timestamp)}`}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
                         {log.ipAddress}
