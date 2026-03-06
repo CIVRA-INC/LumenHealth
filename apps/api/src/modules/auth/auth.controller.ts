@@ -7,6 +7,7 @@ import {
   signRefreshToken,
   verifyRefreshToken,
 } from "./token.service";
+import { resetRoutes } from "./reset.controller";
 import { LoginDto, RefreshDto, loginSchema, refreshSchema } from "./auth.validation";
 
 const router = Router();
@@ -85,5 +86,7 @@ router.post(
     });
   },
 );
+
+router.use(resetRoutes);
 
 export const authRoutes = router;

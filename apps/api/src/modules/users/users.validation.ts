@@ -24,4 +24,11 @@ export const createUserSchema = z.object({
     .optional(),
 });
 
+export const userIdParamSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, "User id must be a valid ObjectId"),
+});
+
 export type CreateUserDto = z.infer<typeof createUserSchema>;
+export type UserIdParamDto = z.infer<typeof userIdParamSchema>;
