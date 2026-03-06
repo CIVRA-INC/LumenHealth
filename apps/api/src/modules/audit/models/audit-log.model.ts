@@ -18,20 +18,23 @@ export interface AuditLogDocument {
 
 const auditLogSchema = new Schema<AuditLogDocument>(
   {
+    clinicId: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
     userId: {
       type: String,
       required: true,
       trim: true,
-    },
-    clinicId: {
-      type: String,
-      required: false,
-      trim: true,
+      index: true,
     },
     action: {
       type: String,
       enum: Object.values(AuditAction),
       required: true,
+      index: true,
     },
     resource: {
       type: String,
@@ -47,6 +50,7 @@ const auditLogSchema = new Schema<AuditLogDocument>(
       type: Date,
       required: true,
       default: () => new Date(),
+      index: true,
     },
     ipAddress: {
       type: String,
@@ -60,7 +64,7 @@ const auditLogSchema = new Schema<AuditLogDocument>(
 );
 
 auditLogSchema.index({ clinicId: 1, timestamp: -1 });
-auditLogSchema.index({ userId: 1, timestamp: -1 });
-auditLogSchema.index({ action: 1, timestamp: -1 });
+auditLogSchema.index({ clinicId: 1, action: 1, timestamp: -1 });
+auditLogSchema.index({ clinicId: 1, userId: 1, timestamp: -1 });
 
 export const AuditLogModel = model<AuditLogDocument>("AuditLog", auditLogSchema);
