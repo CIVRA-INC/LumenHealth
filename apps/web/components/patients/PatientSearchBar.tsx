@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import type { Patient } from "@lumen/types";
 
@@ -20,7 +20,6 @@ export const PatientSearchBar = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Patient[]>([]);
-  const latestRequestIdRef = useRef(0);
 
   const trimmedQuery = useMemo(() => query.trim(), [query]);
 
@@ -31,39 +30,36 @@ export const PatientSearchBar = () => {
       return;
     }
 
-    const requestId = latestRequestIdRef.current + 1;
-    latestRequestIdRef.current = requestId;
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setIsLoading(true);
       setError(null);
       try {
         const response = await apiFetch(
           `/patients/search?q=${encodeURIComponent(trimmedQuery)}`,
+          { signal: controller.signal },
         );
         if (!response.ok) {
           throw new Error("Search request failed");
         }
 
         const payload = (await response.json()) as { data?: Patient[] };
-        if (requestId !== latestRequestIdRef.current) {
-          return;
-        }
         setResults(payload.data ?? []);
-      } catch {
-        if (requestId !== latestRequestIdRef.current) {
+      } catch (error) {
+        if ((error as { name?: string }).name === "AbortError") {
           return;
         }
+
         setError("Unable to fetch patients.");
         setResults([]);
       } finally {
-        if (requestId === latestRequestIdRef.current) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     }, 300);
 
     return () => {
       window.clearTimeout(timer);
+      controller.abort();
     };
   }, [trimmedQuery]);
 

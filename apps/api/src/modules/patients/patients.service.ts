@@ -1,6 +1,5 @@
 import { CreatePatientDto } from "./patients.validation";
 import { PatientModel, PatientDocument } from "./models/patient.model";
-import { PatientCounterModel } from "./models/patient-counter.model";
 
 const normalize = (value: string) =>
   value
@@ -43,6 +42,19 @@ const levenshteinDistance = (a: string, b: string): number => {
 
 const buildSystemId = (counter: number) => `LMN-${counter}`;
 
+const parseSystemIdNumber = (systemId?: string): number => {
+  if (!systemId) {
+    return 999;
+  }
+
+  const match = systemId.match(/^LMN-(\d+)$/);
+  if (!match) {
+    return 999;
+  }
+
+  return Number(match[1]);
+};
+
 const toContractPatient = (doc: {
   _id: unknown;
   systemId: string;
@@ -69,25 +81,42 @@ export const createPatient = async (input: {
   payload: CreatePatientDto;
   clinicId: string;
 }) => {
-  const nextCounter = await PatientCounterModel.findByIdAndUpdate(
-    "patient_system_id_counter",
-    { $inc: { value: 1 } },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
-  ).lean();
-
-  const systemId = buildSystemId(nextCounter?.value ?? 1000);
   const searchName = normalize(`${input.payload.firstName}${input.payload.lastName}`);
 
-  const createdPatient = await PatientModel.create({
-    ...input.payload,
-    dateOfBirth: new Date(input.payload.dateOfBirth),
-    systemId,
-    clinicId: input.clinicId,
-    searchName,
-    isActive: true,
-  });
+  // Concurrency-safe strategy: rely on unique index + retry on duplicate systemId.
+  // This preserves LMN-numeric IDs without race-condition collisions.
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const latestPatient = await PatientModel.findOne({}, { systemId: 1 })
+      .sort({ createdAt: -1 })
+      .lean();
 
-  return toContractPatient(createdPatient.toObject() as unknown as Parameters<typeof toContractPatient>[0]);
+    const latestCounter = parseSystemIdNumber(latestPatient?.systemId);
+    const systemId = buildSystemId(latestCounter + 1);
+
+    try {
+      const createdPatient = await PatientModel.create({
+        ...input.payload,
+        dateOfBirth: new Date(input.payload.dateOfBirth),
+        systemId,
+        clinicId: input.clinicId,
+        searchName,
+        isActive: true,
+      });
+
+      return toContractPatient(
+        createdPatient.toObject() as unknown as Parameters<typeof toContractPatient>[0],
+      );
+    } catch (error) {
+      const code = (error as { code?: number }).code;
+      if (code === 11000) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Failed to generate a unique patient systemId after retries.");
 };
 
 export const getPatientById = async (id: string, clinicId: string) => {
