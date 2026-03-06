@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test API
+        run: npm run test -w apps/api
+
+      - name: Start mock health endpoint for web build
+        run: |
+          node -e "const http=require('http');const server=http.createServer((req,res)=>{if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({status:'ok'}));return;}res.writeHead(404);res.end('Not Found');});server.listen(4000,'127.0.0.1');setInterval(()=>{},1<<30);" > /tmp/mock-health.log 2>&1 &
+          echo $! > /tmp/mock-health.pid
+
+      - name: Build monorepo
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          CI: "true"
+        run: npm run build
+
+      - name: Stop mock health endpoint
+        if: always()
+        run: |
+          if [ -f /tmp/mock-health.pid ]; then
+            kill "$(cat /tmp/mock-health.pid)" || true
+          fi
