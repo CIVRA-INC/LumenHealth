@@ -9,6 +9,7 @@ export const getAuditLogsQuerySchema = z
     endDate: z.string().datetime().optional(),
     userId: z.string().trim().min(1).optional(),
     action: z.enum(AuditAction).optional(),
+    format: z.enum(["json", "csv"]).optional().default("json"),
     page: paginationNumber.default(1),
     limit: paginationNumber.max(100).default(20),
   })

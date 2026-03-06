@@ -1,9 +1,8 @@
-import cron, { ScheduledTask } from "node-cron";
-import { PaymentRecordDocument, PaymentRecordModel } from "./models/payment-record.model";
 import { ClinicModel } from "../clinics/models/clinic.model";
+import { PaymentRecordDocument, PaymentRecordModel } from "./models/payment-record.model";
 import { StellarService } from "./stellar.service";
 
-const POLL_SCHEDULE = "*/2 * * * *";
+const SCHEDULE_MS = 2 * 60 * 1000;
 const MAX_RETRY_ATTEMPTS = 5;
 
 export const getBackoffMilliseconds = (attempt: number): number => {
@@ -83,6 +82,7 @@ const verifySinglePaymentRecord = async (
         }
       : {
           attempts: nextAttempt,
+          status: "pending",
           nextRetryAt: isRateLimitedError(error)
             ? new Date(Date.now() + getBackoffMilliseconds(nextAttempt))
             : new Date(Date.now() + 30_000),
@@ -118,23 +118,25 @@ export const processPendingPayments = async (stellarService = new StellarService
   }
 };
 
-let workerTask: ScheduledTask | null = null;
+let workerTask: NodeJS.Timeout | null = null;
 
 export const startPaymentVerificationWorker = () => {
   if (workerTask) {
     return workerTask;
   }
 
-  workerTask = cron.schedule(POLL_SCHEDULE, () => {
+  workerTask = setInterval(() => {
     void processPendingPayments().catch((error) => {
-      console.error("[payments-worker] cron execution failed", error);
+      console.error("[payments-worker] scheduled execution failed", error);
     });
-  });
+  }, SCHEDULE_MS);
 
   return workerTask;
 };
 
 export const stopPaymentVerificationWorker = () => {
-  workerTask?.stop();
+  if (workerTask) {
+    clearInterval(workerTask);
+  }
   workerTask = null;
 };

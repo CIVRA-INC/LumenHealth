@@ -59,11 +59,14 @@ const userSchema = new Schema<User>(
       type: String,
       required: false,
       select: false,
+      default: undefined,
     },
     resetPasswordExpiresAt: {
       type: Date,
       required: false,
       select: false,
+      default: undefined,
+      index: true,
     },
   },
   {
@@ -80,5 +83,4 @@ userSchema.pre("save", async function hashPassword() {
   this.password = await bcrypt.hash(this.password, 12);
 });
 
-export const UserModel =
-  models.User || model<User>("User", userSchema);
+export const UserModel = models.User || model<User>("User", userSchema);
