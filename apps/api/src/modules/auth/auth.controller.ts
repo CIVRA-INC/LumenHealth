@@ -1,19 +1,25 @@
-import { Request, Response, Router } from "express";
 import bcrypt from "bcryptjs";
+import { Request, Response, Router } from "express";
 import { validateRequest } from "../../middlewares/validate.middleware";
+import {
+  LoginDto,
+  RefreshDto,
+  loginSchema,
+  refreshSchema,
+} from "./auth.validation";
 import { UserModel } from "./models/user.model";
+import { resetRoutes } from "./reset.controller";
 import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
 } from "./token.service";
-import { resetRoutes } from "./reset.controller";
-import { LoginDto, RefreshDto, loginSchema, refreshSchema } from "./auth.validation";
 
 const router = Router();
 
 type LoginRequest = Request<Record<string, string>, unknown, LoginDto>;
 type RefreshRequest = Request<Record<string, string>, unknown, RefreshDto>;
+
 const INVALID_CREDENTIALS = "Invalid email or password";
 
 router.post(

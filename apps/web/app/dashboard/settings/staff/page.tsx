@@ -5,6 +5,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiFetch } from "@/lib/api-client";
+import { useSubscription } from "@/providers/SubscriptionProvider";
 
 type StaffRole =
   | "SUPER_ADMIN"
@@ -25,18 +26,12 @@ type StaffUser = {
   generatedTemporaryPassword?: string | null;
 };
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 const createStaffSchema = z.object({
   fullName: z.string().trim().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Please enter a valid email address."),
-  role: z.enum([
-    "CLINIC_ADMIN",
-    "DOCTOR",
-    "NURSE",
-    "ASSISTANT",
-    "READ_ONLY",
-  ]),
+  role: z.enum(["CLINIC_ADMIN", "DOCTOR", "NURSE", "ASSISTANT", "READ_ONLY"]),
   password: z
     .string()
     .trim()
@@ -61,30 +56,18 @@ const roleLabelMap: Record<StaffRole, string> = {
   READ_ONLY: "Read-Only",
 };
 
-const roleBadgeStyle: Record<StaffRole, { bg: string; color: string }> = {
-  SUPER_ADMIN: { bg: "#ede9fe", color: "#5b21b6" },
-  CLINIC_ADMIN: { bg: "#dbeafe", color: "#1d4ed8" },
-  DOCTOR: { bg: "#dcfce7", color: "#166534" },
-  NURSE: { bg: "#fef3c7", color: "#92400e" },
-  ASSISTANT: { bg: "#e2e8f0", color: "#334155" },
-  READ_ONLY: { bg: "#f1f5f9", color: "#475569" },
+const roleBadgeClass: Record<StaffRole, string> = {
+  SUPER_ADMIN: "bg-violet-100 text-violet-800 border border-violet-200",
+  CLINIC_ADMIN: "bg-blue-100 text-blue-800 border border-blue-200",
+  DOCTOR: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+  NURSE: "bg-amber-100 text-amber-800 border border-amber-200",
+  ASSISTANT: "bg-slate-200 text-slate-700 border border-slate-300",
+  READ_ONLY: "bg-slate-100 text-slate-600 border border-slate-200",
 };
 
 function RoleBadge({ role }: { role: StaffRole }) {
-  const style = roleBadgeStyle[role];
-
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        borderRadius: 999,
-        padding: "2px 8px",
-        fontSize: 12,
-        fontWeight: 600,
-        background: style.bg,
-        color: style.color,
-      }}
-    >
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${roleBadgeClass[role]}`}>
       {roleLabelMap[role]}
     </span>
   );
@@ -93,15 +76,11 @@ function RoleBadge({ role }: { role: StaffRole }) {
 function StatusBadge({ isActive }: { isActive: boolean }) {
   return (
     <span
-      style={{
-        display: "inline-flex",
-        borderRadius: 999,
-        padding: "2px 8px",
-        fontSize: 12,
-        fontWeight: 600,
-        background: isActive ? "#dcfce7" : "#fee2e2",
-        color: isActive ? "#166534" : "#b91c1c",
-      }}
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+        isActive
+          ? "border border-emerald-200 bg-emerald-100 text-emerald-800"
+          : "border border-red-200 bg-red-100 text-red-700"
+      }`}
     >
       {isActive ? "Active" : "Inactive"}
     </span>
@@ -109,11 +88,11 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 }
 
 export default function StaffManagementPage() {
+  const { isExpired } = useSubscription();
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
-  const [actionMenuUserId, setActionMenuUserId] = useState<string | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<StaffUser | null>(null);
   const [isDeactivateSubmitting, setIsDeactivateSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -143,7 +122,6 @@ export default function StaffManagementPage() {
         const response = await apiFetch("/users", { method: "GET" });
         if (!response.ok) {
           setToast({ tone: "error", message: "Failed to load staff members." });
-          setIsLoading(false);
           return;
         }
 
@@ -172,21 +150,6 @@ export default function StaffManagementPage() {
       setPage(pageCount);
     }
   }, [page, pageCount]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      setActionMenuUserId(null);
-      setDeactivateTarget(null);
-      setIsCreateOpen(false);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   const onCreateStaff = handleSubmit(async (values) => {
     setIsCreateSubmitting(true);
@@ -272,7 +235,6 @@ export default function StaffManagementPage() {
       );
 
       setDeactivateTarget(null);
-      setActionMenuUserId(null);
       setToast({ tone: "success", message: "Staff member deactivated." });
     } catch {
       setToast({ tone: "warning", message: "Network error while deactivating staff." });
@@ -282,313 +244,161 @@ export default function StaffManagementPage() {
   };
 
   return (
-    <main style={{ minHeight: "100vh", background: "#f8fafc", padding: 20 }}>
-      <section style={{ maxWidth: 1200, margin: "0 auto" }}>
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 14,
-          }}
+    <main className="space-y-4 p-4 md:p-6">
+      <header className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">Staff Management</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Manage clinic users, permissions, and account status.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          data-primary-action="true"
+          disabled={isExpired}
+          onClick={() => setIsCreateOpen(true)}
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          <div>
-            <h1 style={{ margin: 0, fontSize: 24, color: "#0f172a" }}>Staff Management</h1>
-            <p style={{ margin: "6px 0 0", color: "#475569", fontSize: 13 }}>
-              Manage clinic users, permissions, and account status.
-            </p>
-          </div>
+          Add Staff Member
+        </button>
+      </header>
 
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            style={{
-              border: "none",
-              borderRadius: 8,
-              background: "#0f766e",
-              color: "#ffffff",
-              padding: "10px 14px",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Add Staff Member
-          </button>
-        </header>
-
-        {toast ? (
-          <div
-            style={{
-              marginBottom: 12,
-              border: `1px solid ${
-                toast.tone === "success"
-                  ? "#86efac"
-                  : toast.tone === "warning"
-                    ? "#fde68a"
-                    : "#fecaca"
-              }`,
-              background:
-                toast.tone === "success"
-                  ? "#f0fdf4"
-                  : toast.tone === "warning"
-                    ? "#fffbeb"
-                    : "#fef2f2",
-              color:
-                toast.tone === "success"
-                  ? "#166534"
-                  : toast.tone === "warning"
-                    ? "#92400e"
-                    : "#991b1b",
-              borderRadius: 8,
-              padding: "10px 12px",
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            {toast.message}
-          </div>
-        ) : null}
-
-        <section
-          style={{
-            border: "1px solid #e2e8f0",
-            borderRadius: 12,
-            background: "#ffffff",
-            overflow: "hidden",
-          }}
+      {toast ? (
+        <div
+          className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+            toast.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : toast.tone === "warning"
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : "border-red-200 bg-red-50 text-red-700"
+          }`}
         >
-          {isLoading ? (
-            <div style={{ padding: 16, color: "#475569", fontSize: 13 }}>
-              Loading staff roster...
-            </div>
-          ) : (
-            <>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: "#f8fafc", color: "#334155", textAlign: "left" }}>
-                      <th style={{ padding: "10px 12px", borderBottom: "1px solid #e2e8f0" }}>Name</th>
-                      <th style={{ padding: "10px 12px", borderBottom: "1px solid #e2e8f0" }}>Email</th>
-                      <th style={{ padding: "10px 12px", borderBottom: "1px solid #e2e8f0" }}>Role</th>
-                      <th style={{ padding: "10px 12px", borderBottom: "1px solid #e2e8f0" }}>Status</th>
-                      <th style={{ padding: "10px 12px", borderBottom: "1px solid #e2e8f0" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedStaff.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          style={{ padding: 14, color: "#64748b", borderBottom: "1px solid #f1f5f9" }}
+          {toast.message}
+        </div>
+      ) : null}
+
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-100">
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-800">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                    Loading staff roster...
+                  </td>
+                </tr>
+              ) : pagedStaff.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                    No staff members found.
+                  </td>
+                </tr>
+              ) : (
+                pagedStaff.map((row) => {
+                  const rowId = row.id ?? row._id ?? row.email;
+                  return (
+                    <tr key={rowId}>
+                      <td className="px-4 py-3">{row.fullName}</td>
+                      <td className="px-4 py-3">{row.email}</td>
+                      <td className="px-4 py-3">
+                        <RoleBadge role={row.role} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge isActive={row.isActive} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          data-primary-action="true"
+                          disabled={!row.isActive || isExpired}
+                          onClick={() => setDeactivateTarget(row)}
+                          className="rounded border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          No staff members found.
-                        </td>
-                      </tr>
-                    ) : (
-                      pagedStaff.map((row) => {
-                        const rowId = row.id ?? row._id ?? row.email;
-                        const isMenuOpen = actionMenuUserId === rowId;
+                          Deactivate
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-                        return (
-                          <tr key={rowId} style={{ color: "#0f172a" }}>
-                            <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
-                              {row.fullName}
-                            </td>
-                            <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
-                              {row.email}
-                            </td>
-                            <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
-                              <RoleBadge role={row.role} />
-                            </td>
-                            <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
-                              <StatusBadge isActive={row.isActive} />
-                            </td>
-                            <td
-                              style={{
-                                padding: "10px 12px",
-                                borderBottom: "1px solid #f1f5f9",
-                                position: "relative",
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => setActionMenuUserId(isMenuOpen ? null : rowId)}
-                                style={{
-                                  border: "1px solid #cbd5e1",
-                                  background: "#ffffff",
-                                  borderRadius: 8,
-                                  width: 32,
-                                  height: 32,
-                                  cursor: "pointer",
-                                  fontWeight: 700,
-                                }}
-                                aria-label={`Open actions for ${row.fullName}`}
-                              >
-                                ...
-                              </button>
-
-                              {isMenuOpen ? (
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    top: 42,
-                                    right: 12,
-                                    background: "#ffffff",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: 8,
-                                    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.08)",
-                                    minWidth: 160,
-                                    zIndex: 10,
-                                  }}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDeactivateTarget(row);
-                                      setActionMenuUserId(null);
-                                    }}
-                                    disabled={!row.isActive}
-                                    style={{
-                                      width: "100%",
-                                      textAlign: "left",
-                                      padding: "9px 10px",
-                                      border: "none",
-                                      borderRadius: 8,
-                                      background: "transparent",
-                                      color: row.isActive ? "#b91c1c" : "#94a3b8",
-                                      cursor: row.isActive ? "pointer" : "not-allowed",
-                                      fontSize: 13,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Deactivate
-                                  </button>
-                                </div>
-                              ) : null}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <footer
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  borderTop: "1px solid #e2e8f0",
-                  padding: "10px 12px",
-                  background: "#f8fafc",
-                }}
-              >
-                <span style={{ fontSize: 12, color: "#64748b" }}>
-                  Page {page} of {pageCount}
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    style={{
-                      border: "1px solid #cbd5e1",
-                      background: "#ffffff",
-                      borderRadius: 8,
-                      padding: "6px 10px",
-                      cursor: page === 1 ? "not-allowed" : "pointer",
-                      color: page === 1 ? "#94a3b8" : "#0f172a",
-                    }}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                    disabled={page === pageCount}
-                    style={{
-                      border: "1px solid #cbd5e1",
-                      background: "#ffffff",
-                      borderRadius: 8,
-                      padding: "6px 10px",
-                      cursor: page === pageCount ? "not-allowed" : "pointer",
-                      color: page === pageCount ? "#94a3b8" : "#0f172a",
-                    }}
-                  >
-                    Next
-                  </button>
-                </div>
-              </footer>
-            </>
-          )}
-        </section>
+        <footer className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3">
+          <span className="text-xs text-slate-600">
+            Page {page} of {pageCount}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              disabled={page === pageCount}
+              className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </footer>
       </section>
 
       {isCreateOpen ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.35)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            zIndex: 50,
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 540,
-              background: "#ffffff",
-              borderRadius: 12,
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 14px 36px rgba(15, 23, 42, 0.15)",
-              padding: 16,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 18, color: "#0f172a" }}>Add Staff Member</h2>
-            <p style={{ margin: "6px 0 14px", color: "#64748b", fontSize: 13 }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">Add Staff Member</h2>
+            <p className="mt-1 text-sm text-slate-600">
               Create a new clinic account and assign the appropriate role.
             </p>
 
-            <form onSubmit={onCreateStaff} style={{ display: "grid", gap: 10 }}>
-              <label style={{ fontSize: 13, color: "#334155" }}>
+            <form onSubmit={onCreateStaff} className="mt-4 grid gap-3">
+              <label className="text-sm text-slate-700">
                 Name
                 <input
                   {...register("fullName")}
                   placeholder="Full name"
-                  style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8 }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
                 {errors.fullName ? (
-                  <span style={{ display: "block", marginTop: 4, color: "#b91c1c", fontSize: 12 }}>
-                    {errors.fullName.message}
-                  </span>
+                  <span className="mt-1 block text-xs text-red-600">{errors.fullName.message}</span>
                 ) : null}
               </label>
 
-              <label style={{ fontSize: 13, color: "#334155" }}>
+              <label className="text-sm text-slate-700">
                 Email
                 <input
                   {...register("email")}
                   type="email"
                   placeholder="name@clinic.org"
-                  style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8 }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
                 {errors.email ? (
-                  <span style={{ display: "block", marginTop: 4, color: "#b91c1c", fontSize: 12 }}>
-                    {errors.email.message}
-                  </span>
+                  <span className="mt-1 block text-xs text-red-600">{errors.email.message}</span>
                 ) : null}
               </label>
 
-              <label style={{ fontSize: 13, color: "#334155" }}>
+              <label className="text-sm text-slate-700">
                 Role
                 <select
                   {...register("role")}
-                  style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8 }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 >
                   <option value="CLINIC_ADMIN">Clinic Admin</option>
                   <option value="DOCTOR">Doctor</option>
@@ -598,22 +408,20 @@ export default function StaffManagementPage() {
                 </select>
               </label>
 
-              <label style={{ fontSize: 13, color: "#334155" }}>
+              <label className="text-sm text-slate-700">
                 Password (optional)
                 <input
                   {...register("password")}
                   type="password"
-                  placeholder="Leave blank to generate temporary password"
-                  style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8 }}
+                  placeholder="Leave blank to auto-generate"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
                 {errors.password ? (
-                  <span style={{ display: "block", marginTop: 4, color: "#b91c1c", fontSize: 12 }}>
-                    {errors.password.message}
-                  </span>
+                  <span className="mt-1 block text-xs text-red-600">{errors.password.message}</span>
                 ) : null}
               </label>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+              <div className="mt-2 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -621,28 +429,15 @@ export default function StaffManagementPage() {
                     reset();
                   }}
                   disabled={isCreateSubmitting}
-                  style={{
-                    border: "1px solid #cbd5e1",
-                    background: "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    cursor: "pointer",
-                  }}
+                  className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isCreateSubmitting}
-                  style={{
-                    border: "none",
-                    background: isCreateSubmitting ? "#94a3b8" : "#0f766e",
-                    color: "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    fontWeight: 700,
-                    cursor: isCreateSubmitting ? "not-allowed" : "pointer",
-                  }}
+                  data-primary-action="true"
+                  disabled={isCreateSubmitting || isExpired}
+                  className="rounded bg-teal-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
                   {isCreateSubmitting ? "Creating..." : "Create Staff"}
                 </button>
@@ -653,60 +448,28 @@ export default function StaffManagementPage() {
       ) : null}
 
       {deactivateTarget ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.35)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            zIndex: 55,
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 430,
-              background: "#ffffff",
-              borderRadius: 12,
-              border: "1px solid #e2e8f0",
-              padding: 16,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 18, color: "#0f172a" }}>Deactivate Staff</h2>
-            <p style={{ margin: "8px 0 14px", color: "#475569", fontSize: 13 }}>
-              Deactivate <strong>{deactivateTarget.fullName}</strong>? They will lose access immediately.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">Deactivate Staff</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Deactivate <span className="font-semibold">{deactivateTarget.fullName}</span>? They
+              will lose access immediately.
             </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setDeactivateTarget(null)}
                 disabled={isDeactivateSubmitting}
-                style={{
-                  border: "1px solid #cbd5e1",
-                  background: "#ffffff",
-                  borderRadius: 8,
-                  padding: "8px 12px",
-                  cursor: "pointer",
-                }}
+                className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                data-primary-action="true"
                 onClick={() => void onConfirmDeactivate()}
-                disabled={isDeactivateSubmitting}
-                style={{
-                  border: "none",
-                  background: isDeactivateSubmitting ? "#94a3b8" : "#dc2626",
-                  color: "#ffffff",
-                  borderRadius: 8,
-                  padding: "8px 12px",
-                  fontWeight: 700,
-                  cursor: isDeactivateSubmitting ? "not-allowed" : "pointer",
-                }}
+                disabled={isDeactivateSubmitting || isExpired}
+                className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {isDeactivateSubmitting ? "Deactivating..." : "Deactivate"}
               </button>
