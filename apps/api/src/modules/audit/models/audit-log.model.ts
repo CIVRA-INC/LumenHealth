@@ -7,8 +7,8 @@ export enum AuditAction {
 }
 
 export interface AuditLogDocument {
-  clinicId: string;
   userId: string;
+  clinicId?: string;
   action: AuditAction;
   resource: string;
   resourceId?: string;
