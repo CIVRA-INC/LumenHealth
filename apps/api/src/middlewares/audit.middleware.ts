@@ -9,35 +9,7 @@ const MUTATING_METHOD_TO_ACTION: Record<string, AuditAction> = {
   DELETE: AuditAction.DELETE,
 };
 
-const getAction = (method: string): AuditAction | null => {
-  return MUTATING_METHOD_TO_ACTION[method] ?? null;
-};
-
-const getResourceFromPath = (baseUrl: string): string => {
-  const normalized = baseUrl.replace(/^\/+|\/+$/g, "");
-  if (!normalized) {
-    return "Unknown";
-  }
-
-  const parts = normalized.split("/");
-  const resourceSegment = parts[parts.length - 1] || "Unknown";
-
-  return resourceSegment
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("");
-};
-
-const getResourceId = (
-  params: Record<string, string | string[] | undefined>,
-): string | undefined => {
-  const candidate = params.id ?? params.resourceId ?? params.userId ?? params.clinicId;
-  if (Array.isArray(candidate)) {
-    return candidate[0];
-  }
-
-  return candidate;
-};
+const getAction = (method: string): AuditAction | null => MUTATING_METHOD_TO_ACTION[method] ?? null;
 
 const getTokenFromAuthorizationHeader = (authorization: unknown): string | null => {
   if (typeof authorization !== "string") {
@@ -52,34 +24,56 @@ const getTokenFromAuthorizationHeader = (authorization: unknown): string | null 
   return token;
 };
 
+const getResourceFromPath = (baseUrl: string, path: string): string => {
+  const normalized = `${baseUrl}${path}`.replace(/^\/+|\/+$/g, "");
+  if (!normalized) {
+    return "unknown";
+  }
+
+  const parts = normalized.split("/").filter(Boolean);
+  const resourceSegment = parts.find((part) => part !== "api" && part !== "v1") || "unknown";
+
+  return resourceSegment
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+};
+
+const getResourceId = (params: Record<string, string | string[] | undefined>): string | undefined => {
+  const candidate = params.id ?? params.resourceId ?? params.userId ?? params.clinicId;
+  return Array.isArray(candidate) ? candidate[0] : candidate;
+};
+
 export const auditMiddleware: RequestHandler = (req, res, next) => {
   const action = getAction(req.method);
   if (!action) {
     return next();
   }
 
-  const token = getTokenFromAuthorizationHeader(req.headers.authorization);
-  if (!req.user && token) {
-    const decodedUser = verifyAccessToken(token);
-    if (decodedUser) {
-      req.user = decodedUser;
+  if (!req.user) {
+    const token = getTokenFromAuthorizationHeader(req.headers.authorization);
+    if (token) {
+      const decodedUser = verifyAccessToken(token);
+      if (decodedUser) {
+        req.user = decodedUser;
+      }
     }
   }
 
   const userId = req.user?.userId;
-  if (!userId) {
+  const clinicId = req.user?.clinicId;
+  if (!userId || !clinicId) {
     return next();
   }
 
-  const clinicId = req.user?.clinicId;
-  const resource = getResourceFromPath(req.baseUrl || req.path);
+  const resource = getResourceFromPath(req.baseUrl || "", req.path || "");
   const resourceId = getResourceId(req.params);
   const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
 
   res.on("finish", () => {
     void AuditLogModel.create({
-      userId,
       clinicId,
+      userId,
       action,
       resource,
       resourceId,

@@ -1,12 +1,12 @@
 import { Request, Response, Router } from "express";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
-import { AuditLogModel } from "./models/audit-log.model";
 import { buildAuditLogFilters } from "./audit.service";
 import {
   GetAuditLogsQueryDto,
   getAuditLogsQuerySchema,
 } from "./audit.validation";
+import { AuditLogModel } from "./models/audit-log.model";
 
 const router = Router();
 
@@ -37,6 +37,28 @@ router.get(
       AuditLogModel.countDocuments(filters),
     ]);
 
+    if (query.format === "csv") {
+      const header = "timestamp,userId,action,resource,resourceId,ipAddress\n";
+      const rows = logs
+        .map((log) =>
+          [
+            new Date(log.timestamp).toISOString(),
+            log.userId,
+            log.action,
+            log.resource,
+            log.resourceId ?? "",
+            log.ipAddress,
+          ]
+            .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+            .join(","),
+        )
+        .join("\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="audit-logs.csv"');
+      return res.status(200).send(header + rows);
+    }
+
     return res.json({
       status: "success",
       data: logs,
@@ -44,7 +66,7 @@ router.get(
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
     });
   },

@@ -1,5 +1,5 @@
-import { Request, Response, Router } from "express";
 import crypto from "crypto";
+import { Request, Response, Router } from "express";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
 import { UserModel } from "../auth/models/user.model";
@@ -34,9 +34,9 @@ router.post(
       });
     }
 
-    const generatedTemporaryPassword = !req.body.password
-      ? createTemporaryPassword()
-      : null;
+    const generatedTemporaryPassword = req.body.password
+      ? null
+      : createTemporaryPassword();
 
     const user = new UserModel({
       fullName: req.body.fullName.trim(),

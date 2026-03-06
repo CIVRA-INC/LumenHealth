@@ -18,6 +18,23 @@ export class StellarService {
     this.server = new Horizon.Server(config.stellar.horizonUrl);
   }
 
+  private memoMatchesExpected(
+    memoType: string,
+    memoValue: string | undefined,
+    expectedMemo: string,
+  ): boolean {
+    if (!memoValue) {
+      return false;
+    }
+
+    if (memoType === "hash") {
+      const hexMemo = Buffer.from(memoValue, "base64").toString("hex");
+      return hexMemo === expectedMemo;
+    }
+
+    return memoValue === expectedMemo;
+  }
+
   async verifyPaymentOnChain(
     input: StellarVerificationInput,
   ): Promise<StellarVerificationResult> {
@@ -76,22 +93,5 @@ export class StellarService {
     );
 
     return { isVerified: Boolean(payment) };
-  }
-
-  private memoMatchesExpected(
-    memoType: string,
-    memoValue: string | undefined,
-    expectedMemo: string,
-  ): boolean {
-    if (!memoValue) {
-      return false;
-    }
-
-    if (memoType === "hash") {
-      const hexMemo = Buffer.from(memoValue, "base64").toString("hex");
-      return hexMemo === expectedMemo;
-    }
-
-    return memoValue === expectedMemo;
   }
 }
