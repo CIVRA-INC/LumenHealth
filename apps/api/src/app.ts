@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from '@lumen/config';
 import { connectDB } from './config/db';
 import { paymentRoutes } from './modules/payments/payments.controller';
+import { startPaymentVerificationWorker } from './modules/payments/worker';
 import { authRoutes } from './modules/auth/auth.controller';
 import { clinicOnboardingRoutes } from './modules/clinics/onboarding.controller';
 import { clinicSettingsRoutes } from './modules/clinics/settings.controller';
@@ -27,6 +28,7 @@ app.get('/health', (req, res) => {
 
 const start = async () => {
   await connectDB();
+  startPaymentVerificationWorker();
   app.listen(config.port, () => {
     console.log(`🚀 API running on http://localhost:${config.port}`);
   });
