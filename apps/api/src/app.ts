@@ -6,14 +6,15 @@ import { startPaymentVerificationWorker } from './modules/payments/worker';
 import { patientRoutes } from './modules/patients/patients.controller';
 import { encounterRoutes } from './modules/encounters/encounters.controller';
 import { auditRoutes } from './modules/audit/audit.controller';
-import { auditMiddleware } from "./middlewares/audit.middleware";
-import { requireActiveSubscription } from "./middlewares/subscription.middleware";
-import { authRoutes } from "./modules/auth/auth.controller";
-import { clinicOnboardingRoutes } from "./modules/clinics/onboarding.controller";
-import { clinicSettingsRoutes } from "./modules/clinics/settings.controller";
-import { paymentRoutes } from "./modules/payments/payments.controller";
-import { userRoutes } from "./modules/users/users.controller";
-import { vitalsRoutes } from "./modules/vitals/vitals.controller";
+import { auditMiddleware } from './middlewares/audit.middleware';
+import { requireActiveSubscription } from './middlewares/subscription.middleware';
+import { authRoutes } from './modules/auth/auth.controller';
+import { clinicOnboardingRoutes } from './modules/clinics/onboarding.controller';
+import { clinicSettingsRoutes } from './modules/clinics/settings.controller';
+import { paymentRoutes } from './modules/payments/payments.controller';
+import { userRoutes } from './modules/users/users.controller';
+import { notesRoutes } from './modules/notes/notes.controller';
+import { vitalsRoutes } from './modules/vitals/vitals.controller';
 
 const app = express();
 
@@ -30,12 +31,11 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/patients', patientRoutes);
 app.use('/api/v1/vitals', vitalsRoutes);
 app.use('/api/v1/encounters', encounterRoutes);
+app.use('/api/v1/notes', notesRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 
-
-
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date() });
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
 });
 
 const start = async () => {
