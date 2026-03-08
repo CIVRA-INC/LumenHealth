@@ -6,6 +6,7 @@ import { ActiveEncounterHeader } from "@/components/encounters/ActiveEncounterHe
 import { CloseEncounterModal } from "@/components/encounters/CloseEncounterModal";
 import { EncounterLockOverlay } from "@/components/encounters/EncounterLockOverlay";
 import { AlertSystem } from "@/components/encounters/AlertSystem";
+import { Summarizer } from "@/components/ai/Summarizer";
 
 type EncounterStatus = "OPEN" | "IN_PROGRESS" | "CLOSED";
 
@@ -138,6 +139,8 @@ export default function EncountersPage() {
           </label>
         </div>
       </section>
+
+      <Summarizer encounterId={encounter.id} />
 
       <CloseEncounterModal
         isOpen={isModalOpen}

@@ -135,6 +135,30 @@ router.get(
 );
 
 router.get(
+  "/stream-dummy",
+  authorize(ALL_ROLES),
+  validateRequest({ query: streamSummaryQuerySchema }),
+  async (req: StreamSummaryRequest, res: Response) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    const words = splitTextForSse(
+      `Draft summary for ${req.query.encounterId}: patient reviewed, treatment started, follow-up advised.`,
+    );
+
+    for (const word of words) {
+      res.write(toSsePayload(word));
+      await wait(50);
+    }
+
+    writeEvent(res, "done", { complete: true });
+    res.end();
+  },
+);
+
+router.get(
   "/alerts/encounter/:encounterId",
   authorize(ALL_ROLES),
   validateRequest({ params: encounterAlertsParamsSchema }),

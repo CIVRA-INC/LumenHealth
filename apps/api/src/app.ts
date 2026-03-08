@@ -20,6 +20,7 @@ import { userRoutes } from './modules/users/users.controller';
 import { notesRoutes } from './modules/notes/notes.controller';
 import { vitalsRoutes } from './modules/vitals/vitals.controller';
 import { startCdsWorker } from './modules/ai/cds.worker';
+import { aiDraftRoutes } from './modules/ai/drafts.controller';
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use('/api/v1/clinics', clinicSettingsRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/ai', aiRoutes);
+app.use('/api/v1/ai', aiDraftRoutes);
 app.use('/api/v1/queue', queueRoutes);
 app.use('/api/v1', diagnosisRoutes);
 app.use('/api/v1/patients', patientRoutes);
