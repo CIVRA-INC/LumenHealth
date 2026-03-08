@@ -3,6 +3,13 @@ import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
 import { splitTextForSse, toSsePayload } from "./stream.utils";
 import { StreamSummaryQueryDto, streamSummaryQuerySchema } from "./stream.validation";
+import { ClinicalAlertModel } from "./models/clinical-alert.model";
+import {
+  AlertIdParamsDto,
+  EncounterAlertsParamsDto,
+  alertIdParamsSchema,
+  encounterAlertsParamsSchema,
+} from "./cds.validation";
 
 const router = Router();
 const ALL_ROLES: Roles[] = Object.values(Roles);
@@ -82,6 +89,8 @@ const streamFromMock = async (res: Response, encounterId: string) => {
 };
 
 type StreamSummaryRequest = Request<Record<string, string>, unknown, unknown, StreamSummaryQueryDto>;
+type EncounterAlertsRequest = Request<EncounterAlertsParamsDto>;
+type AlertByIdRequest = Request<AlertIdParamsDto>;
 
 router.get(
   "/stream-summary",
@@ -122,6 +131,78 @@ router.get(
         res.end();
       }
     }
+  },
+);
+
+router.get(
+  "/alerts/encounter/:encounterId",
+  authorize(ALL_ROLES),
+  validateRequest({ params: encounterAlertsParamsSchema }),
+  async (req: EncounterAlertsRequest, res: Response) => {
+    const clinicId = req.user?.clinicId;
+    if (!clinicId) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
+    const alerts = await ClinicalAlertModel.find({
+      clinicId,
+      encounterId: req.params.encounterId,
+      isDismissed: false,
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    return res.json({
+      status: "success",
+      data: alerts.map((item) => ({
+        id: String(item._id),
+        encounterId: item.encounterId,
+        message: item.message,
+        source: item.source,
+        createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : null,
+      })),
+    });
+  },
+);
+
+router.patch(
+  "/alerts/:id/dismiss",
+  authorize(ALL_ROLES),
+  validateRequest({ params: alertIdParamsSchema }),
+  async (req: AlertByIdRequest, res: Response) => {
+    const clinicId = req.user?.clinicId;
+    if (!clinicId) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
+    const updated = await ClinicalAlertModel.findOneAndUpdate(
+      { _id: req.params.id, clinicId },
+      { $set: { isDismissed: true, dismissedAt: new Date() } },
+      { new: true },
+    ).lean();
+
+    if (!updated) {
+      return res.status(404).json({
+        error: "NotFound",
+        message: "Alert not found",
+      });
+    }
+
+    return res.json({
+      status: "success",
+      data: {
+        id: String(updated._id),
+        isDismissed: updated.isDismissed,
+        dismissedAt: updated.dismissedAt ? new Date(updated.dismissedAt).toISOString() : null,
+      },
+    });
   },
 );
 

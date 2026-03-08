@@ -19,6 +19,7 @@ import { queueRoutes } from './modules/queue/queue.controller';
 import { userRoutes } from './modules/users/users.controller';
 import { notesRoutes } from './modules/notes/notes.controller';
 import { vitalsRoutes } from './modules/vitals/vitals.controller';
+import { startCdsWorker } from './modules/ai/cds.worker';
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.get('/health', (_req, res) => {
 const start = async () => {
   await connectDB();
   startPaymentVerificationWorker();
+  startCdsWorker();
 
   app.listen(config.port, () => {
     console.log(`🚀 API running on http://localhost:${config.port}`);

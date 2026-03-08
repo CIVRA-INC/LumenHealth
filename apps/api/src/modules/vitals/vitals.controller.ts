@@ -3,6 +3,7 @@ import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
 import { calculateVitalsFlags } from "./vitals.flags";
 import { VitalsModel } from "./models/vitals.model";
+import { emitVitalsCreated } from "../ai/cds.events";
 import {
   CreateVitalsDto,
   EncounterVitalsParamsDto,
@@ -80,6 +81,13 @@ router.post(
       spO2: req.body.spO2,
       weight: req.body.weight,
       flags,
+    });
+
+    // Trigger CDS processing asynchronously so API response path stays fast.
+    emitVitalsCreated({
+      clinicId,
+      encounterId: req.body.encounterId ?? "mock-enc-123",
+      vitalsId: String(created._id),
     });
 
     return res.status(201).json({

@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api-client";
 import { ActiveEncounterHeader } from "@/components/encounters/ActiveEncounterHeader";
 import { CloseEncounterModal } from "@/components/encounters/CloseEncounterModal";
 import { EncounterLockOverlay } from "@/components/encounters/EncounterLockOverlay";
+import { AlertSystem } from "@/components/encounters/AlertSystem";
 
 type EncounterStatus = "OPEN" | "IN_PROGRESS" | "CLOSED";
 
@@ -78,6 +79,8 @@ export default function EncountersPage() {
 
   return (
     <main className="space-y-4 p-4 md:p-6">
+      <AlertSystem encounterId={encounter.id} />
+
       <ActiveEncounterHeader
         openedAt={encounter.openedAt}
         isClosed={isLocked}
