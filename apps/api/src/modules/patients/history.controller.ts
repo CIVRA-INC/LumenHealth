@@ -1,10 +1,10 @@
 import { Request, Response, Router } from "express";
+import { ParsedQs } from "qs";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
 import { getPatientHistory } from "./history.service";
 import {
   PatientHistoryParamsDto,
-  PatientHistoryQueryDto,
   patientHistoryParamsSchema,
   patientHistoryQuerySchema,
 } from "./history.validation";
@@ -16,7 +16,7 @@ type PatientHistoryRequest = Request<
   PatientHistoryParamsDto,
   unknown,
   unknown,
-  PatientHistoryQueryDto
+  ParsedQs
 >;
 
 router.get(
@@ -35,11 +35,13 @@ router.get(
       });
     }
 
+    const query = patientHistoryQuerySchema.parse(req.query);
+
     const payload = await getPatientHistory({
       patientId: req.params.id,
       clinicId,
-      page: req.query.page,
-      limit: req.query.limit,
+      page: query.page,
+      limit: query.limit,
     });
 
     if (!payload) {
