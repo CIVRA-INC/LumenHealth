@@ -11,6 +11,7 @@ const NAV = [
   { href: "/dashboard/encounters", label: "Encounters", disabled: false },
   { href: "/dashboard/vitals", label: "Vitals", disabled: false },
   { href: "/dashboard/notes", label: "Notes", disabled: false },
+  { href: "/dashboard/diagnoses", label: "Diagnoses", disabled: false },
   { href: "/dashboard/patients", label: "Patients", disabled: false },
   { href: "/dashboard/settings/staff", label: "Staff", disabled: false },
   { href: "/dashboard/audit", label: "Audit Logs", disabled: false },
