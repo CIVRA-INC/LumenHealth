@@ -57,6 +57,7 @@ export const ActiveEncounterHeader = ({ openedAt, isClosed, onCloseClick }: Prop
 
       <button
         type="button"
+        data-primary-action="true"
         onClick={onCloseClick}
         disabled={isClosed}
         className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"

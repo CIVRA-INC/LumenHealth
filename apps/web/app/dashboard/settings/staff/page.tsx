@@ -88,7 +88,7 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 }
 
 export default function StaffManagementPage() {
-  const { isExpired } = useSubscription();
+  const { isWriteLocked } = useSubscription();
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -256,7 +256,7 @@ export default function StaffManagementPage() {
         <button
           type="button"
           data-primary-action="true"
-          disabled={isExpired}
+          disabled={isWriteLocked}
           onClick={() => setIsCreateOpen(true)}
           className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
@@ -320,7 +320,7 @@ export default function StaffManagementPage() {
                         <button
                           type="button"
                           data-primary-action="true"
-                          disabled={!row.isActive || isExpired}
+                          disabled={!row.isActive || isWriteLocked}
                           onClick={() => setDeactivateTarget(row)}
                           className="rounded border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -436,7 +436,7 @@ export default function StaffManagementPage() {
                 <button
                   type="submit"
                   data-primary-action="true"
-                  disabled={isCreateSubmitting || isExpired}
+                  disabled={isCreateSubmitting || isWriteLocked}
                   className="rounded bg-teal-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
                   {isCreateSubmitting ? "Creating..." : "Create Staff"}
@@ -468,7 +468,7 @@ export default function StaffManagementPage() {
                 type="button"
                 data-primary-action="true"
                 onClick={() => void onConfirmDeactivate()}
-                disabled={isDeactivateSubmitting || isExpired}
+                disabled={isDeactivateSubmitting || isWriteLocked}
                 className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {isDeactivateSubmitting ? "Deactivating..." : "Deactivate"}

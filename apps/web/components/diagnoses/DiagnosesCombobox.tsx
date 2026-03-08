@@ -140,6 +140,7 @@ export const DiagnosesCombobox = ({ encounterId }: { encounterId: string }) => {
                 <li key={option.code}>
                   <button
                     type="button"
+                    data-primary-action="true"
                     onClick={() => void attachDiagnosis(option)}
                     className="flex w-full items-center justify-between rounded border border-slate-200 bg-white px-3 py-2 text-left text-xs hover:border-teal-300"
                   >
