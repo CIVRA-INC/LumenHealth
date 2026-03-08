@@ -59,13 +59,20 @@ router.post(
         clinicId,
         encounterId,
       })
-        .select({ _id: 1 })
+        .select({ _id: 1, type: 1 })
         .lean();
 
       if (!original) {
         return res.status(400).json({
           error: "BadRequest",
           message: "Original note for correction was not found",
+        });
+      }
+
+      if (original.type === "CORRECTION") {
+        return res.status(400).json({
+          error: "BadRequest",
+          message: "Correction notes cannot target other correction notes",
         });
       }
     }
@@ -121,7 +128,18 @@ const methodNotAllowed = (_req: NoteByIdRequest, res: Response) => {
   });
 };
 
-router.patch("/:id", authorize(ALL_ROLES), validateRequest({ params: noteIdParamsSchema }), methodNotAllowed);
-router.delete("/:id", authorize(ALL_ROLES), validateRequest({ params: noteIdParamsSchema }), methodNotAllowed);
+router.patch(
+  "/:id",
+  authorize(ALL_ROLES),
+  validateRequest({ params: noteIdParamsSchema }),
+  methodNotAllowed,
+);
+
+router.delete(
+  "/:id",
+  authorize(ALL_ROLES),
+  validateRequest({ params: noteIdParamsSchema }),
+  methodNotAllowed,
+);
 
 export const notesRoutes = router;
