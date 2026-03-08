@@ -7,7 +7,12 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", disabled: false },
-  { href: "#", label: "Patients", disabled: true },
+  { href: "/dashboard/queue", label: "Queue", disabled: false },
+  { href: "/dashboard/encounters", label: "Encounters", disabled: false },
+  { href: "/dashboard/vitals", label: "Vitals", disabled: false },
+  { href: "/dashboard/notes", label: "Notes", disabled: false },
+  { href: "/dashboard/diagnoses", label: "Diagnoses", disabled: false },
+  { href: "/dashboard/patients", label: "Patients", disabled: false },
   { href: "/dashboard/settings/staff", label: "Staff", disabled: false },
   { href: "/dashboard/audit", label: "Audit Logs", disabled: false },
   { href: "/dashboard/billing", label: "Billing", disabled: false },
@@ -26,7 +31,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
               LumenHealth
             </p>
             <nav className="space-y-2">
-              {NAV.map((item) => (
+              {NAV.map((item) =>
                 item.disabled ? (
                   <span
                     key={item.label}
@@ -46,8 +51,8 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
                   >
                     {item.label}
                   </Link>
-                )
-              ))}
+                ),
+              )}
             </nav>
 
             <button
