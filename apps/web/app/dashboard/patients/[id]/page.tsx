@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
 
-type TimelineVitals = {
+type HistoryVitals = {
   id: string;
   timestamp: string;
   bpSystolic: number;
@@ -15,166 +16,164 @@ type TimelineVitals = {
   weight: number;
 };
 
-type TimelineNote = {
+type HistoryNote = {
   id: string;
-  type: string;
-  authorId: string;
   timestamp: string;
+  authorId: string;
+  type: "SOAP" | "FREE_TEXT" | "AI_SUMMARY" | "CORRECTION";
   content: string;
+  correctionOfNoteId?: string;
 };
 
-type TimelineDiagnosis = {
+type HistoryDiagnosis = {
   id: string;
   code: string;
   description: string;
-  status: string;
+  status: "SUSPECTED" | "CONFIRMED" | "RESOLVED";
 };
 
-type TimelineEncounter = {
+type HistoryEncounter = {
   id: string;
-  status: string;
+  status: "OPEN" | "IN_PROGRESS" | "CLOSED";
   openedAt: string;
   closedAt: string | null;
-  providerId: string;
-  vitals: TimelineVitals[];
-  notes: TimelineNote[];
-  diagnoses: TimelineDiagnosis[];
+  vitals: HistoryVitals[];
+  notes: HistoryNote[];
+  diagnoses: HistoryDiagnosis[];
+};
+
+type HistoryPatient = {
+  id: string;
+  systemId: string;
+  firstName: string;
+  lastName: string;
+  sex: "M" | "F" | "O";
+  dateOfBirth: string;
+  isActive: boolean;
 };
 
 type HistoryResponse = {
-  data?: {
-    id: string;
-    systemId: string;
-    firstName: string;
-    lastName: string;
-    sex: string;
-    dateOfBirth: string;
-  };
-  encounters?: TimelineEncounter[];
-  meta?: {
+  status: "success";
+  data: HistoryPatient;
+  encounters: HistoryEncounter[];
+  meta: {
     page: number;
     limit: number;
     total: number;
-    totalPages: number;
-    source: "db" | "mock";
+    hasNextPage: boolean;
   };
 };
 
-const formatDateTime = (value: string | null) => {
-  if (!value) {
-    return "N/A";
-  }
+const PAGE_SIZE = 5;
 
-  return new Intl.DateTimeFormat("en-US", {
+const formatDateTime = (value: string) =>
+  new Date(value).toLocaleString(undefined, {
+    year: "numeric",
     month: "short",
     day: "2-digit",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(value));
+  });
+
+const statusBadgeClass = (status: HistoryDiagnosis["status"]) => {
+  if (status === "CONFIRMED") return "border-green-200 bg-green-50 text-green-700";
+  if (status === "RESOLVED") return "border-slate-200 bg-slate-50 text-slate-700";
+  return "border-amber-200 bg-amber-50 text-amber-700";
 };
 
-const getPatientIdFromPath = () => {
-  const parts = window.location.pathname.split("/").filter(Boolean);
-  const idx = parts.findIndex((part) => part === "patients");
-  if (idx === -1) {
-    return "";
-  }
-  return parts[idx + 1] ?? "";
-};
+export default function PatientHistoryPage() {
+  const params = useParams<{ id: string }>();
+  const patientId = params?.id ?? "";
 
-export default function PatientTimelinePage() {
-  const [patientId, setPatientId] = useState("");
-  const [patient, setPatient] = useState<HistoryResponse["data"] | null>(null);
-  const [encounters, setEncounters] = useState<TimelineEncounter[]>([]);
-  const [meta, setMeta] = useState<HistoryResponse["meta"] | null>(null);
-  const [expandedById, setExpandedById] = useState<Record<string, boolean>>({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [patient, setPatient] = useState<HistoryPatient | null>(null);
+  const [encounters, setEncounters] = useState<HistoryEncounter[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const loaderRef = useRef<HTMLDivElement | null>(null);
+  const inFlightRef = useRef(false);
 
-  const hasMore = useMemo(() => {
-    if (!meta) {
-      return false;
-    }
-    return meta.page < meta.totalPages;
-  }, [meta]);
-
-  const loadPage = async (id: string, page: number, append: boolean) => {
-    if (!id) {
-      return;
-    }
-
-    if (append) {
-      setIsLoadingMore(true);
-    } else {
-      setIsLoading(true);
+  const loadPage = useCallback(
+    async (nextPage: number, replace = false) => {
+      if (!patientId || inFlightRef.current) return;
+      inFlightRef.current = true;
       setError(null);
-    }
 
-    try {
-      const response = await apiFetch(`/patients/${id}/history?page=${page}&limit=5`);
-      if (!response.ok) {
-        throw new Error("Failed to load timeline");
-      }
+      if (replace) setIsInitialLoading(true);
+      else setIsLoadingMore(true);
 
-      const payload = (await response.json()) as HistoryResponse;
-      if (!payload.data) {
-        throw new Error("Invalid history payload");
-      }
+      try {
+        const res = await apiFetch(
+          `/patients/${encodeURIComponent(patientId)}/history?page=${nextPage}&limit=${PAGE_SIZE}`,
+        );
 
-      setPatient(payload.data);
-      setMeta(payload.meta ?? null);
+        if (!res.ok) {
+          if (res.status === 404) throw new Error("Patient not found.");
+          throw new Error("Unable to load patient history.");
+        }
 
-      const newEncounters = payload.encounters ?? [];
-      if (append) {
+        const payload = (await res.json()) as HistoryResponse;
+
+        setPatient(payload.data);
+        setHasNextPage(payload.meta.hasNextPage);
+        setPage(payload.meta.page);
+
         setEncounters((current) => {
-          const existing = new Set(current.map((entry) => entry.id));
-          const deduped = newEncounters.filter((entry) => !existing.has(entry.id));
-          return [...current, ...deduped];
+          if (replace) return payload.encounters;
+
+          const existing = new Map(current.map((item) => [item.id, item]));
+          for (const encounter of payload.encounters) {
+            existing.set(encounter.id, encounter);
+          }
+          return Array.from(existing.values()).sort(
+            (a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime(),
+          );
         });
-      } else {
-        setEncounters(newEncounters);
+      } catch (err) {
+        setError((err as Error).message || "Unable to load patient history.");
+      } finally {
+        inFlightRef.current = false;
+        setIsInitialLoading(false);
+        setIsLoadingMore(false);
       }
-    } catch {
-      setError("Unable to load patient history timeline.");
-      if (!append) {
-        setEncounters([]);
-      }
-    } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
-    }
-  };
+    },
+    [patientId],
+  );
 
   useEffect(() => {
-    const id = getPatientIdFromPath();
-    setPatientId(id);
-    if (id) {
-      void loadPage(id, 1, false);
-    }
-  }, []);
+    setPatient(null);
+    setEncounters([]);
+    setExpanded({});
+    setHasNextPage(true);
+    setPage(1);
+    void loadPage(1, true);
+  }, [loadPage]);
 
   useEffect(() => {
-    if (!sentinelRef.current || !hasMore || !meta || !patientId) {
-      return;
-    }
+    if (!loaderRef.current || !hasNextPage) return;
 
-    const observer = new IntersectionObserver((entries) => {
-      const first = entries[0];
-      if (!first.isIntersecting || isLoadingMore) {
-        return;
-      }
+    const target = loaderRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting || inFlightRef.current || isInitialLoading) return;
+        void loadPage(page + 1, false);
+      },
+      { rootMargin: "200px 0px" },
+    );
 
-      void loadPage(patientId, meta.page + 1, true);
-    });
-
-    observer.observe(sentinelRef.current);
-
+    observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMore, isLoadingMore, meta, patientId]);
+  }, [hasNextPage, isInitialLoading, loadPage, page]);
+
+  const fullName = useMemo(() => {
+    if (!patient) return "";
+    return `${patient.firstName} ${patient.lastName}`.trim();
+  }, [patient]);
 
   return (
     <main className="space-y-4 p-4 md:p-6">
@@ -182,125 +181,122 @@ export default function PatientTimelinePage() {
         <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">Patient Timeline</h1>
         {patient ? (
           <p className="mt-1 text-sm text-slate-600">
-            {patient.firstName} {patient.lastName} ({patient.systemId})
+            {fullName} ({patient.systemId}) · {patient.sex}
           </p>
-        ) : null}
-        {meta ? (
-          <p className="mt-1 text-xs text-slate-500">
-            Source: {meta.source.toUpperCase()} • Loaded {encounters.length} of {meta.total} encounters
-          </p>
-        ) : null}
+        ) : (
+          <p className="mt-1 text-sm text-slate-600">Loading patient profile...</p>
+        )}
       </header>
 
-      {isLoading ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-          Loading timeline...
-        </section>
-      ) : error ? (
-        <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
-          {error}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+      ) : null}
+
+      {isInitialLoading ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+          Loading medical history...
         </section>
       ) : encounters.length === 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-          No historical encounters found.
+        <section className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+          No encounter history found.
         </section>
       ) : (
-        <section className="relative pl-4">
-          <div className="absolute left-[11px] top-0 h-full w-px bg-slate-300" />
+        <section className="space-y-3">
+          {encounters.map((encounter) => {
+            const isOpen = expanded[encounter.id] ?? false;
+            return (
+              <article key={encounter.id} className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpanded((current) => ({ ...current, [encounter.id]: !isOpen }))
+                  }
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Encounter · {formatDateTime(encounter.openedAt)}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      Status: {encounter.status}
+                      {encounter.closedAt ? ` · Closed: ${formatDateTime(encounter.closedAt)}` : ""}
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium text-teal-700">{isOpen ? "Collapse" : "Expand"}</span>
+                </button>
 
-          <div className="space-y-4">
-            {encounters.map((encounter) => {
-              const expanded = expandedById[encounter.id] ?? false;
-              return (
-                <article key={encounter.id} className="relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <span className="absolute -left-[10px] top-5 h-4 w-4 rounded-full border-2 border-white bg-teal-600" />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExpandedById((current) => ({
-                        ...current,
-                        [encounter.id]: !expanded,
-                      }))
-                    }
-                    className="flex w-full items-center justify-between gap-3 text-left"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        Encounter #{encounter.id.slice(0, 8)}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Opened {formatDateTime(encounter.openedAt)} • Closed {formatDateTime(encounter.closedAt)}
-                      </p>
-                    </div>
-                    <span className="rounded border border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                      {expanded ? "Collapse" : "Expand"}
-                    </span>
-                  </button>
-
-                  {expanded ? (
-                    <div className="mt-4 space-y-4">
-                      <section>
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Vitals</h3>
-                        <div className="mt-2 space-y-2">
-                          {encounter.vitals.length === 0 ? (
-                            <p className="text-xs text-slate-500">No vitals recorded.</p>
-                          ) : (
-                            encounter.vitals.map((vital) => (
-                              <div key={vital.id} className="rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
-                                {formatDateTime(vital.timestamp)} • BP {vital.bpSystolic}/{vital.bpDiastolic} • HR {vital.heartRate} • Temp {vital.temperature}°C • SpO2 {vital.spO2}%
-                              </div>
-                            ))
-                          )}
+                {isOpen ? (
+                  <div className="space-y-4 border-t border-slate-200 px-4 py-4">
+                    <section>
+                      <h3 className="text-sm font-semibold text-slate-900">Vitals</h3>
+                      {encounter.vitals.length === 0 ? (
+                        <p className="mt-1 text-xs text-slate-500">No vitals recorded.</p>
+                      ) : (
+                        <div className="mt-2 grid gap-2 md:grid-cols-2">
+                          {encounter.vitals.map((vital) => (
+                            <div key={vital.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+                              <p className="font-medium text-slate-700">{formatDateTime(vital.timestamp)}</p>
+                              <p className="mt-1 text-slate-600">
+                                BP {vital.bpSystolic}/{vital.bpDiastolic} · HR {vital.heartRate} · Temp{" "}
+                                {vital.temperature}°C · RR {vital.respirationRate} · SpO2 {vital.spO2}% · Wt{" "}
+                                {vital.weight}kg
+                              </p>
+                            </div>
+                          ))}
                         </div>
-                      </section>
+                      )}
+                    </section>
 
-                      <section>
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Notes</h3>
+                    <section>
+                      <h3 className="text-sm font-semibold text-slate-900">Notes</h3>
+                      {encounter.notes.length === 0 ? (
+                        <p className="mt-1 text-xs text-slate-500">No notes recorded.</p>
+                      ) : (
                         <div className="mt-2 space-y-2">
-                          {encounter.notes.length === 0 ? (
-                            <p className="text-xs text-slate-500">No notes recorded.</p>
-                          ) : (
-                            encounter.notes.map((note) => (
-                              <div key={note.id} className="rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
-                                <p className="font-semibold text-slate-800">{note.type}</p>
-                                <p className="mt-1 whitespace-pre-wrap">{note.content}</p>
-                              </div>
-                            ))
-                          )}
+                          {encounter.notes.map((note) => (
+                            <div key={note.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+                              <p className="font-medium text-slate-700">
+                                {note.type} · {formatDateTime(note.timestamp)}
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-slate-700">{note.content}</p>
+                            </div>
+                          ))}
                         </div>
-                      </section>
+                      )}
+                    </section>
 
-                      <section>
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Diagnoses</h3>
-                        <div className="mt-2 space-y-2">
-                          {encounter.diagnoses.length === 0 ? (
-                            <p className="text-xs text-slate-500">No diagnoses linked.</p>
-                          ) : (
-                            encounter.diagnoses.map((diagnosis) => (
-                              <div key={diagnosis.id} className="rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
-                                {diagnosis.code} - {diagnosis.description} ({diagnosis.status})
-                              </div>
-                            ))
-                          )}
+                    <section>
+                      <h3 className="text-sm font-semibold text-slate-900">Diagnoses</h3>
+                      {encounter.diagnoses.length === 0 ? (
+                        <p className="mt-1 text-xs text-slate-500">No diagnoses recorded.</p>
+                      ) : (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {encounter.diagnoses.map((diagnosis) => (
+                            <span
+                              key={diagnosis.id}
+                              className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium ${statusBadgeClass(
+                                diagnosis.status,
+                              )}`}
+                            >
+                              {diagnosis.code} - {diagnosis.description} ({diagnosis.status})
+                            </span>
+                          ))}
                         </div>
-                      </section>
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
+                      )}
+                    </section>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+
+          <div ref={loaderRef} className="h-8">
+            {isLoadingMore ? (
+              <p className="text-center text-xs text-slate-500">Loading more encounters...</p>
+            ) : hasNextPage ? null : (
+              <p className="text-center text-xs text-slate-400">End of timeline.</p>
+            )}
           </div>
-
-          <div ref={sentinelRef} className="h-8" />
-
-          {isLoadingMore ? (
-            <p className="text-xs text-slate-500">Loading more encounters...</p>
-          ) : hasMore ? (
-            <p className="text-xs text-slate-400">Scroll to load more encounters</p>
-          ) : (
-            <p className="text-xs text-slate-400">End of timeline</p>
-          )}
         </section>
       )}
     </main>
