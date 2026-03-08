@@ -1,0 +1,63 @@
+import { Request, Response, Router } from "express";
+import { ParsedQs } from "qs";
+import { authorize, Roles } from "../../middlewares/rbac.middleware";
+import { validateRequest } from "../../middlewares/validate.middleware";
+import { getPatientHistory } from "./history.service";
+import {
+  PatientHistoryParamsDto,
+  patientHistoryParamsSchema,
+  patientHistoryQuerySchema,
+} from "./history.validation";
+
+const router = Router();
+const ALL_ROLES: Roles[] = Object.values(Roles);
+
+type PatientHistoryRequest = Request<
+  PatientHistoryParamsDto,
+  unknown,
+  unknown,
+  ParsedQs
+>;
+
+router.get(
+  "/:id/history",
+  authorize(ALL_ROLES),
+  validateRequest({
+    params: patientHistoryParamsSchema,
+    query: patientHistoryQuerySchema,
+  }),
+  async (req: PatientHistoryRequest, res: Response) => {
+    const clinicId = req.user?.clinicId;
+    if (!clinicId) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
+    const query = patientHistoryQuerySchema.parse(req.query);
+
+    const payload = await getPatientHistory({
+      patientId: req.params.id,
+      clinicId,
+      page: query.page,
+      limit: query.limit,
+    });
+
+    if (!payload) {
+      return res.status(404).json({
+        error: "NotFound",
+        message: "Patient not found",
+      });
+    }
+
+    return res.json({
+      status: "success",
+      data: payload.patient,
+      encounters: payload.encounters,
+      meta: payload.meta,
+    });
+  },
+);
+
+export const patientHistoryRoutes = router;
