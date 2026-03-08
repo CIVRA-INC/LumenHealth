@@ -1,0 +1,63 @@
+import { Schema, model, models } from "mongoose";
+
+export type QueueStatus = "WAITING" | "TRIAGE" | "CONSULTATION";
+export type EncounterStatus = "OPEN" | "IN_PROGRESS" | "CLOSED";
+
+export interface QueueEncounterDocument {
+  clinicId: string;
+  patientName: string;
+  systemId: string;
+  queueStatus: QueueStatus;
+  encounterStatus: EncounterStatus;
+  openedAt: Date;
+}
+
+const queueEncounterSchema = new Schema<QueueEncounterDocument>(
+  {
+    clinicId: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    patientName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    systemId: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    queueStatus: {
+      type: String,
+      enum: ["WAITING", "TRIAGE", "CONSULTATION"],
+      required: true,
+      index: true,
+    },
+    encounterStatus: {
+      type: String,
+      enum: ["OPEN", "IN_PROGRESS", "CLOSED"],
+      required: true,
+      default: "OPEN",
+      index: true,
+    },
+    openedAt: {
+      type: Date,
+      required: true,
+      default: () => new Date(),
+      index: true,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+queueEncounterSchema.index({ clinicId: 1, openedAt: -1 });
+
+export const QueueEncounterModel =
+  models.QueueEncounter || model<QueueEncounterDocument>("QueueEncounter", queueEncounterSchema);
