@@ -19,7 +19,7 @@ export const DiagnosesCombobox = ({ encounterId }: { encounterId: string }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [options, setOptions] = useState<DiagnosisOption[]>([]);
   const [selected, setSelected] = useState<SelectedDiagnosis[]>([]);
-  const [statusByCode, setStatusByCode] = useState<Record<string, DiagnosisStatus>>({});
+  const [selectedStatus, setSelectedStatus] = useState<DiagnosisStatus>("CONFIRMED");
   const [error, setError] = useState<string | null>(null);
 
   const normalizedQuery = useMemo(() => query.trim(), [query]);
@@ -65,7 +65,7 @@ export const DiagnosesCombobox = ({ encounterId }: { encounterId: string }) => {
   }, [normalizedQuery]);
 
   const attachDiagnosis = async (option: DiagnosisOption) => {
-    const currentStatus = statusByCode[option.code] ?? "CONFIRMED";
+    const currentStatus = selectedStatus;
 
     const response = await apiFetch(`/encounters/${encounterId}/diagnoses`, {
       method: "POST",
@@ -113,13 +113,8 @@ export const DiagnosesCombobox = ({ encounterId }: { encounterId: string }) => {
 
         <select
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-          value={statusByCode[normalizedQuery] ?? "CONFIRMED"}
-          onChange={(event) =>
-            setStatusByCode((current) => ({
-              ...current,
-              [normalizedQuery]: event.target.value as DiagnosisStatus,
-            }))
-          }
+          value={selectedStatus}
+          onChange={(event) => setSelectedStatus(event.target.value as DiagnosisStatus)}
         >
           <option value="SUSPECTED">SUSPECTED</option>
           <option value="CONFIRMED">CONFIRMED</option>
@@ -165,7 +160,7 @@ export const DiagnosesCombobox = ({ encounterId }: { encounterId: string }) => {
             key={item.code}
             className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800"
           >
-            {item.code} - {item.description}
+            {item.code} - {item.description} ({item.status})
             <button
               type="button"
               onClick={() => removeDiagnosis(item.code)}
