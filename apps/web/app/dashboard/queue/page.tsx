@@ -239,6 +239,7 @@ export default function QueuePage() {
                         </select>
                         <button
                           type="button"
+                          data-primary-action="true"
                           onClick={() => void moveQueueItem(item)}
                           className="rounded bg-teal-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-800"
                         >

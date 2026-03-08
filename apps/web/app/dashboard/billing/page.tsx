@@ -40,7 +40,7 @@ const getQrImageUrl = (stellarUri: string) =>
 
 export default function BillingPage() {
   const { user } = useAuth();
-  const { expiryDate, daysRemaining, isExpired, refresh } = useSubscription();
+  const { expiryDate, daysRemaining, isWriteLocked, refresh } = useSubscription();
 
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
@@ -143,11 +143,11 @@ export default function BillingPage() {
   };
 
   const statusLabel = useMemo(() => {
-    if (isExpired) {
+    if (isWriteLocked) {
       return "Expired";
     }
     return "Active";
-  }, [isExpired]);
+  }, [isWriteLocked]);
 
   const qrImageUrl = useMemo(() => {
     if (!intent) {
@@ -193,7 +193,7 @@ export default function BillingPage() {
             {isCreating ? "Generating..." : "Generate Stellar Payment"}
           </button>
 
-          {isExpired ? (
+          {isWriteLocked ? (
             <p className="mt-2 text-xs font-medium text-red-700">
               Subscription is expired. Write access is disabled until payment is verified.
             </p>

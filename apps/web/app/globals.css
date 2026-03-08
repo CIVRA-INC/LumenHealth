@@ -26,3 +26,10 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.subscription-write-locked [data-primary-action="true"]:not([data-allow-when-expired="true"]) {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: grayscale(1);
+}

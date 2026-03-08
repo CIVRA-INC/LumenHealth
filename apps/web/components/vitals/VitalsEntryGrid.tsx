@@ -238,6 +238,7 @@ export const VitalsEntryGrid = () => {
         <div className="md:col-span-2 lg:col-span-4">
           <button
             type="submit"
+            data-primary-action="true"
             className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
             disabled={isSubmitting}
           >

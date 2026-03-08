@@ -33,6 +33,14 @@ const withAuthHeader = (init: RequestInit, accessToken: string): RequestInit => 
   };
 };
 
+const notifyPaymentRequired = (status: number) => {
+  if (status !== 402 || typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent("lumen:payment-required"));
+};
+
 export const apiFetch = async (
   path: string,
   init: RequestInit = {},
@@ -47,6 +55,7 @@ export const apiFetch = async (
     : init;
 
   const firstResponse = await fetch(buildUrl(path), requestInit);
+  notifyPaymentRequired(firstResponse.status);
   if (firstResponse.status !== 401 || !currentTokens?.refreshToken) {
     return firstResponse;
   }
@@ -57,5 +66,7 @@ export const apiFetch = async (
     return firstResponse;
   }
 
-  return fetch(buildUrl(path), withAuthHeader(init, newAccessToken));
+  const retryResponse = await fetch(buildUrl(path), withAuthHeader(init, newAccessToken));
+  notifyPaymentRequired(retryResponse.status);
+  return retryResponse;
 };
