@@ -139,6 +139,11 @@ router.patch(
             message: 'Encounter is closed and cannot be modified',
           });
         }
+
+        return res.status(409).json({
+          error: 'Conflict',
+          message: 'Encounter could not be claimed',
+        });
       }
 
       const updated = await EncounterModel.findOne({
@@ -223,7 +228,7 @@ router.patch(
           _id: req.params.id,
           clinicId,
         })
-          .select({ status: 1 })
+          .select({ status: 1, providerId: 1 })
           .lean();
 
         if (!existing) {
@@ -233,16 +238,23 @@ router.patch(
           });
         }
 
+        if (existing.status === 'CLOSED') {
+          return res.status(409).json({
+            error: 'Conflict',
+            message: 'Encounter is already closed',
+          });
+        }
+
+        if (!canAdminOverride && existing.providerId !== providerId) {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'Only the assigned provider can close this encounter',
+          });
+        }
+
         return res.status(409).json({
           error: 'Conflict',
-          message: 'Encounter is already closed',
-        });
-      }
-
-      if (!canAdminOverride && existing.status !== 'CLOSED') {
-        return res.status(403).json({
-          error: 'Forbidden',
-          message: 'Only the assigned provider can close this encounter',
+          message: 'Encounter could not be closed',
         });
       }
 
