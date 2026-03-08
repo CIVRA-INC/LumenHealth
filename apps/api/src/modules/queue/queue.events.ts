@@ -1,34 +1,52 @@
 import { Response } from "express";
 
-const subscribers = new Set<Response>();
+const subscribersByClinic = new Map<string, Set<Response>>();
 
-export const subscribeQueueUpdates = (res: Response) => {
-  subscribers.add(res);
+export const subscribeQueueUpdates = (clinicId: string, res: Response) => {
+  const clinicSubscribers = subscribersByClinic.get(clinicId) ?? new Set<Response>();
+  clinicSubscribers.add(res);
+  subscribersByClinic.set(clinicId, clinicSubscribers);
 
   const heartbeat = setInterval(() => {
     if (!res.writableEnded) {
-      res.write(`event: heartbeat\\ndata: ${JSON.stringify({ ok: true })}\\n\\n`);
+      res.write(`event: heartbeat\ndata: ${JSON.stringify({ ok: true })}\n\n`);
     }
   }, 15_000);
 
   const cleanup = () => {
     clearInterval(heartbeat);
-    subscribers.delete(res);
+
+    const current = subscribersByClinic.get(clinicId);
+    if (!current) return;
+
+    current.delete(res);
+    if (current.size === 0) {
+      subscribersByClinic.delete(clinicId);
+    }
   };
 
   res.on("close", cleanup);
   res.on("finish", cleanup);
 };
 
-export const emitQueueUpdate = (payload: unknown) => {
-  const data = `event: queue.update\\ndata: ${JSON.stringify(payload)}\\n\\n`;
+export const emitQueueUpdate = (clinicId: string, payload: unknown) => {
+  const clinicSubscribers = subscribersByClinic.get(clinicId);
+  if (!clinicSubscribers || clinicSubscribers.size === 0) {
+    return;
+  }
 
-  subscribers.forEach((res) => {
+  const data = `event: queue.update\ndata: ${JSON.stringify(payload)}\n\n`;
+
+  clinicSubscribers.forEach((res) => {
     if (res.writableEnded) {
-      subscribers.delete(res);
+      clinicSubscribers.delete(res);
       return;
     }
 
     res.write(data);
   });
+
+  if (clinicSubscribers.size === 0) {
+    subscribersByClinic.delete(clinicId);
+  }
 };
