@@ -16,13 +16,16 @@ type PatientHistoryRequest = Request<
   PatientHistoryParamsDto,
   unknown,
   unknown,
-  Record<string, unknown>
+  PatientHistoryQueryDto
 >;
 
 router.get(
   "/:id/history",
   authorize(ALL_ROLES),
-  validateRequest({ params: patientHistoryParamsSchema, query: patientHistoryQuerySchema }),
+  validateRequest({
+    params: patientHistoryParamsSchema,
+    query: patientHistoryQuerySchema,
+  }),
   async (req: PatientHistoryRequest, res: Response) => {
     const clinicId = req.user?.clinicId;
     if (!clinicId) {
@@ -32,13 +35,11 @@ router.get(
       });
     }
 
-    const query = req.query as PatientHistoryQueryDto;
-
     const payload = await getPatientHistory({
       patientId: req.params.id,
       clinicId,
-      page: query.page,
-      limit: query.limit,
+      page: req.query.page,
+      limit: req.query.limit,
     });
 
     if (!payload) {
