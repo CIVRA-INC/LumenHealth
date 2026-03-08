@@ -160,9 +160,9 @@ router.get(
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
 
-    res.write(`event: connected\\ndata: ${JSON.stringify({ ok: true })}\\n\\n`);
+    res.write(`event: connected\ndata: ${JSON.stringify({ ok: true })}\n\n`);
 
-    subscribeQueueUpdates(res);
+    subscribeQueueUpdates(user.clinicId, res);
   },
 );
 
@@ -198,7 +198,7 @@ router.patch(
     }
 
     const payload = toPayload(updated as Parameters<typeof toPayload>[0]);
-    emitQueueUpdate({ type: "queue.updated", item: payload });
+    emitQueueUpdate(clinicId, { type: "queue.updated", item: payload });
 
     return res.json({
       status: "success",
