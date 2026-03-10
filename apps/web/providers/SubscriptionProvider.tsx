@@ -8,6 +8,7 @@ type SubscriptionContextValue = {
   expiryDate: string | null;
   daysRemaining: number | null;
   isExpired: boolean;
+  isWriteLocked: boolean;
   isLoading: boolean;
   refresh: () => Promise<void>;
 };
@@ -59,6 +60,7 @@ const Banner = ({ isExpired, daysRemaining }: { isExpired: boolean; daysRemainin
 export const SubscriptionProvider = ({ children }: { children: React.ReactNode }) => {
   const [expiryDate, setExpiryDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasPaymentRequiredSignal, setHasPaymentRequiredSignal] = useState(false);
 
   const refresh = async () => {
     setIsLoading(true);
@@ -73,7 +75,12 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
         data?: { subscriptionExpiryDate?: string | null };
       };
 
-      setExpiryDate(payload.data?.subscriptionExpiryDate ?? null);
+      const nextExpiryDate = payload.data?.subscriptionExpiryDate ?? null;
+      setExpiryDate(nextExpiryDate);
+
+      if (nextExpiryDate && new Date(nextExpiryDate).getTime() > Date.now()) {
+        setHasPaymentRequiredSignal(false);
+      }
     } catch {
       setExpiryDate(null);
     } finally {
@@ -87,39 +94,35 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
 
   const daysRemaining = calcDaysRemaining(expiryDate);
   const isExpired = daysRemaining !== null && daysRemaining < 0;
+  const isWriteLocked = isExpired || hasPaymentRequiredSignal;
 
   useEffect(() => {
-    const buttons = document.querySelectorAll<HTMLButtonElement>('button[data-primary-action="true"]');
+    const onPaymentRequired = () => {
+      setHasPaymentRequiredSignal(true);
+    };
 
-    buttons.forEach((button) => {
-      if (button.dataset.allowWhenExpired === "true") {
-        return;
-      }
-
-      if (isExpired) {
-        button.disabled = true;
-        button.classList.add("cursor-not-allowed", "opacity-50", "grayscale");
-      } else {
-        button.classList.remove("cursor-not-allowed", "opacity-50", "grayscale");
-      }
-    });
-  }, [isExpired, children]);
+    window.addEventListener("lumen:payment-required", onPaymentRequired);
+    return () => {
+      window.removeEventListener("lumen:payment-required", onPaymentRequired);
+    };
+  }, []);
 
   const value = useMemo<SubscriptionContextValue>(
     () => ({
       expiryDate,
       daysRemaining,
       isExpired,
+      isWriteLocked,
       isLoading,
       refresh,
     }),
-    [expiryDate, daysRemaining, isExpired, isLoading],
+    [expiryDate, daysRemaining, isExpired, isWriteLocked, isLoading],
   );
 
   return (
     <SubscriptionContext.Provider value={value}>
-      <Banner isExpired={isExpired} daysRemaining={daysRemaining} />
-      {children}
+      <Banner isExpired={isWriteLocked} daysRemaining={daysRemaining} />
+      <div className={isWriteLocked ? "subscription-write-locked" : undefined}>{children}</div>
     </SubscriptionContext.Provider>
   );
 };

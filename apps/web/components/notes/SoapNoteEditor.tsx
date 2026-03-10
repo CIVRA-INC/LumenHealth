@@ -143,6 +143,7 @@ export const SoapNoteEditor = ({ encounterId, isLocked, onSubmit }: Props) => {
 
           <button
             type="submit"
+            data-primary-action="true"
             disabled={isLocked || isSubmitting || !canSubmit}
             className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
           >

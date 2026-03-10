@@ -3,7 +3,7 @@
 import { useSubscription } from "@/providers/SubscriptionProvider";
 
 export default function DashboardPage() {
-  const { isExpired } = useSubscription();
+  const { isWriteLocked } = useSubscription();
 
   return (
     <main className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -14,7 +14,7 @@ export default function DashboardPage() {
         <button
           type="button"
           data-primary-action="true"
-          disabled={isExpired}
+          disabled={isWriteLocked}
           className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-400"
         >
           New Patient
@@ -22,7 +22,7 @@ export default function DashboardPage() {
         <button
           type="button"
           data-primary-action="true"
-          disabled={isExpired}
+          disabled={isWriteLocked}
           className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-400"
         >
           Edit Profile

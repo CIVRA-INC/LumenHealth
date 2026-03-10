@@ -36,6 +36,7 @@ export const CloseEncounterModal = ({ isOpen, isSubmitting, onCancel, onConfirm 
           </button>
           <button
             type="button"
+            data-primary-action="true"
             onClick={onConfirm}
             disabled={isSubmitting}
             className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-400"
