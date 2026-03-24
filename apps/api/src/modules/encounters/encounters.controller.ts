@@ -2,6 +2,7 @@ import { Request, Response, Router } from 'express';
 import { authorize, Roles } from '../../middlewares/rbac.middleware';
 import { validateRequest } from '../../middlewares/validate.middleware';
 import { EncounterModel } from './models/encounter.model';
+import { syncQueueEncounterState } from '../queue/queue-state.service';
 import {
   CreateEncounterDto,
   EncounterIdParamsDto,
@@ -157,6 +158,13 @@ router.patch(
         });
       }
 
+      await syncQueueEncounterState({
+        clinicId,
+        encounterId: String(updated._id),
+        encounterStatus: 'IN_PROGRESS',
+        queueStatus: 'CONSULTATION',
+      });
+
       return res.json({
         status: 'success',
         data: toPayload(updated as Parameters<typeof toPayload>[0]),
@@ -257,6 +265,13 @@ router.patch(
           message: 'Encounter could not be closed',
         });
       }
+
+      await syncQueueEncounterState({
+        clinicId,
+        encounterId: req.params.id,
+        encounterStatus: 'CLOSED',
+        closedAt,
+      });
 
       const updated = await EncounterModel.findOne({
         _id: req.params.id,
