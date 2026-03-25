@@ -66,4 +66,6 @@ export interface Diagnosis {
   code: string;
   description: string;
   status: DiagnosisStatus;
+  createdAt: string;
+  updatedAt: string;
 }

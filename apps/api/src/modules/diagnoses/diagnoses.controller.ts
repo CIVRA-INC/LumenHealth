@@ -10,7 +10,10 @@ import {
   attachDiagnosisSchema,
   diagnosisSearchQuerySchema,
   encounterDiagnosisParamsSchema,
+  diagnosisIdParamsSchema,
+  updateDiagnosisStatusSchema,
 } from "./diagnoses.validation";
+import { EncounterModel } from "../encounters/models/encounter.model";
 
 const router = Router();
 const ALL_ROLES: Roles[] = Object.values(Roles);
@@ -79,42 +82,196 @@ router.post(
   authorize(CLINICAL_ROLES),
   validateRequest({ params: encounterDiagnosisParamsSchema, body: attachDiagnosisSchema }),
   async (req: AttachDiagnosisRequest, res: Response) => {
+    const userId = req.user?.userId;
     const clinicId = req.user?.clinicId;
-    if (!clinicId) {
+
+    if (!userId || !clinicId) {
       return res.status(401).json({
         error: "Unauthorized",
         message: "Authentication required",
       });
     }
 
-    const diagnosis = await DiagnosisModel.findOneAndUpdate(
-      {
-        clinicId,
-        encounterId: req.params.encounterId,
-        code: req.body.code,
-      },
-      {
-        $set: {
-          description: req.body.description,
-          status: req.body.status,
+    // CHANGE 1 — Encounter existence validation
+    const encounter = await EncounterModel.findOne({
+      _id: req.params.encounterId,
+      clinicId,
+    }).lean();
+
+    if (!encounter) {
+      return res.status(404).json({
+        error: "Encounter not found",
+        code: "ENCOUNTER_NOT_FOUND",
+      });
+    }
+
+    // CHANGE 2 — Encounter ownership validation
+    const isOwner = encounter.patientId === userId || encounter.providerId === userId;
+    if (!isOwner) {
+      return res.status(403).json({
+        error: "Not authorized for this encounter",
+        code: "ENCOUNTER_FORBIDDEN",
+      });
+    }
+
+    // CHANGE 3 — Duplicate diagnosis prevention
+    const existing = await DiagnosisModel.findOne({
+      encounterId: req.params.encounterId,
+      code: req.body.code,
+    }).lean();
+
+    if (existing) {
+      return res.status(200).json({
+        status: "success",
+        data: {
+          id: String(existing._id),
+          encounterId: existing.encounterId,
+          code: existing.code,
+          description: existing.description,
+          status: existing.status,
+          createdAt: (existing as any).createdAt,
+          updatedAt: (existing as any).updatedAt,
         },
-      },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true,
-      },
-    ).lean();
+        duplicate: true,
+      });
+    }
+
+    const diagnosis = await DiagnosisModel.create({
+      clinicId,
+      encounterId: req.params.encounterId,
+      code: req.body.code,
+      description: req.body.description,
+      status: req.body.status,
+    });
 
     return res.status(201).json({
       status: "success",
       data: {
-        id: String(diagnosis?._id),
-        encounterId: diagnosis?.encounterId,
-        code: diagnosis?.code,
-        description: diagnosis?.description,
-        status: diagnosis?.status,
+        id: String(diagnosis._id),
+        encounterId: diagnosis.encounterId,
+        code: diagnosis.code,
+        description: diagnosis.description,
+        status: diagnosis.status,
+        createdAt: (diagnosis as any).createdAt,
+        updatedAt: (diagnosis as any).updatedAt,
       },
+    });
+  },
+);
+
+// CHANGE 4 — Status update endpoint
+router.patch(
+  "/diagnoses/:id/status",
+  authorize(CLINICAL_ROLES),
+  validateRequest({ params: diagnosisIdParamsSchema, body: updateDiagnosisStatusSchema }),
+  async (req, res) => {
+    const userId = req.user?.userId;
+    const clinicId = req.user?.clinicId;
+
+    if (!userId || !clinicId) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
+    const diagnosis = await DiagnosisModel.findById(req.params.id);
+    if (!diagnosis) {
+      return res.status(404).json({
+        error: "Diagnosis not found",
+        code: "DIAGNOSIS_NOT_FOUND",
+      });
+    }
+
+    const encounter = await EncounterModel.findOne({
+      _id: diagnosis.encounterId,
+      clinicId,
+    }).lean();
+
+    if (!encounter) {
+      return res.status(404).json({
+        error: "Associated encounter not found",
+        code: "ENCOUNTER_NOT_FOUND",
+      });
+    }
+
+    const isOwner = encounter.patientId === userId || encounter.providerId === userId;
+    if (!isOwner) {
+      return res.status(403).json({
+        error: "Not authorized for this encounter",
+        code: "ENCOUNTER_FORBIDDEN",
+      });
+    }
+
+    diagnosis.status = req.body.status;
+    await diagnosis.save();
+
+    return res.json({
+      status: "success",
+      data: {
+        id: String(diagnosis._id),
+        encounterId: diagnosis.encounterId,
+        code: diagnosis.code,
+        description: diagnosis.description,
+        status: diagnosis.status,
+        updatedAt: (diagnosis as any).updatedAt,
+      },
+    });
+  },
+);
+
+// CHANGE 5 — List diagnoses for encounter
+router.get(
+  "/encounters/:encounterId/diagnoses",
+  authorize(ALL_ROLES),
+  validateRequest({ params: encounterDiagnosisParamsSchema }),
+  async (req, res) => {
+    const userId = req.user?.userId;
+    const clinicId = req.user?.clinicId;
+
+    if (!userId || !clinicId) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
+    const encounter = await EncounterModel.findOne({
+      _id: req.params.encounterId,
+      clinicId,
+    }).lean();
+
+    if (!encounter) {
+      return res.status(404).json({
+        error: "Encounter not found",
+        code: "ENCOUNTER_NOT_FOUND",
+      });
+    }
+
+    const isOwner = encounter.patientId === userId || encounter.providerId === userId;
+    if (!isOwner) {
+      return res.status(403).json({
+        error: "Not authorized for this encounter",
+        code: "ENCOUNTER_FORBIDDEN",
+      });
+    }
+
+    const diagnoses = await DiagnosisModel.find({
+      encounterId: req.params.encounterId,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({
+      status: "success",
+      data: diagnoses.map((d) => ({
+        id: String(d._id),
+        code: d.code,
+        description: d.description,
+        status: d.status,
+        createdAt: (d as any).createdAt,
+        updatedAt: (d as any).updatedAt,
+      })),
     });
   },
 );

@@ -1,7 +1,19 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import { DiagnosesCombobox } from "@/components/diagnoses/DiagnosesCombobox";
 
 export default function DiagnosesPage() {
-  const encounterId = "mock-enc-123";
+  const params = useParams<{ id: string }>();
+  const id = params?.id;
+
+  if (!id) {
+    return (
+      <main className="p-4 md:p-6 text-center text-slate-500">
+        Encounter context missing.
+      </main>
+    );
+  }
 
   return (
     <main className="space-y-4 p-4 md:p-6">
@@ -12,7 +24,7 @@ export default function DiagnosesPage() {
         </p>
       </header>
 
-      <DiagnosesCombobox encounterId={encounterId} />
+      <DiagnosesCombobox encounterId={id} />
     </main>
   );
 }

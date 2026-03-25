@@ -5,19 +5,24 @@ import { apiFetch } from "@/lib/api-client";
 import { NotesFeed, type ClinicalNoteItem } from "@/components/notes/NotesFeed";
 import { SoapNoteEditor } from "@/components/notes/SoapNoteEditor";
 
-const ENCOUNTER_ID = "mock-enc-123";
+import { useEncounter } from "@/providers/EncounterProvider";
 
 export default function NotesPage() {
+  const { activeEncounterId } = useEncounter();
   const [notes, setNotes] = useState<ClinicalNoteItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadNotes = async () => {
+    if (!activeEncounterId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await apiFetch(`/notes/encounter/${ENCOUNTER_ID}`);
+      const response = await apiFetch(`/notes/encounter/${activeEncounterId}`);
       if (!response.ok) {
         throw new Error("Failed to load notes");
       }
@@ -80,7 +85,13 @@ export default function NotesPage() {
         </p>
       </header>
 
-      <SoapNoteEditor encounterId={ENCOUNTER_ID} isLocked={false} onSubmit={appendNote} />
+      {activeEncounterId ? (
+        <SoapNoteEditor encounterId={activeEncounterId} isLocked={false} onSubmit={appendNote} />
+      ) : (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 shadow-sm">
+          Please select an active encounter to add clinical notes.
+        </section>
+      )}
 
       {isLoading ? (
         <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">

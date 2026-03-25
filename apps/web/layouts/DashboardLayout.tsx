@@ -4,23 +4,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
-
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", disabled: false },
-  { href: "/dashboard/queue", label: "Queue", disabled: false },
-  { href: "/dashboard/encounters", label: "Encounters", disabled: false },
-  { href: "/dashboard/vitals", label: "Vitals", disabled: false },
-  { href: "/dashboard/notes", label: "Notes", disabled: false },
-  { href: "/dashboard/diagnoses", label: "Diagnoses", disabled: false },
-  { href: "/dashboard/patients", label: "Patients", disabled: false },
-  { href: "/dashboard/settings/staff", label: "Staff", disabled: false },
-  { href: "/dashboard/audit", label: "Audit Logs", disabled: false },
-  { href: "/dashboard/billing", label: "Billing", disabled: false },
-] as const;
+import { useEncounter } from "@/providers/EncounterProvider";
 
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { activeEncounterId } = useEncounter();
+
+  const NAV = [
+    { href: "/dashboard", label: "Dashboard", disabled: false },
+    { href: "/dashboard/queue", label: "Queue", disabled: false },
+    { href: "/dashboard/encounters", label: "Encounters", disabled: false },
+    { href: "/dashboard/vitals", label: "Vitals", disabled: false },
+    { href: "/dashboard/notes", label: "Notes", disabled: false },
+    {
+      href: activeEncounterId ? `/dashboard/encounters/${activeEncounterId}/diagnoses` : "#",
+      label: "Diagnoses",
+      disabled: !activeEncounterId,
+    },
+    { href: "/dashboard/patients", label: "Patients", disabled: false },
+    { href: "/dashboard/settings/staff", label: "Staff", disabled: false },
+    { href: "/dashboard/audit", label: "Audit Logs", disabled: false },
+    { href: "/dashboard/billing", label: "Billing", disabled: false },
+  ] as const;
 
   return (
     <SubscriptionProvider>
@@ -35,7 +41,8 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
                 item.disabled ? (
                   <span
                     key={item.label}
-                    className="block rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-400 line-through"
+                    className="block rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-400 line-through cursor-not-allowed bg-slate-50"
+                    title="Select an encounter first"
                   >
                     {item.label}
                   </span>

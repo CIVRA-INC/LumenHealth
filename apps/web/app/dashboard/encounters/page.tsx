@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { ActiveEncounterHeader } from "@/components/encounters/ActiveEncounterHeader";
 import { CloseEncounterModal } from "@/components/encounters/CloseEncounterModal";
@@ -30,8 +30,21 @@ const DEMO_ENCOUNTER: EncounterPayload = {
   closedAt: null,
 };
 
+import { useEncounter } from "@/providers/EncounterProvider";
+
 export default function EncountersPage() {
-  const [encounter, setEncounter] = useState<EncounterPayload>(DEMO_ENCOUNTER);
+  const { activeEncounterId, setActiveEncounterId } = useEncounter();
+  const [encounter, setEncounter] = useState<EncounterPayload>(() => {
+    if (activeEncounterId === "demo-encounter") return DEMO_ENCOUNTER;
+    return DEMO_ENCOUNTER; // Fallback to demo for now
+  });
+
+  useEffect(() => {
+    if (encounter.id) {
+      setActiveEncounterId(encounter.id);
+    }
+  }, [encounter.id, setActiveEncounterId]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmittingClose, setIsSubmittingClose] = useState(false);
   const [message, setMessage] = useState<string | null>(null);

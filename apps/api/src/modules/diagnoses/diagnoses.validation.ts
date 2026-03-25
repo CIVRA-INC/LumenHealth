@@ -14,6 +14,16 @@ export const attachDiagnosisSchema = z.object({
   status: z.enum(["SUSPECTED", "CONFIRMED", "RESOLVED"]).default("CONFIRMED"),
 });
 
+export const diagnosisIdParamsSchema = z.object({
+  id: z.string().trim().min(1),
+});
+
+export const updateDiagnosisStatusSchema = z.object({
+  status: z.enum(["SUSPECTED", "CONFIRMED", "RESOLVED"]),
+});
+
 export type DiagnosisSearchQueryDto = z.infer<typeof diagnosisSearchQuerySchema>;
 export type EncounterDiagnosisParamsDto = z.infer<typeof encounterDiagnosisParamsSchema>;
 export type AttachDiagnosisDto = z.infer<typeof attachDiagnosisSchema>;
+export type DiagnosisIdParamsDto = z.infer<typeof diagnosisIdParamsSchema>;
+export type UpdateDiagnosisStatusDto = z.infer<typeof updateDiagnosisStatusSchema>;

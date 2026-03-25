@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -58,7 +58,10 @@ const getTempSignal = (value: number | undefined) => {
   };
 };
 
+import { useEncounter } from "@/providers/EncounterProvider";
+
 export const VitalsEntryGrid = () => {
+  const { activeEncounterId } = useEncounter();
   const [apiError, setApiError] = useState<string | null>(null);
   const [successState, setSuccessState] = useState<VitalsResponse | null>(null);
 
@@ -68,10 +71,11 @@ export const VitalsEntryGrid = () => {
     watch,
     formState: { errors, isSubmitting },
     reset,
+    setValue,
   } = useForm<VitalsFormInput>({
     resolver: zodResolver(vitalsSchema),
     defaultValues: {
-      encounterId: "mock-enc-123",
+      encounterId: activeEncounterId ?? "mock-enc-123",
       bpSystolic: 120,
       bpDiastolic: 80,
       heartRate: 78,
@@ -81,6 +85,12 @@ export const VitalsEntryGrid = () => {
       weight: 70,
     },
   });
+
+  useEffect(() => {
+    if (activeEncounterId) {
+      setValue("encounterId", activeEncounterId);
+    }
+  }, [activeEncounterId, setValue]);
 
   const watchedTemperature = watch("temperature");
   const tempSignal = useMemo(
