@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createClinicalNoteSchema = z
   .object({
-    encounterId: z.string().trim().min(1).optional(),
+    encounterId: z.string().trim().min(1),
     type: z.enum(["SOAP", "FREE_TEXT", "AI_SUMMARY", "CORRECTION"]),
     content: z.string().trim().min(1, "content is required"),
     correctionOfNoteId: z.string().trim().min(1).optional(),
