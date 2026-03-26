@@ -35,9 +35,6 @@ const getStellarUri = (intent: PaymentIntent) =>
     intent.amount,
   )}&memo=${encodeURIComponent(intent.memo)}&memo_type=${encodeURIComponent(intent.memoType)}`;
 
-const getQrImageUrl = (stellarUri: string) =>
-  `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(stellarUri)}`;
-
 export default function BillingPage() {
   const { user } = useAuth();
   const { expiryDate, daysRemaining, isWriteLocked, refresh } = useSubscription();
@@ -153,7 +150,7 @@ export default function BillingPage() {
     if (!intent) {
       return null;
     }
-    return getQrImageUrl(getStellarUri(intent));
+    return getStellarUri(intent);
   }, [intent]);
 
   return (
@@ -214,10 +211,20 @@ export default function BillingPage() {
             <div className="mt-4 grid gap-4 lg:grid-cols-[280px_1fr]">
               <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-3">
                 {qrImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={qrImageUrl} alt="Stellar QR code" className="h-[240px] w-[240px]" />
+                  <div className="space-y-3 text-center">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Wallet Payment URI
+                    </p>
+                    <p className="max-w-[240px] break-all text-xs text-slate-700">{qrImageUrl}</p>
+                    <a
+                      href={qrImageUrl}
+                      className="inline-flex rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Open Wallet Link
+                    </a>
+                  </div>
                 ) : (
-                  <span className="text-xs text-slate-500">Generating QR code...</span>
+                  <span className="text-xs text-slate-500">Generating checkout link...</span>
                 )}
               </div>
 
@@ -294,6 +301,11 @@ export default function BillingPage() {
                       {isPolling
                         ? "Awaiting on-chain verification..."
                         : "Polling every 10 seconds for on-chain verification..."}
+                    </p>
+                  ) : null}
+                  {intent.expiresAt ? (
+                    <p className="mt-1 text-xs text-slate-600">
+                      Intent expires: {formatDateTime(intent.expiresAt)}
                     </p>
                   ) : null}
                 </div>
