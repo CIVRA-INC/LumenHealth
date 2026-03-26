@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { StatePanel } from "@/components/ui/StatePanel";
 
 type AuditAction = "CREATE" | "UPDATE" | "DELETE";
 
@@ -262,20 +263,20 @@ export default function AuditLogsPage() {
               <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-800">
                 {isLoading ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
-                      Loading audit logs...
+                    <td className="px-4 py-4" colSpan={6}>
+                      <StatePanel>Loading audit logs...</StatePanel>
                     </td>
                   </tr>
                 ) : errorMessage ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-red-600" colSpan={6}>
-                      {errorMessage}
+                    <td className="px-4 py-4" colSpan={6}>
+                      <StatePanel tone="error">{errorMessage}</StatePanel>
                     </td>
                   </tr>
                 ) : logs.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
-                      No logs found for the selected filters.
+                    <td className="px-4 py-4" colSpan={6}>
+                      <StatePanel>No logs found for the selected filters.</StatePanel>
                     </td>
                   </tr>
                 ) : (

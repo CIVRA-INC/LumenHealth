@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { NotesFeed, type ClinicalNoteItem } from "@/components/notes/NotesFeed";
 import { SoapNoteEditor } from "@/components/notes/SoapNoteEditor";
+import { StatePanel } from "@/components/ui/StatePanel";
 
 const ENCOUNTER_ID = "mock-enc-123";
 
@@ -83,13 +84,9 @@ export default function NotesPage() {
       <SoapNoteEditor encounterId={ENCOUNTER_ID} isLocked={false} onSubmit={appendNote} />
 
       {isLoading ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-          Loading notes...
-        </section>
+        <StatePanel>Loading notes...</StatePanel>
       ) : error ? (
-        <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
-          {error}
-        </section>
+        <StatePanel tone="error">{error}</StatePanel>
       ) : (
         <NotesFeed notes={notes} />
       )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { StatePanel } from "@/components/ui/StatePanel";
 import { useAuth } from "@/providers/AuthProvider";
 
 type QueueStatus = "WAITING" | "TRIAGE" | "CONSULTATION";
@@ -182,15 +183,11 @@ export default function QueuePage() {
       </header>
 
       {error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+        <StatePanel tone="error">{error}</StatePanel>
       ) : null}
 
       {isLoading ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-          Loading queue...
-        </section>
+        <StatePanel>Loading queue...</StatePanel>
       ) : (
         <section className="grid gap-4 lg:grid-cols-3">
           {COLUMNS.map((column) => (
