@@ -156,6 +156,14 @@ npm run dev -w apps/web       # Run only Frontend
 
 ```
 
+### Seeding Demo Data
+
+To seed a small demo clinic, admin account, patients, and open encounters:
+
+```bash
+MONGO_URI=mongodb://localhost:27017/lumenhealth npm run seed:demo -w apps/api
+```
+
 ---
 
 [UI design](https://www.figma.com/design/zKvGSIUGADZgYe1aKyJuUg/Qyou?node-id=0-1&t=O7feQUlPDaDLVIcK-1)
