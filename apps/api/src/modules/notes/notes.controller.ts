@@ -1,6 +1,7 @@
 import { Request, Response, Router } from "express";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
+import { findClinicEncounter } from "../clinics/ownership.service";
 import { ClinicalNoteModel } from "./models/clinical-note.model";
 import {
   CreateClinicalNoteDto,
@@ -52,6 +53,15 @@ router.post(
     }
 
     const encounterId = req.body.encounterId ?? "mock-enc-123";
+    if (req.body.encounterId) {
+      const encounter = await findClinicEncounter(clinicId, req.body.encounterId);
+      if (!encounter) {
+        return res.status(404).json({
+          error: "NotFound",
+          message: "Encounter not found",
+        });
+      }
+    }
 
     if (req.body.type === "CORRECTION") {
       const original = await ClinicalNoteModel.findOne({

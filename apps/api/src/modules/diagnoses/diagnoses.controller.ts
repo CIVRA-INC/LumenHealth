@@ -1,6 +1,7 @@
 import { Request, Response, Router } from "express";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
+import { findClinicEncounter } from "../clinics/ownership.service";
 import { DiagnosisModel } from "./models/diagnosis.model";
 import { Icd10CodeModel } from "./models/icd10-code.model";
 import {
@@ -84,6 +85,14 @@ router.post(
       return res.status(401).json({
         error: "Unauthorized",
         message: "Authentication required",
+      });
+    }
+
+    const encounter = await findClinicEncounter(clinicId, req.params.encounterId);
+    if (!encounter) {
+      return res.status(404).json({
+        error: "NotFound",
+        message: "Encounter not found",
       });
     }
 

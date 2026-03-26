@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { authorize, Roles } from '../../middlewares/rbac.middleware';
 import { validateRequest } from '../../middlewares/validate.middleware';
+import { findClinicPatient } from '../clinics/ownership.service';
 import { EncounterModel } from './models/encounter.model';
 import {
   CreateEncounterDto,
@@ -70,6 +71,16 @@ router.post(
         error: 'Unauthorized',
         message: 'Authentication required',
       });
+    }
+
+    if (req.body.patientId) {
+      const patient = await findClinicPatient(clinicId, req.body.patientId);
+      if (!patient) {
+        return res.status(404).json({
+          error: 'NotFound',
+          message: 'Patient not found',
+        });
+      }
     }
 
     const created = await EncounterModel.create({

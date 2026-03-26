@@ -1,6 +1,7 @@
 import { Request, Response, Router } from "express";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
+import { findClinicEncounter } from "../clinics/ownership.service";
 import { calculateVitalsFlags } from "./vitals.flags";
 import { VitalsModel } from "./models/vitals.model";
 import { emitVitalsCreated } from "../ai/cds.events";
@@ -57,6 +58,16 @@ router.post(
       return res.status(401).json({
         error: "Unauthorized",
         message: "Authentication required",
+      });
+    }
+
+    const encounter = req.body.encounterId
+      ? await findClinicEncounter(clinicId, req.body.encounterId)
+      : null;
+    if (req.body.encounterId && !encounter) {
+      return res.status(404).json({
+        error: "NotFound",
+        message: "Encounter not found",
       });
     }
 
