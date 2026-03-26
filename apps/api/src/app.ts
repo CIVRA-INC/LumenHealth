@@ -21,6 +21,7 @@ import { notesRoutes } from './modules/notes/notes.controller';
 import { vitalsRoutes } from './modules/vitals/vitals.controller';
 import { startCdsWorker } from './modules/ai/cds.worker';
 import { aiDraftRoutes } from './modules/ai/drafts.controller';
+import { errorMiddleware } from './middlewares/error.middleware';
 
 const app = express();
 
@@ -48,6 +49,8 @@ app.use('/api/v1/audit-logs', auditRoutes);
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
+
+app.use(errorMiddleware);
 
 const start = async () => {
   await connectDB();
