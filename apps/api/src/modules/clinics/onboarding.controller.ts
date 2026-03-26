@@ -32,6 +32,8 @@ router.post(
           [
             {
               name: req.body.clinicName,
+              location: req.body.location,
+              contact: req.body.contactNumber,
             },
           ],
           { session },
@@ -39,7 +41,7 @@ router.post(
 
         const clinicDoc = clinic[0];
         const adminUser = new UserModel({
-          fullName: `${req.body.clinicName} Admin`,
+          fullName: req.body.adminName.trim(),
           email: req.body.adminEmail.toLowerCase().trim(),
           password: req.body.adminPassword,
           role: "CLINIC_ADMIN",

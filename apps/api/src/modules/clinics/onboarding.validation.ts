@@ -6,6 +6,13 @@ export const clinicRegistrationSchema = z.object({
     .trim()
     .min(2, "Clinic name must be at least 2 characters")
     .max(120, "Clinic name must be at most 120 characters"),
+  location: z.string().trim().min(2, "Location must be at least 2 characters"),
+  contactNumber: z.string().trim().min(7, "Contact number must be at least 7 characters"),
+  adminName: z
+    .string()
+    .trim()
+    .min(2, "Admin name must be at least 2 characters")
+    .max(120, "Admin name must be at most 120 characters"),
   adminEmail: z.string().email("Admin email must be a valid email address"),
   adminPassword: z
     .string()

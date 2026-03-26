@@ -100,6 +100,9 @@ export default function RegisterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clinicName: values.clinicName,
+          location: values.location,
+          contactNumber: values.contactNumber,
+          adminName: values.adminName,
           adminEmail: values.adminEmail,
           adminPassword: values.adminPassword,
         }),
