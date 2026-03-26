@@ -6,21 +6,22 @@ import { useAuth } from "@/providers/AuthProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", disabled: false },
-  { href: "/dashboard/queue", label: "Queue", disabled: false },
-  { href: "/dashboard/encounters", label: "Encounters", disabled: false },
-  { href: "/dashboard/vitals", label: "Vitals", disabled: false },
-  { href: "/dashboard/notes", label: "Notes", disabled: false },
-  { href: "/dashboard/diagnoses", label: "Diagnoses", disabled: false },
-  { href: "/dashboard/patients", label: "Patients", disabled: false },
-  { href: "/dashboard/settings/staff", label: "Staff", disabled: false },
-  { href: "/dashboard/audit", label: "Audit Logs", disabled: false },
-  { href: "/dashboard/billing", label: "Billing", disabled: false },
+  { href: "/dashboard", label: "Dashboard", roles: "ALL" },
+  { href: "/dashboard/queue", label: "Queue", roles: "ALL" },
+  { href: "/dashboard/encounters", label: "Encounters", roles: "ALL" },
+  { href: "/dashboard/vitals", label: "Vitals", roles: "ALL" },
+  { href: "/dashboard/notes", label: "Notes", roles: "ALL" },
+  { href: "/dashboard/diagnoses", label: "Diagnoses", roles: "ALL" },
+  { href: "/dashboard/patients", label: "Patients", roles: "ALL" },
+  { href: "/dashboard/settings/staff", label: "Staff", roles: ["SUPER_ADMIN", "CLINIC_ADMIN"] },
+  { href: "/dashboard/audit", label: "Audit Logs", roles: ["SUPER_ADMIN", "CLINIC_ADMIN"] },
+  { href: "/dashboard/billing", label: "Billing", roles: ["SUPER_ADMIN", "CLINIC_ADMIN"] },
 ] as const;
 
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const visibleNav = NAV.filter((item) => item.roles === "ALL" || item.roles.includes(user?.role ?? ""));
 
   return (
     <SubscriptionProvider>
@@ -31,28 +32,19 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
               LumenHealth
             </p>
             <nav className="space-y-2">
-              {NAV.map((item) =>
-                item.disabled ? (
-                  <span
-                    key={item.label}
-                    className="block rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-400 line-through"
-                  >
-                    {item.label}
-                  </span>
-                ) : (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`block rounded-md border px-3 py-2 text-sm font-medium ${
-                      pathname === item.href
-                        ? "border-teal-700 bg-teal-50 text-teal-900"
-                        : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                ),
-              )}
+              {visibleNav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`block rounded-md border px-3 py-2 text-sm font-medium ${
+                    pathname === item.href
+                      ? "border-teal-700 bg-teal-50 text-teal-900"
+                      : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
             </nav>
 
             <button

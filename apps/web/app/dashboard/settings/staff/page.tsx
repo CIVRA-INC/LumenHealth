@@ -5,6 +5,8 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiFetch } from "@/lib/api-client";
+import { UnauthorizedNotice } from "@/components/auth/UnauthorizedNotice";
+import { useAuth } from "@/providers/AuthProvider";
 import { useSubscription } from "@/providers/SubscriptionProvider";
 
 type StaffRole =
@@ -88,7 +90,9 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
 }
 
 export default function StaffManagementPage() {
+  const { user } = useAuth();
   const { isWriteLocked } = useSubscription();
+  const canManageStaff = user?.role === "SUPER_ADMIN" || user?.role === "CLINIC_ADMIN";
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -114,6 +118,11 @@ export default function StaffManagementPage() {
   });
 
   useEffect(() => {
+    if (!canManageStaff) {
+      setIsLoading(false);
+      return;
+    }
+
     const loadStaff = async () => {
       setIsLoading(true);
       setToast(null);
@@ -135,7 +144,15 @@ export default function StaffManagementPage() {
     };
 
     void loadStaff();
-  }, []);
+  }, [canManageStaff]);
+
+  if (!canManageStaff) {
+    return (
+      <main className="space-y-4 p-4 md:p-6">
+        <UnauthorizedNotice message="Only clinic administrators can view and manage staff accounts." />
+      </main>
+    );
+  }
 
   const pagedStaff = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
