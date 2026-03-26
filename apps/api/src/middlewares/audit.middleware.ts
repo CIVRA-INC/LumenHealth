@@ -44,6 +44,18 @@ const getResourceId = (params: Record<string, string | string[] | undefined>): s
   return Array.isArray(candidate) ? candidate[0] : candidate;
 };
 
+const getBodyResourceId = (body: unknown): string | undefined => {
+  if (!body || typeof body !== "object") {
+    return undefined;
+  }
+
+  const candidate = (body as Record<string, unknown>).encounterId
+    ?? (body as Record<string, unknown>).patientId
+    ?? (body as Record<string, unknown>).clinicId;
+
+  return typeof candidate === "string" ? candidate : undefined;
+};
+
 export const auditMiddleware: RequestHandler = (req, res, next) => {
   const action = getAction(req.method);
   if (!action) {
@@ -67,8 +79,9 @@ export const auditMiddleware: RequestHandler = (req, res, next) => {
   }
 
   const resource = getResourceFromPath(req.baseUrl || "", req.path || "");
-  const resourceId = getResourceId(req.params);
+  const resourceId = getResourceId(req.params) ?? getBodyResourceId(req.body);
   const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
+  const path = `${req.baseUrl || ""}${req.path || ""}` || req.originalUrl || "unknown";
 
   res.on("finish", () => {
     void AuditLogModel.create({
@@ -77,6 +90,9 @@ export const auditMiddleware: RequestHandler = (req, res, next) => {
       action,
       resource,
       resourceId,
+      method: req.method,
+      path,
+      statusCode: res.statusCode,
       ipAddress,
       timestamp: new Date(),
     }).catch((error: unknown) => {
