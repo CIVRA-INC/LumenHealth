@@ -1,9 +1,15 @@
 import { Request, Response, Router } from "express";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
+import { EncounterModel } from "../encounters/models/encounter.model";
+import { PatientModel } from "../patients/models/patient.model";
+import { VitalsModel } from "../vitals/models/vitals.model";
+import { ClinicalNoteModel } from "../notes/models/clinical-note.model";
+import { DiagnosisModel } from "../diagnoses/models/diagnosis.model";
 import { splitTextForSse, toSsePayload } from "./stream.utils";
 import { StreamSummaryQueryDto, streamSummaryQuerySchema } from "./stream.validation";
 import { ClinicalAlertModel } from "./models/clinical-alert.model";
+import { assembleContext } from "./scrubber.service";
 import {
   AlertIdParamsDto,
   EncounterAlertsParamsDto,
@@ -40,7 +46,67 @@ const loadGeminiSdk = async () => {
   }>;
 };
 
-const streamFromGemini = async (res: Response, encounterId: string) => {
+const buildEncounterContext = async (clinicId: string, encounterId: string) => {
+  const encounter = await EncounterModel.findOne({ _id: encounterId, clinicId }).lean();
+  if (!encounter) {
+    throw new Error("Encounter context not found");
+  }
+
+  const [patient, vitals, notes, diagnoses] = await Promise.all([
+    PatientModel.findOne({ _id: encounter.patientId, clinicId }).lean(),
+    VitalsModel.find({ encounterId, clinicId }).sort({ timestamp: -1 }).limit(5).lean(),
+    ClinicalNoteModel.find({ encounterId, clinicId }).sort({ timestamp: -1 }).limit(5).lean(),
+    DiagnosisModel.find({ encounterId, clinicId }).sort({ updatedAt: -1 }).limit(10).lean(),
+  ]);
+
+  if (!patient) {
+    throw new Error("Patient context not found");
+  }
+
+  return assembleContext({
+    patient: {
+      id: String(patient._id),
+      systemId: patient.systemId,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      dateOfBirth: patient.dateOfBirth.toISOString(),
+      sex: patient.sex,
+      contactNumber: patient.contactNumber,
+      address: patient.address,
+      isActive: patient.isActive,
+    },
+    vitals: vitals.map((row) => ({
+      id: String(row._id),
+      encounterId: row.encounterId,
+      authorId: row.authorId,
+      timestamp: row.timestamp.toISOString(),
+      bpSystolic: row.bpSystolic,
+      bpDiastolic: row.bpDiastolic,
+      heartRate: row.heartRate,
+      temperature: row.temperature,
+      respirationRate: row.respirationRate,
+      spO2: row.spO2,
+      weight: row.weight,
+    })),
+    notes: notes.map((row) => ({
+      id: String(row._id),
+      encounterId: row.encounterId,
+      authorId: row.authorId,
+      type: row.type,
+      content: row.content,
+      timestamp: row.timestamp.toISOString(),
+    })),
+    diagnoses: diagnoses.map((row) => ({
+      id: String(row._id),
+      encounterId: row.encounterId,
+      code: row.code,
+      description: row.description,
+      status: row.status,
+    })),
+  });
+};
+
+const streamFromGemini = async (res: Response, clinicId: string, encounterId: string) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured");
@@ -57,11 +123,13 @@ const streamFromGemini = async (res: Response, encounterId: string) => {
     throw new Error("Gemini stream method not available in installed SDK");
   }
 
+  const scrubbedContext = await buildEncounterContext(clinicId, encounterId);
+
   const prompt = [
     "You are a clinical summarizer.",
     "Return only concise, clinically safe text.",
     `Encounter ID: ${encounterId}`,
-    "Context source: mocked scrubbed context for streaming integration.",
+    scrubbedContext,
   ].join("\n");
 
   const streamResult = await streamMethod.call(model, prompt);
@@ -97,6 +165,14 @@ router.get(
   authorize(ALL_ROLES),
   validateRequest({ query: streamSummaryQuerySchema }),
   async (req: StreamSummaryRequest, res: Response) => {
+    const clinicId = req.user?.clinicId;
+    if (!clinicId) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
@@ -111,7 +187,7 @@ router.get(
 
     try {
       try {
-        await streamFromGemini(res, req.query.encounterId);
+        await streamFromGemini(res, clinicId, req.query.encounterId);
       } catch {
         await streamFromMock(res, req.query.encounterId);
       }
