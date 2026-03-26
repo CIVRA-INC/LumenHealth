@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/providers/AuthProvider";
@@ -45,12 +46,14 @@ const nextStage = (current: QueueStatus): QueueStatus => {
 };
 
 export default function QueuePage() {
+  const router = useRouter();
   const { tokens } = useAuth();
   const [items, setItems] = useState<QueueItem[]>([]);
   const [selectedTargetById, setSelectedTargetById] = useState<Record<string, QueueStatus>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [claimingId, setClaimingId] = useState<string | null>(null);
 
   const fetchQueue = async () => {
     setError(null);
@@ -172,6 +175,29 @@ export default function QueuePage() {
     );
   };
 
+  const claimAndOpenEncounter = async (item: QueueItem) => {
+    setClaimingId(item.id);
+    setError(null);
+
+    try {
+      const response = await apiFetch(`/encounters/${item.id}/claim`, {
+        method: "PATCH",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to claim encounter.");
+      }
+
+      const payload = (await response.json()) as { data?: { id?: string } };
+      const encounterId = payload.data?.id ?? item.id;
+      router.push(`/dashboard/encounters?encounterId=${encodeURIComponent(encounterId)}`);
+    } catch {
+      router.push(`/dashboard/encounters?encounterId=${encodeURIComponent(item.id)}`);
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   return (
     <main className="space-y-4 p-4 md:p-6">
       <header className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -244,6 +270,14 @@ export default function QueuePage() {
                           className="rounded bg-teal-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-800"
                         >
                           Move
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void claimAndOpenEncounter(item)}
+                          disabled={claimingId === item.id}
+                          className="rounded border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100"
+                        >
+                          {claimingId === item.id ? "Opening..." : "Open Visit"}
                         </button>
                       </div>
                     </div>
