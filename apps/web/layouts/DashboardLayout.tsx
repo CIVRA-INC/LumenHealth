@@ -13,6 +13,7 @@ const NAV = [
   { href: "/dashboard/notes", label: "Notes", disabled: false },
   { href: "/dashboard/diagnoses", label: "Diagnoses", disabled: false },
   { href: "/dashboard/patients", label: "Patients", disabled: false },
+  { href: "/dashboard/settings/clinic", label: "Clinic Settings", disabled: false },
   { href: "/dashboard/settings/staff", label: "Staff", disabled: false },
   { href: "/dashboard/audit", label: "Audit Logs", disabled: false },
   { href: "/dashboard/billing", label: "Billing", disabled: false },
