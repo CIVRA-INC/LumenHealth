@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
 
 type HistoryVitals = {
@@ -83,6 +84,7 @@ const statusBadgeClass = (status: HistoryDiagnosis["status"]) => {
 
 export default function PatientHistoryPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const patientId = params?.id ?? "";
 
   const [patient, setPatient] = useState<HistoryPatient | null>(null);
@@ -93,6 +95,7 @@ export default function PatientHistoryPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [isStartingEncounter, setIsStartingEncounter] = useState(false);
 
   const loaderRef = useRef<HTMLDivElement | null>(null);
   const inFlightRef = useRef(false);
@@ -175,14 +178,114 @@ export default function PatientHistoryPage() {
     return `${patient.firstName} ${patient.lastName}`.trim();
   }, [patient]);
 
+  const patientAge = useMemo(() => {
+    if (!patient?.dateOfBirth) return null;
+    const dob = new Date(patient.dateOfBirth);
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    const monthDelta = now.getMonth() - dob.getMonth();
+    if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < dob.getDate())) {
+      age -= 1;
+    }
+    return age;
+  }, [patient?.dateOfBirth]);
+
+  const activeEncounter = useMemo(
+    () => encounters.find((encounter) => encounter.status !== "CLOSED") ?? null,
+    [encounters],
+  );
+
+  const startEncounter = async () => {
+    if (!patientId) {
+      return;
+    }
+
+    setIsStartingEncounter(true);
+    setError(null);
+    try {
+      const response = await apiFetch("/encounters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to start encounter.");
+      }
+
+      const payload = (await response.json()) as { data?: { id?: string } };
+      const encounterId = payload.data?.id;
+      if (!encounterId) {
+        throw new Error("Encounter could not be opened.");
+      }
+
+      router.push(`/dashboard/encounters?encounterId=${encodeURIComponent(encounterId)}`);
+    } catch (err) {
+      setError((err as Error).message || "Unable to start encounter.");
+    } finally {
+      setIsStartingEncounter(false);
+    }
+  };
+
   return (
     <main className="space-y-4 p-4 md:p-6">
       <header className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">Patient Timeline</h1>
         {patient ? (
-          <p className="mt-1 text-sm text-slate-600">
-            {fullName} ({patient.systemId}) · {patient.sex}
-          </p>
+          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600">
+                {fullName} ({patient.systemId}) · {patient.sex}
+                {patientAge !== null ? ` · ${patientAge}y` : ""}
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span
+                  className={`rounded-full border px-2.5 py-1 font-semibold ${
+                    patient.isActive
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-slate-50 text-slate-600"
+                  }`}
+                >
+                  {patient.isActive ? "Active Record" : "Inactive Record"}
+                </span>
+                {activeEncounter ? (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">
+                    Active Encounter
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {activeEncounter ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/dashboard/encounters?encounterId=${encodeURIComponent(activeEncounter.id)}`,
+                    )
+                  }
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Continue Encounter
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void startEncounter()}
+                disabled={isStartingEncounter}
+                className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-400"
+              >
+                {isStartingEncounter ? "Starting..." : "Start Encounter"}
+              </button>
+              <Link
+                href="/dashboard/billing"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Billing
+              </Link>
+            </div>
+          </div>
         ) : (
           <p className="mt-1 text-sm text-slate-600">Loading patient profile...</p>
         )}
