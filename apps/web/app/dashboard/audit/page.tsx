@@ -13,6 +13,9 @@ type AuditLogRecord = {
   resource: string;
   resourceId?: string;
   ipAddress: string;
+  method?: string;
+  path?: string;
+  statusCode?: number;
 };
 
 type AuditLogsResponse = {
@@ -72,6 +75,7 @@ export default function AuditLogsPage() {
   const [endDate, setEndDate] = useState("");
   const [action, setAction] = useState<AuditAction | "">("");
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const [debouncedFilters, setDebouncedFilters] = useState({
     startDate: "",
@@ -231,18 +235,41 @@ export default function AuditLogsPage() {
             <p className="text-xs text-slate-500">
               {isDebouncing ? "Applying filters..." : "Filters applied"}
             </p>
-            <button
-              type="button"
-              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-              onClick={() => {
-                setStartDate("");
-                setEndDate("");
-                setAction("");
-                setSelectedUserId("");
-              }}
-            >
-              Clear filters
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  const queryString = buildQueryString({
+                    startDate: toIsoStartOfDay(debouncedFilters.startDate),
+                    endDate: toIsoEndOfDay(debouncedFilters.endDate),
+                    action: debouncedFilters.action || undefined,
+                    userId: debouncedFilters.selectedUserId || undefined,
+                    format: "csv",
+                  });
+
+                  window.open(
+                    `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1"}/audit-logs?${queryString}`,
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                }}
+              >
+                Export CSV
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                  setAction("");
+                  setSelectedUserId("");
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
           </div>
         </section>
 
@@ -279,35 +306,72 @@ export default function AuditLogsPage() {
                     </td>
                   </tr>
                 ) : (
-                  logs.map((log) => (
-                    <tr key={log._id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
-                        {formatTimestamp(log.timestamp)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium">{log.userId}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${ACTION_STYLES[log.action]}`}
-                        >
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-medium">{log.resource}</span>
-                        {log.resourceId ? (
-                          <span className="ml-1 text-xs text-slate-500">#{log.resourceId}</span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">
-                        {`${log.userId} [${log.action}] ${log.resource}${
-                          log.resourceId ? ` #${log.resourceId}` : ""
-                        } at ${formatTimestamp(log.timestamp)}`}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
-                        {log.ipAddress}
-                      </td>
-                    </tr>
-                  ))
+                  logs.flatMap((log) => {
+                    const isExpanded = expandedLogId === log._id;
+
+                    return [
+                      <tr key={log._id}>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
+                          {formatTimestamp(log.timestamp)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 font-medium">{log.userId}</td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${ACTION_STYLES[log.action]}`}
+                          >
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-medium">{log.resource}</span>
+                          {log.resourceId ? (
+                            <span className="ml-1 text-xs text-slate-500">#{log.resourceId}</span>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          <div className="space-y-1">
+                            <p>
+                              {`${log.userId} [${log.action}] ${log.resource}${
+                                log.resourceId ? ` #${log.resourceId}` : ""
+                              } at ${formatTimestamp(log.timestamp)}`}
+                            </p>
+                            <button
+                              type="button"
+                              className="font-semibold text-teal-700"
+                              onClick={() => setExpandedLogId(isExpanded ? null : log._id)}
+                            >
+                              {isExpanded ? "Hide details" : "View details"}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
+                          {log.ipAddress}
+                        </td>
+                      </tr>,
+                      ...(isExpanded
+                        ? [
+                            <tr key={`${log._id}-details`} className="bg-slate-50">
+                              <td className="px-4 py-3 text-xs text-slate-600" colSpan={6}>
+                                <div className="grid gap-2 md:grid-cols-3">
+                                  <div>
+                                    <p className="font-semibold text-slate-700">Path</p>
+                                    <p>{log.path ?? "Unavailable on this deployment"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-slate-700">Method</p>
+                                    <p>{log.method ?? "Unavailable on this deployment"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-slate-700">Status Code</p>
+                                    <p>{log.statusCode ?? "Unavailable on this deployment"}</p>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>,
+                          ]
+                        : []),
+                    ];
+                  })
                 )}
               </tbody>
             </table>
