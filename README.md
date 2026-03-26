@@ -127,6 +127,8 @@ cp .env.example .env
 ```env
 API_PORT=4000
 MONGO_URI=mongodb://localhost:27017/lumenhealth
+JWT_ACCESS_TOKEN_SECRET=replace_me
+JWT_REFRESH_TOKEN_SECRET=replace_me_too
 STELLAR_NETWORK=testnet
 GEMINI_API_KEY=your_key_here
 
