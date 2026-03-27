@@ -156,6 +156,22 @@ npm run dev -w apps/web       # Run only Frontend
 
 ```
 
+### Running API Tests
+
+Install workspace dependencies from the repository root first:
+
+```bash
+npm install
+```
+
+Then run the API test suite:
+
+```bash
+npm test -w apps/api
+```
+
+If the API workspace has not been installed yet, the test script now exits with a clear setup message instead of a generic missing-binary error.
+
 ---
 
 [UI design](https://www.figma.com/design/zKvGSIUGADZgYe1aKyJuUg/Qyou?node-id=0-1&t=O7feQUlPDaDLVIcK-1)
