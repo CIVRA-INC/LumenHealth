@@ -1,6 +1,11 @@
+"use client";
+
 import { VitalsEntryGrid } from "@/components/vitals/VitalsEntryGrid";
+import { useEncounter } from "@/providers/EncounterProvider";
 
 export default function VitalsPage() {
+  const { activeEncounterId } = useEncounter();
+
   return (
     <main className="space-y-4 p-4 md:p-6">
       <header className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -10,7 +15,7 @@ export default function VitalsPage() {
         </p>
       </header>
 
-      <VitalsEntryGrid />
+      <VitalsEntryGrid encounterId={activeEncounterId} />
     </main>
   );
 }

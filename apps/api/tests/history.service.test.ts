@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMockHistoryEncounters, toPagination } from "../src/modules/patients/history.service";
+import { toPagination } from "../src/modules/patients/history.service";
 
 describe("patient history helpers", () => {
   it("calculates pagination offsets", () => {
@@ -7,12 +7,10 @@ describe("patient history helpers", () => {
     expect(pagination).toEqual({ page: 3, limit: 5, skip: 10 });
   });
 
-  it("returns mock encounters sorted newest to oldest", () => {
-    const rows = buildMockHistoryEncounters();
-    expect(rows.length).toBe(3);
-
-    const openedTimes = rows.map((row) => new Date(row.openedAt).getTime());
-    expect(openedTimes[0]).toBeGreaterThan(openedTimes[1]);
-    expect(openedTimes[1]).toBeGreaterThan(openedTimes[2]);
+  it("keeps page and limit for empty datasets", () => {
+    const pagination = toPagination(1, 10);
+    expect(pagination.page).toBe(1);
+    expect(pagination.limit).toBe(10);
+    expect(pagination.skip).toBe(0);
   });
 });

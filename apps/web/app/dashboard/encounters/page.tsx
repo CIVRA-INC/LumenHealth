@@ -7,6 +7,7 @@ import { CloseEncounterModal } from "@/components/encounters/CloseEncounterModal
 import { EncounterLockOverlay } from "@/components/encounters/EncounterLockOverlay";
 import { AlertSystem } from "@/components/encounters/AlertSystem";
 import { Summarizer } from "@/components/ai/Summarizer";
+import { useEncounter } from "@/providers/EncounterProvider";
 
 type EncounterStatus = "OPEN" | "IN_PROGRESS" | "CLOSED";
 
@@ -38,6 +39,7 @@ const DEMO_ENCOUNTER: EncounterPayload = {
 };
 
 export default function EncountersPage() {
+  const { setActiveEncounterId } = useEncounter();
   const [encounter, setEncounter] = useState<EncounterPayload>(DEMO_ENCOUNTER);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmittingClose, setIsSubmittingClose] = useState(false);
@@ -130,6 +132,8 @@ export default function EncountersPage() {
       isCancelled = true;
     };
   }, [encounter.id]);
+    setActiveEncounterId(isLocked ? null : encounter.id);
+  }, [encounter.id, isLocked, setActiveEncounterId]);
 
   const closeEncounter = async () => {
     if (encounter.id === "demo-encounter") {
@@ -138,6 +142,7 @@ export default function EncountersPage() {
         status: "CLOSED",
         closedAt: new Date().toISOString(),
       }));
+      setActiveEncounterId(null);
       setIsModalOpen(false);
       setMessage("Encounter closed locally (demo mode). All inputs are now locked.");
       return;
@@ -161,6 +166,7 @@ export default function EncountersPage() {
       const payload = (await response.json()) as { data?: EncounterPayload };
       if (payload.data) {
         setEncounter(payload.data);
+        setActiveEncounterId(payload.data.status === "CLOSED" ? null : payload.data.id);
       }
       setIsModalOpen(false);
       setMessage("Encounter closed successfully.");

@@ -2,10 +2,13 @@ import { Request, Response, Router } from 'express';
 import { authorize, Roles } from '../../middlewares/rbac.middleware';
 import { validateRequest } from '../../middlewares/validate.middleware';
 import { EncounterModel } from './models/encounter.model';
+import { syncQueueEncounterState } from '../queue/queue-state.service';
 import {
   CreateEncounterDto,
+  EncounterListQueryDto,
   EncounterIdParamsDto,
   createEncounterSchema,
+  encounterListQuerySchema,
   encounterIdParamsSchema,
 } from './encounters.validation';
 
@@ -37,6 +40,12 @@ type CreateEncounterRequest = Request<
   unknown,
   CreateEncounterDto
 >;
+type EncounterListRequest = Request<
+  Record<string, string>,
+  unknown,
+  unknown,
+  EncounterListQueryDto
+>;
 type EncounterByIdRequest = Request<EncounterIdParamsDto>;
 
 const toPayload = (doc: {
@@ -56,6 +65,40 @@ const toPayload = (doc: {
   openedAt: doc.openedAt.toISOString(),
   closedAt: doc.closedAt ? doc.closedAt.toISOString() : null,
 });
+
+router.get(
+  '/',
+  authorize(CREATE_ROLES),
+  validateRequest({ query: encounterListQuerySchema }),
+  async (req: EncounterListRequest, res: Response) => {
+    const clinicId = req.user?.clinicId;
+
+    if (!clinicId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      });
+    }
+
+    const filter = {
+      clinicId,
+      ...(req.query.patientId ? { patientId: req.query.patientId } : {}),
+      ...(req.query.status ? { status: req.query.status } : {}),
+    };
+
+    const encounters = await EncounterModel.find(filter)
+      .sort({ openedAt: -1 })
+      .limit(req.query.limit ?? 25)
+      .lean();
+
+    return res.json({
+      status: 'success',
+      data: encounters.map((encounter) =>
+        toPayload(encounter as Parameters<typeof toPayload>[0]),
+      ),
+    });
+  },
+);
 
 router.post(
   '/',
@@ -157,6 +200,13 @@ router.patch(
         });
       }
 
+      await syncQueueEncounterState({
+        clinicId,
+        encounterId: String(updated._id),
+        encounterStatus: 'IN_PROGRESS',
+        queueStatus: 'CONSULTATION',
+      });
+
       return res.json({
         status: 'success',
         data: toPayload(updated as Parameters<typeof toPayload>[0]),
@@ -257,6 +307,13 @@ router.patch(
           message: 'Encounter could not be closed',
         });
       }
+
+      await syncQueueEncounterState({
+        clinicId,
+        encounterId: req.params.id,
+        encounterStatus: 'CLOSED',
+        closedAt,
+      });
 
       const updated = await EncounterModel.findOne({
         _id: req.params.id,
