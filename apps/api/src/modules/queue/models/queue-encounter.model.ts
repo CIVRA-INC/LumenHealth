@@ -11,6 +11,7 @@ export interface QueueEncounterDocument {
   queueStatus: QueueStatus;
   encounterStatus: EncounterStatus;
   openedAt: Date;
+  closedAt?: Date | null;
 }
 
 const queueEncounterSchema = new Schema<QueueEncounterDocument>(
@@ -56,6 +57,10 @@ const queueEncounterSchema = new Schema<QueueEncounterDocument>(
       default: () => new Date(),
       index: true,
     },
+    closedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -65,6 +70,7 @@ const queueEncounterSchema = new Schema<QueueEncounterDocument>(
 
 queueEncounterSchema.index({ clinicId: 1, openedAt: -1 });
 queueEncounterSchema.index({ clinicId: 1, encounterId: 1 }, { unique: true, sparse: true });
+
 
 export const QueueEncounterModel =
   models.QueueEncounter || model<QueueEncounterDocument>("QueueEncounter", queueEncounterSchema);
