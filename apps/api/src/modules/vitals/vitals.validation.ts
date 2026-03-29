@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const createVitalsSchema = z.object({
-  encounterId: z.string().trim().min(1).optional(),
+  encounterId: z.string().trim().min(1),
   bpSystolic: z.number().min(30).max(300),
   bpDiastolic: z.number().min(20).max(200),
   heartRate: z.number().min(20).max(260),

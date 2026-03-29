@@ -35,69 +35,6 @@ const endOfDay = (date: Date) => {
   return result;
 };
 
-const buildMockQueueRows = (clinicId: string) => {
-  const now = Date.now();
-  return [
-    {
-      clinicId,
-      patientName: "Amina Kato",
-      systemId: "LMN-2041",
-      queueStatus: "WAITING" as const,
-      encounterStatus: "OPEN" as const,
-      openedAt: new Date(now - 22 * 60_000),
-    },
-    {
-      clinicId,
-      patientName: "John Okello",
-      systemId: "LMN-2042",
-      queueStatus: "WAITING" as const,
-      encounterStatus: "OPEN" as const,
-      openedAt: new Date(now - 14 * 60_000),
-    },
-    {
-      clinicId,
-      patientName: "Sarah Ninsiima",
-      systemId: "LMN-2043",
-      queueStatus: "TRIAGE" as const,
-      encounterStatus: "IN_PROGRESS" as const,
-      openedAt: new Date(now - 9 * 60_000),
-    },
-    {
-      clinicId,
-      patientName: "David Mugisha",
-      systemId: "LMN-2044",
-      queueStatus: "CONSULTATION" as const,
-      encounterStatus: "IN_PROGRESS" as const,
-      openedAt: new Date(now - 31 * 60_000),
-    },
-    {
-      clinicId,
-      patientName: "Mercy Atwine",
-      systemId: "LMN-2045",
-      queueStatus: "TRIAGE" as const,
-      encounterStatus: "IN_PROGRESS" as const,
-      openedAt: new Date(now - 5 * 60_000),
-    },
-  ];
-};
-
-const ensureQueueSeed = async (clinicId: string) => {
-  const todayStart = startOfDay(new Date());
-  const todayEnd = endOfDay(new Date());
-
-  const existingCount = await QueueEncounterModel.countDocuments({
-    clinicId,
-    openedAt: { $gte: todayStart, $lte: todayEnd },
-    encounterStatus: { $in: ["OPEN", "IN_PROGRESS"] },
-  });
-
-  if (existingCount > 0) {
-    return;
-  }
-
-  await QueueEncounterModel.insertMany(buildMockQueueRows(clinicId));
-};
-
 const toPayload = (doc: {
   _id: unknown;
   patientName: string;
@@ -123,8 +60,6 @@ router.get("/today", authorize(ALL_ROLES), async (req: Request, res: Response) =
       message: "Authentication required",
     });
   }
-
-  await ensureQueueSeed(clinicId);
 
   const todayStart = startOfDay(new Date());
   const todayEnd = endOfDay(new Date());

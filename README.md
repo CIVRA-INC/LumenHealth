@@ -53,6 +53,48 @@ lumen-health/
 
 ```
 
+## Current MVP Surface
+
+The repository already contains:
+
+- Clinic registration and authentication
+- Staff management
+- Patient registration, search, and timeline
+- Encounter create, claim, and close flows
+- Queue board with live updates
+- Vitals, notes, diagnoses, and audit views
+- Stellar billing intent generation and payment polling
+- AI streaming and CDS worker scaffolding
+
+## Main Web Routes
+
+- `/login`
+- `/register`
+- `/dashboard`
+- `/dashboard/queue`
+- `/dashboard/encounters`
+- `/dashboard/patients`
+- `/dashboard/notes`
+- `/dashboard/vitals`
+- `/dashboard/diagnoses`
+- `/dashboard/audit`
+- `/dashboard/billing`
+
+## Main API Areas
+
+- `/api/v1/auth`
+- `/api/v1/clinics`
+- `/api/v1/users`
+- `/api/v1/patients`
+- `/api/v1/encounters`
+- `/api/v1/queue`
+- `/api/v1/vitals`
+- `/api/v1/notes`
+- `/api/v1/diagnoses/search`
+- `/api/v1/audit-logs`
+- `/api/v1/payments`
+- `/api/v1/ai`
+
 ### Backend Internal Structure (`apps/api`)
 
 The API follows a **Modular Monolith** pattern. Code is organized by domain, not just technical layer.
@@ -127,6 +169,8 @@ cp .env.example .env
 ```env
 API_PORT=4000
 MONGO_URI=mongodb://localhost:27017/lumenhealth
+JWT_ACCESS_TOKEN_SECRET=replace_me
+JWT_REFRESH_TOKEN_SECRET=replace_me_too
 STELLAR_NETWORK=testnet
 GEMINI_API_KEY=your_key_here
 

@@ -6,8 +6,8 @@
     "dev": "tsx watch src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
-    "test": "vitest run",
-    "seed:demo": "node scripts/seed-demo.cjs"
+    "test": "npm run test:check && vitest run",
+    "test:check": "node scripts/ensure-test-tooling.cjs"
   },
   "keywords": [],
   "author": "",

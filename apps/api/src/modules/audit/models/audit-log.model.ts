@@ -12,6 +12,9 @@ export interface AuditLogDocument {
   action: AuditAction;
   resource: string;
   resourceId?: string;
+  method: string;
+  path: string;
+  statusCode: number;
   timestamp: Date;
   ipAddress: string;
 }
@@ -45,6 +48,21 @@ const auditLogSchema = new Schema<AuditLogDocument>(
       type: String,
       required: false,
       trim: true,
+    },
+    method: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    path: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    statusCode: {
+      type: Number,
+      required: true,
+      index: true,
     },
     timestamp: {
       type: Date,

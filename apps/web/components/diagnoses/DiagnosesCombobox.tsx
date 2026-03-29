@@ -11,6 +11,8 @@ type DiagnosisOption = {
 };
 
 type SelectedDiagnosis = DiagnosisOption & {
+  id?: string;
+  encounterId?: string;
   status: DiagnosisStatus;
 };
 
@@ -23,6 +25,26 @@ export const DiagnosesCombobox = ({ encounterId }: { encounterId: string }) => {
   const [error, setError] = useState<string | null>(null);
 
   const normalizedQuery = useMemo(() => query.trim(), [query]);
+
+  useEffect(() => {
+    const loadAttachedDiagnoses = async () => {
+      setError(null);
+
+      try {
+        const response = await apiFetch(`/encounters/${encounterId}/diagnoses`);
+        if (!response.ok) {
+          throw new Error("failed");
+        }
+
+        const payload = (await response.json()) as { data?: SelectedDiagnosis[] };
+        setSelected(payload.data ?? []);
+      } catch {
+        setSelected([]);
+      }
+    };
+
+    void loadAttachedDiagnoses();
+  }, [encounterId]);
 
   useEffect(() => {
     if (!normalizedQuery) {
@@ -82,12 +104,18 @@ export const DiagnosesCombobox = ({ encounterId }: { encounterId: string }) => {
       return;
     }
 
+    const payload = (await response.json()) as { data?: SelectedDiagnosis };
+
     setSelected((current) => {
-      if (current.some((item) => item.code === option.code)) {
-        return current;
+      const existingIndex = current.findIndex((item) => item.code === option.code);
+      const nextItem = payload.data ?? { ...option, status: currentStatus };
+      if (existingIndex === -1) {
+        return [...current, nextItem];
       }
 
-      return [...current, { ...option, status: currentStatus }];
+      const next = [...current];
+      next[existingIndex] = nextItem;
+      return next;
     });
 
     setQuery("");

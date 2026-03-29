@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { NotesFeed, type ClinicalNoteItem } from "@/components/notes/NotesFeed";
 import { SoapNoteEditor } from "@/components/notes/SoapNoteEditor";
-
-const ENCOUNTER_ID = "mock-enc-123";
+import { useEncounter } from "@/providers/EncounterProvider";
 
 export default function NotesPage() {
+  const { activeEncounterId } = useEncounter();
   const [notes, setNotes] = useState<ClinicalNoteItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,8 +16,14 @@ export default function NotesPage() {
     setIsLoading(true);
     setError(null);
 
+    if (!activeEncounterId) {
+      setNotes([]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const response = await apiFetch(`/notes/encounter/${ENCOUNTER_ID}`);
+      const response = await apiFetch(`/notes/encounter/${activeEncounterId}`);
       if (!response.ok) {
         throw new Error("Failed to load notes");
       }
@@ -34,7 +40,7 @@ export default function NotesPage() {
 
   useEffect(() => {
     void loadNotes();
-  }, []);
+  }, [activeEncounterId]);
 
   const appendNote = async (payload: {
     encounterId: string;
@@ -80,7 +86,13 @@ export default function NotesPage() {
         </p>
       </header>
 
-      <SoapNoteEditor encounterId={ENCOUNTER_ID} isLocked={false} onSubmit={appendNote} />
+      {!activeEncounterId ? (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-sm">
+          Open or select an encounter to view and append notes.
+        </section>
+      ) : (
+        <SoapNoteEditor encounterId={activeEncounterId} isLocked={false} onSubmit={appendNote} />
+      )}
 
       {isLoading ? (
         <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
@@ -89,6 +101,10 @@ export default function NotesPage() {
       ) : error ? (
         <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
           {error}
+        </section>
+      ) : !activeEncounterId ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
+          No encounter selected.
         </section>
       ) : (
         <NotesFeed notes={notes} />

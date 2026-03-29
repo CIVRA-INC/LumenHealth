@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -58,20 +58,25 @@ const getTempSignal = (value: number | undefined) => {
   };
 };
 
-export const VitalsEntryGrid = () => {
+export const VitalsEntryGrid = ({
+  encounterId,
+}: {
+  encounterId: string | null;
+}) => {
   const [apiError, setApiError] = useState<string | null>(null);
   const [successState, setSuccessState] = useState<VitalsResponse | null>(null);
 
   const {
     register,
     handleSubmit,
+    setValue,
     watch,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<VitalsFormInput>({
     resolver: zodResolver(vitalsSchema),
     defaultValues: {
-      encounterId: "mock-enc-123",
+      encounterId: encounterId ?? "",
       bpSystolic: 120,
       bpDiastolic: 80,
       heartRate: 78,
@@ -82,11 +87,21 @@ export const VitalsEntryGrid = () => {
     },
   });
 
+  const watchedEncounterId = watch("encounterId");
   const watchedTemperature = watch("temperature");
   const tempSignal = useMemo(
     () => getTempSignal(typeof watchedTemperature === "number" ? watchedTemperature : undefined),
     [watchedTemperature],
   );
+  const isEncounterMissing = !encounterId && !watchedEncounterId;
+
+  useEffect(() => {
+    if (!encounterId) {
+      return;
+    }
+
+    setValue("encounterId", encounterId, { shouldValidate: true });
+  }, [encounterId, setValue]);
 
   const onSubmit = handleSubmit(async (input) => {
     setApiError(null);
@@ -127,6 +142,12 @@ export const VitalsEntryGrid = () => {
           Enter vitals rapidly with real-time risk feedback before submission.
         </p>
       </header>
+
+      {isEncounterMissing ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Open or select an encounter to save vitals.
+        </div>
+      ) : null}
 
       <form className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4" onSubmit={onSubmit}>
         <label className="text-xs font-medium uppercase tracking-wide text-slate-600">
@@ -240,7 +261,7 @@ export const VitalsEntryGrid = () => {
             type="submit"
             data-primary-action="true"
             className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isEncounterMissing}
           >
             {isSubmitting ? "Saving Vitals..." : "Save Vitals"}
           </button>

@@ -1,7 +1,10 @@
+"use client";
+
 import { DiagnosesCombobox } from "@/components/diagnoses/DiagnosesCombobox";
+import { useEncounter } from "@/providers/EncounterProvider";
 
 export default function DiagnosesPage() {
-  const encounterId = "mock-enc-123";
+  const { activeEncounterId } = useEncounter();
 
   return (
     <main className="space-y-4 p-4 md:p-6">
@@ -12,7 +15,13 @@ export default function DiagnosesPage() {
         </p>
       </header>
 
-      <DiagnosesCombobox encounterId={encounterId} />
+      {activeEncounterId ? (
+        <DiagnosesCombobox encounterId={activeEncounterId} />
+      ) : (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-sm">
+          Open or select an encounter to search and attach diagnoses.
+        </section>
+      )}
     </main>
   );
 }

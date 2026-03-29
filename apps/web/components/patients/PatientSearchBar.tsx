@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
 import type { Patient } from "@lumen/types";
 
@@ -16,10 +18,12 @@ const getAge = (dobIso: string) => {
 };
 
 export const PatientSearchBar = () => {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Patient[]>([]);
+  const [launchingPatientId, setLaunchingPatientId] = useState<string | null>(null);
 
   const trimmedQuery = useMemo(() => query.trim(), [query]);
 
@@ -63,6 +67,35 @@ export const PatientSearchBar = () => {
     };
   }, [trimmedQuery]);
 
+  const launchEncounter = async (patientId: string) => {
+    setLaunchingPatientId(patientId);
+    setError(null);
+
+    try {
+      const response = await apiFetch("/encounters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to start encounter");
+      }
+
+      const payload = (await response.json()) as { data?: { id?: string } };
+      const encounterId = payload.data?.id;
+      if (!encounterId) {
+        throw new Error("Invalid encounter response");
+      }
+
+      router.push(`/dashboard/encounters?encounterId=${encodeURIComponent(encounterId)}`);
+    } catch {
+      setError("Unable to start encounter for this patient.");
+    } finally {
+      setLaunchingPatientId(null);
+    }
+  };
+
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
@@ -91,7 +124,7 @@ export const PatientSearchBar = () => {
               {results.map((patient) => (
                 <li
                   key={patient.id}
-                  className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                 >
                   <div>
                     <p className="font-medium text-slate-900">
@@ -104,6 +137,22 @@ export const PatientSearchBar = () => {
                   <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                     {patient.systemId}
                   </span>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/dashboard/patients/${patient.id}`}
+                      className="rounded border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                    >
+                      View
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void launchEncounter(patient.id)}
+                      disabled={launchingPatientId === patient.id}
+                      className="rounded bg-teal-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-teal-800 disabled:bg-slate-400"
+                    >
+                      {launchingPatientId === patient.id ? "Starting..." : "Start Encounter"}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
