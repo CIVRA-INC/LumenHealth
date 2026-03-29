@@ -69,7 +69,8 @@ const queueEncounterSchema = new Schema<QueueEncounterDocument>(
 );
 
 queueEncounterSchema.index({ clinicId: 1, openedAt: -1 });
-queueEncounterSchema.index({ clinicId: 1, encounterId: 1 }, { sparse: true });
+queueEncounterSchema.index({ clinicId: 1, encounterId: 1 }, { unique: true, sparse: true });
+
 
 export const QueueEncounterModel =
   models.QueueEncounter || model<QueueEncounterDocument>("QueueEncounter", queueEncounterSchema);
