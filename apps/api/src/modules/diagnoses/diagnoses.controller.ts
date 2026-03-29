@@ -1,6 +1,7 @@
 import { Request, Response, Router } from "express";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
+import { EncounterModel } from "../encounters/models/encounter.model";
 import { DiagnosisModel } from "./models/diagnosis.model";
 import { Icd10CodeModel } from "./models/icd10-code.model";
 import {
@@ -22,6 +23,7 @@ type AttachDiagnosisRequest = Request<
   unknown,
   AttachDiagnosisDto
 >;
+type EncounterDiagnosisRequest = Request<EncounterDiagnosisParamsDto>;
 
 router.get(
   "/diagnoses/search",
@@ -87,6 +89,20 @@ router.post(
       });
     }
 
+    const encounter = await EncounterModel.findOne({
+      _id: req.params.encounterId,
+      clinicId,
+    })
+      .select({ _id: 1 })
+      .lean();
+
+    if (!encounter) {
+      return res.status(404).json({
+        error: "NotFound",
+        message: "Encounter not found",
+      });
+    }
+
     const diagnosis = await DiagnosisModel.findOneAndUpdate(
       {
         clinicId,
@@ -115,6 +131,39 @@ router.post(
         description: diagnosis?.description,
         status: diagnosis?.status,
       },
+    });
+  },
+);
+
+router.get(
+  "/encounters/:encounterId/diagnoses",
+  authorize(CLINICAL_ROLES),
+  validateRequest({ params: encounterDiagnosisParamsSchema }),
+  async (req: EncounterDiagnosisRequest, res: Response) => {
+    const clinicId = req.user?.clinicId;
+    if (!clinicId) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
+    const diagnoses = await DiagnosisModel.find({
+      clinicId,
+      encounterId: req.params.encounterId,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({
+      status: "success",
+      data: diagnoses.map((diagnosis) => ({
+        id: String(diagnosis._id),
+        encounterId: diagnosis.encounterId,
+        code: diagnosis.code,
+        description: diagnosis.description,
+        status: diagnosis.status,
+      })),
     });
   },
 );
