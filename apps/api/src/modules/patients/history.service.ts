@@ -13,76 +13,6 @@ export const toPagination = (page: number, limit: number): Pagination => ({
   skip: (page - 1) * limit,
 });
 
-const iso = (date: Date) => date.toISOString();
-
-const makeMockEncounter = (
-  id: string,
-  openedAt: Date,
-  closedAt: Date,
-  summary: string,
-) => ({
-  id,
-  status: "CLOSED",
-  openedAt: iso(openedAt),
-  closedAt: iso(closedAt),
-  providerId: "mock-provider-1",
-  vitals: [
-    {
-      id: `${id}-v1`,
-      timestamp: iso(new Date(openedAt.getTime() + 20 * 60_000)),
-      bpSystolic: 122,
-      bpDiastolic: 80,
-      heartRate: 88,
-      temperature: 37,
-      respirationRate: 16,
-      spO2: 98,
-      weight: 72,
-    },
-  ],
-  notes: [
-    {
-      id: `${id}-n1`,
-      type: "SOAP",
-      authorId: "mock-provider-1",
-      timestamp: iso(new Date(openedAt.getTime() + 35 * 60_000)),
-      content: summary,
-    },
-  ],
-  diagnoses: [
-    {
-      id: `${id}-d1`,
-      code: "B50.9",
-      description: "Malaria, unspecified",
-      status: "CONFIRMED",
-    },
-  ],
-});
-
-export const buildMockHistoryEncounters = () => {
-  const now = Date.now();
-
-  return [
-    makeMockEncounter(
-      "mock-enc-3003",
-      new Date(now - 7 * 24 * 60 * 60_000),
-      new Date(now - 7 * 24 * 60 * 60_000 + 70 * 60_000),
-      "Patient improved after antimalarial dose.",
-    ),
-    makeMockEncounter(
-      "mock-enc-3002",
-      new Date(now - 21 * 24 * 60 * 60_000),
-      new Date(now - 21 * 24 * 60 * 60_000 + 65 * 60_000),
-      "Follow-up visit with reduced fever.",
-    ),
-    makeMockEncounter(
-      "mock-enc-3001",
-      new Date(now - 38 * 24 * 60 * 60_000),
-      new Date(now - 38 * 24 * 60 * 60_000 + 95 * 60_000),
-      "Initial presentation with high fever and chills.",
-    ),
-  ];
-};
-
 export const getPatientHistory = async (input: {
   patientId: string;
   clinicId: string;
@@ -213,11 +143,6 @@ export const getPatientHistory = async (input: {
     })),
   }));
 
-  const fallback = buildMockHistoryEncounters();
-  const hasReal = mappedEncounters.length > 0;
-
-  const fallbackPageSlice = fallback.slice(pagination.skip, pagination.skip + pagination.limit);
-
   return {
     patient: {
       id: String(patient._id),
@@ -227,13 +152,13 @@ export const getPatientHistory = async (input: {
       sex: patient.sex,
       dateOfBirth: patient.dateOfBirth.toISOString(),
     },
-    encounters: hasReal ? mappedEncounters : fallbackPageSlice,
+    encounters: mappedEncounters,
     meta: {
       page: pagination.page,
       limit: pagination.limit,
-      total: hasReal ? total : fallback.length,
-      totalPages: Math.max(1, Math.ceil((hasReal ? total : fallback.length) / pagination.limit)),
-      source: hasReal ? "db" : "mock",
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pagination.limit)),
+      source: "db",
     },
   };
 };

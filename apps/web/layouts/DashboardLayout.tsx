@@ -6,16 +6,17 @@ import { useAuth } from "@/providers/AuthProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", roles: "ALL" },
-  { href: "/dashboard/queue", label: "Queue", roles: "ALL" },
-  { href: "/dashboard/encounters", label: "Encounters", roles: "ALL" },
-  { href: "/dashboard/vitals", label: "Vitals", roles: "ALL" },
-  { href: "/dashboard/notes", label: "Notes", roles: "ALL" },
-  { href: "/dashboard/diagnoses", label: "Diagnoses", roles: "ALL" },
-  { href: "/dashboard/patients", label: "Patients", roles: "ALL" },
-  { href: "/dashboard/settings/staff", label: "Staff", roles: ["SUPER_ADMIN", "CLINIC_ADMIN"] },
-  { href: "/dashboard/audit", label: "Audit Logs", roles: ["SUPER_ADMIN", "CLINIC_ADMIN"] },
-  { href: "/dashboard/billing", label: "Billing", roles: ["SUPER_ADMIN", "CLINIC_ADMIN"] },
+  { href: "/dashboard", label: "Dashboard", disabled: false },
+  { href: "/dashboard/queue", label: "Queue", disabled: false },
+  { href: "/dashboard/encounters", label: "Encounters", disabled: false },
+  { href: "/dashboard/vitals", label: "Vitals", disabled: false },
+  { href: "/dashboard/notes", label: "Notes", disabled: false },
+  { href: "/dashboard/diagnoses", label: "Diagnoses", disabled: false },
+  { href: "/dashboard/patients", label: "Patients", disabled: false },
+  { href: "/dashboard/settings/clinic", label: "Clinic Settings", disabled: false },
+  { href: "/dashboard/settings/staff", label: "Staff", disabled: false },
+  { href: "/dashboard/audit", label: "Audit Logs", disabled: false },
+  { href: "/dashboard/billing", label: "Billing", disabled: false },
 ] as const;
 
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
