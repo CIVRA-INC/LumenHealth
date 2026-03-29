@@ -200,21 +200,13 @@ npm run dev -w apps/web       # Run only Frontend
 
 ```
 
-### Running API Tests
+### Seeding Demo Data
 
-Install workspace dependencies from the repository root first:
-
-```bash
-npm install
-```
-
-Then run the API test suite:
+To seed a small demo clinic, admin account, patients, and open encounters:
 
 ```bash
-npm test -w apps/api
+MONGO_URI=mongodb://localhost:27017/lumenhealth npm run seed:demo -w apps/api
 ```
-
-If the API workspace has not been installed yet, the test script now exits with a clear setup message instead of a generic missing-binary error.
 
 ---
 
