@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
 
 type HistoryVitals = {
@@ -83,6 +83,7 @@ const statusBadgeClass = (status: HistoryDiagnosis["status"]) => {
 
 export default function PatientHistoryPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const patientId = params?.id ?? "";
 
   const [patient, setPatient] = useState<HistoryPatient | null>(null);
@@ -93,6 +94,7 @@ export default function PatientHistoryPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [isStartingEncounter, setIsStartingEncounter] = useState(false);
 
   const loaderRef = useRef<HTMLDivElement | null>(null);
   const inFlightRef = useRef(false);
@@ -175,14 +177,57 @@ export default function PatientHistoryPage() {
     return `${patient.firstName} ${patient.lastName}`.trim();
   }, [patient]);
 
+  const startEncounter = async () => {
+    if (!patientId) {
+      return;
+    }
+
+    setIsStartingEncounter(true);
+    setError(null);
+
+    try {
+      const response = await apiFetch("/encounters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to start encounter.");
+      }
+
+      const payload = (await response.json()) as { data?: { id?: string } };
+      const encounterId = payload.data?.id;
+      if (!encounterId) {
+        throw new Error("Invalid encounter response.");
+      }
+
+      router.push(`/dashboard/encounters?encounterId=${encodeURIComponent(encounterId)}`);
+    } catch (err) {
+      setError((err as Error).message || "Unable to start encounter.");
+    } finally {
+      setIsStartingEncounter(false);
+    }
+  };
+
   return (
     <main className="space-y-4 p-4 md:p-6">
       <header className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">Patient Timeline</h1>
         {patient ? (
-          <p className="mt-1 text-sm text-slate-600">
-            {fullName} ({patient.systemId}) · {patient.sex}
-          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-600">
+              {fullName} ({patient.systemId}) · {patient.sex}
+            </p>
+            <button
+              type="button"
+              onClick={() => void startEncounter()}
+              disabled={isStartingEncounter}
+              className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-400"
+            >
+              {isStartingEncounter ? "Starting..." : "Start Encounter"}
+            </button>
+          </div>
         ) : (
           <p className="mt-1 text-sm text-slate-600">Loading patient profile...</p>
         )}
