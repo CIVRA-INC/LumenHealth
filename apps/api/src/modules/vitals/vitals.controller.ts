@@ -4,6 +4,8 @@ import { validateRequest } from "../../middlewares/validate.middleware";
 import { calculateVitalsFlags } from "./vitals.flags";
 import { VitalsModel } from "./models/vitals.model";
 import { emitVitalsCreated } from "../ai/cds.events";
+import { EncounterModel } from "../encounters/models/encounter.model";
+import { PatientModel } from "../patients/models/patient.model";
 import {
   CreateVitalsDto,
   EncounterVitalsParamsDto,
@@ -16,6 +18,17 @@ const ALL_ROLES: Roles[] = Object.values(Roles);
 
 type CreateVitalsRequest = Request<Record<string, string>, unknown, CreateVitalsDto>;
 type EncounterVitalsRequest = Request<EncounterVitalsParamsDto>;
+
+const toAgeInYears = (dateOfBirth: Date) => {
+  const now = new Date();
+  let age = now.getFullYear() - dateOfBirth.getFullYear();
+  const monthDelta = now.getMonth() - dateOfBirth.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < dateOfBirth.getDate())) {
+    age -= 1;
+  }
+
+  return Math.max(age, 0);
+};
 
 const toPayload = (doc: {
   _id: unknown;
@@ -60,8 +73,35 @@ router.post(
       });
     }
 
-    const mockPatientAge = 45;
-    const flags = calculateVitalsFlags(mockPatientAge, {
+    const encounter = await EncounterModel.findOne({
+      _id: req.body.encounterId,
+      clinicId,
+    })
+      .select({ patientId: 1 })
+      .lean();
+
+    if (!encounter) {
+      return res.status(404).json({
+        error: "NotFound",
+        message: "Encounter not found",
+      });
+    }
+
+    const patient = await PatientModel.findOne({
+      _id: encounter.patientId,
+      clinicId,
+    })
+      .select({ dateOfBirth: 1 })
+      .lean();
+
+    if (!patient?.dateOfBirth) {
+      return res.status(400).json({
+        error: "BadRequest",
+        message: "Encounter patient record is required before saving vitals",
+      });
+    }
+
+    const flags = calculateVitalsFlags(toAgeInYears(new Date(patient.dateOfBirth)), {
       bpSystolic: req.body.bpSystolic,
       bpDiastolic: req.body.bpDiastolic,
       heartRate: req.body.heartRate,
@@ -69,7 +109,7 @@ router.post(
     });
 
     const created = await VitalsModel.create({
-      encounterId: req.body.encounterId ?? "mock-enc-123",
+      encounterId: req.body.encounterId,
       authorId,
       clinicId,
       timestamp: new Date(),
@@ -86,7 +126,7 @@ router.post(
     // Trigger CDS processing asynchronously so API response path stays fast.
     emitVitalsCreated({
       clinicId,
-      encounterId: req.body.encounterId ?? "mock-enc-123",
+      encounterId: req.body.encounterId,
       vitalsId: String(created._id),
     });
 
