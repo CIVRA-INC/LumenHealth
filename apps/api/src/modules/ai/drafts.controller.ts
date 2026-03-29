@@ -21,6 +21,7 @@ type CreateDraftRequest = Request<Record<string, string>, unknown, CreateAiDraft
 type UpdateDraftRequest = Request<AiDraftIdParamsDto, unknown, UpdateAiDraftDto>;
 type ApproveDraftRequest = Request<AiDraftIdParamsDto, unknown, ApproveAiDraftDto>;
 type DraftByIdRequest = Request<AiDraftIdParamsDto>;
+type DraftListRequest = Request<Record<string, string>, unknown, unknown, { encounterId?: string }>;
 
 const toDraftPayload = (doc: {
   _id: unknown;
@@ -65,6 +66,34 @@ router.post(
     return res.status(201).json({
       status: "success",
       data: toDraftPayload(created.toObject() as Parameters<typeof toDraftPayload>[0]),
+    });
+  },
+);
+
+router.get(
+  "/drafts",
+  authorize(ALL_ROLES),
+  async (req: DraftListRequest, res: Response) => {
+    const clinicId = req.user?.clinicId;
+    if (!clinicId) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
+    const drafts = await AiDraftModel.find({
+      clinicId,
+      ...(req.query.encounterId ? { encounterId: req.query.encounterId } : {}),
+      status: "DRAFT",
+    })
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .lean();
+
+    return res.json({
+      status: "success",
+      data: drafts.map((draft) => toDraftPayload(draft as Parameters<typeof toDraftPayload>[0])),
     });
   },
 );
@@ -185,4 +214,3 @@ router.post(
 );
 
 export const aiDraftRoutes = router;
-

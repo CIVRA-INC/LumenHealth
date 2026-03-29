@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 
 type Props = {
@@ -53,6 +53,33 @@ export const Summarizer = ({ encounterId }: Props) => {
     () => !isGenerating && !isSaving && mode === "draft" && content.trim().length > 0 && !!draftId,
     [content, draftId, isGenerating, isSaving, mode],
   );
+
+  useEffect(() => {
+    const loadDraft = async () => {
+      try {
+        const response = await apiFetch(`/ai/drafts?encounterId=${encodeURIComponent(encounterId)}`);
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as {
+          data?: Array<{ id: string; content: string }>;
+        };
+        const existingDraft = payload.data?.[0];
+        if (!existingDraft) {
+          return;
+        }
+
+        setDraftId(existingDraft.id);
+        setContent(existingDraft.content);
+        setMode("draft");
+      } catch {
+        // Ignore draft bootstrap failures.
+      }
+    };
+
+    void loadDraft();
+  }, [encounterId]);
 
   const startGeneration = async (useDummyStream = false) => {
     if (isGenerating || isSaving) {
@@ -173,6 +200,12 @@ export const Summarizer = ({ encounterId }: Props) => {
     setIsSaving(true);
 
     try {
+      await apiFetch(`/ai/drafts/${encodeURIComponent(draftId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: content.trim() }),
+      });
+
       const response = await apiFetch(`/ai/drafts/${encodeURIComponent(draftId)}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -288,4 +321,3 @@ export const Summarizer = ({ encounterId }: Props) => {
     </section>
   );
 };
-
