@@ -190,6 +190,20 @@ const processVitalsCreated = async (event: VitalsCreatedEvent) => {
     return;
   }
 
+  const existingActiveAlert = await ClinicalAlertModel.findOne({
+    clinicId: event.clinicId,
+    encounterId: event.encounterId,
+    isDismissed: false,
+    "metadata.vitalsId": String(latestVitals._id),
+    message: decision.message,
+  })
+    .select({ _id: 1 })
+    .lean();
+
+  if (existingActiveAlert) {
+    return;
+  }
+
   await ClinicalAlertModel.create({
     clinicId: event.clinicId,
     encounterId: event.encounterId,
@@ -229,4 +243,3 @@ export const __testables = {
   parseJsonResponse,
   maybeExtractJson,
 };
-

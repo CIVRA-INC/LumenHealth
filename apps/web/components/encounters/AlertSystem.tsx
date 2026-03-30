@@ -80,6 +80,7 @@ export const AlertSystem = ({ encounterId }: Props) => {
       await apiFetch(`/ai/alerts/${encodeURIComponent(alertId)}/dismiss`, {
         method: "PATCH",
       });
+      setAlerts((current) => current.filter((alert) => alert.id !== alertId));
     } catch {
       // Keep UI dismissed locally even if network fails.
     }
@@ -119,4 +120,3 @@ export const AlertSystem = ({ encounterId }: Props) => {
     </aside>
   );
 };
-
