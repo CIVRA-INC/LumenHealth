@@ -4,7 +4,7 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 export const config = {
-  port: process.env.API_PORT || 4000,
+  port: process.env.MONGO_URI || process.env.API_PORT || 4000,
 
   mongoUri: process.env.MONGO_URI || '',
   jwt: {
