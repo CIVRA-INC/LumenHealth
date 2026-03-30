@@ -15,7 +15,7 @@ const requireEnv = (name: string) => {
 const optionalEnv = (name: string, fallback = '') => process.env[name]?.trim() || fallback;
 
 export const config = {
-  port: process.env.API_PORT || 4000,
+  port: process.env.MONGO_URI || process.env.API_PORT || 4000,
 
   mongoUri: requireEnv('MONGO_URI'),
   jwt: {
