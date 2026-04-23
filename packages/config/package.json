@@ -1,10 +1,16 @@
 {
   "name": "@lumen/config",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./public": "./public.ts",
+    "./feature-flags": "./feature-flags.ts",
+    "./workspace-boundaries": "./workspace-boundaries.ts"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "main": "index.ts"
+    "check:boundaries": "node check-workspace-boundaries.cjs",
+    "check:boundaries:fixtures": "node check-workspace-boundaries.cjs --fixtures"
   },
   "keywords": [],
   "author": "",

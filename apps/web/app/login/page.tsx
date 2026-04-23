@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { AuthError, useAuth } from "@/providers/AuthProvider";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 
 type Toast = {
   id: string;
@@ -167,10 +168,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const baseUrl =
-        process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1";
-
-      const response = await fetch(`${baseUrl}/auth/forgot-password`, {
+      const response = await fetch(`${getApiBaseUrl()}/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result.data),

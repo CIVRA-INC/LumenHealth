@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { isFeatureEnabled } from "@/lib/runtime-config";
 
 type Props = {
   encounterId: string;
@@ -41,6 +42,7 @@ const parseSseBlock = (block: string): { event: string; payload: unknown } | nul
 };
 
 export const Summarizer = ({ encounterId }: Props) => {
+  const aiEnabled = isFeatureEnabled("aiSummaries");
   const [content, setContent] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -50,11 +52,21 @@ export const Summarizer = ({ encounterId }: Props) => {
   const [mode, setMode] = useState<"idle" | "draft">("idle");
 
   const canApprove = useMemo(
-    () => !isGenerating && !isSaving && mode === "draft" && content.trim().length > 0 && !!draftId,
-    [content, draftId, isGenerating, isSaving, mode],
+    () =>
+      aiEnabled &&
+      !isGenerating &&
+      !isSaving &&
+      mode === "draft" &&
+      content.trim().length > 0 &&
+      !!draftId,
+    [aiEnabled, content, draftId, isGenerating, isSaving, mode],
   );
 
   useEffect(() => {
+    if (!aiEnabled) {
+      return;
+    }
+
     const loadDraft = async () => {
       try {
         const response = await apiFetch(`/ai/drafts?encounterId=${encodeURIComponent(encounterId)}`);
@@ -79,7 +91,18 @@ export const Summarizer = ({ encounterId }: Props) => {
     };
 
     void loadDraft();
-  }, [encounterId]);
+  }, [aiEnabled, encounterId]);
+
+  if (!aiEnabled) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">AI Summary</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          AI summarization is currently disabled by runtime configuration.
+        </p>
+      </section>
+    );
+  }
 
   const startGeneration = async (useDummyStream = false) => {
     if (isGenerating || isSaving) {

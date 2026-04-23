@@ -53,6 +53,29 @@ lumen-health/
 
 ```
 
+## Workspace Boundaries
+
+LumenHealth keeps runtime responsibilities explicit so contributors can work in parallel safely:
+
+- `apps/api`: backend domain modules and REST interfaces only
+- `apps/web`: Next.js operator experience only
+- `apps/stellar-service`: Stellar network operations and diagnostics only
+- `packages/config`: shared runtime configuration, feature flags, and platform guardrails
+- `packages/types`: shared schemas and cross-app TypeScript contracts
+
+Allowed shared imports are intentionally narrow:
+
+- app workspaces may import `@lumen/config` and `@lumen/types`
+- shared packages must not import app workspaces
+- cross-workspace root-relative imports are rejected by `npm run check:boundaries`
+
+Use the boundary checker before merging architecture-sensitive work:
+
+```bash
+npm run check:boundaries
+npm run check:boundaries:fixtures
+```
+
 ## Current MVP Surface
 
 The repository already contains:
@@ -186,6 +209,28 @@ To start **Frontend**, **Backend**, and **Services** simultaneously:
 npm run dev
 
 ```
+
+### Bootstrap Checks
+
+Before first run, validate local prerequisites and optional integrations:
+
+```bash
+npm run setup
+```
+
+To run the same bootstrap flow and seed the demo clinic in one pass:
+
+```bash
+npm run setup:seed-demo
+```
+
+Bootstrap validates:
+
+- Node.js and npm availability
+- root `.env` presence
+- required API secrets
+- optional Gemini and Stellar secrets
+- basic MongoDB host reachability when the URI is directly parseable
 
 * **Frontend:** [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000)
 * **Backend:** [http://localhost:4000](https://www.google.com/search?q=http://localhost:4000)

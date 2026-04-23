@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getPublicRuntimeConfig } from "@lumen/config";
 import { AuthProvider } from "@/providers/AuthProvider";
 import "./globals.css";
 
@@ -12,9 +13,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const runtimeConfig = JSON.stringify(getPublicRuntimeConfig());
+
   return (
     <html lang="en">
       <body className="antialiased">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__LUMEN_RUNTIME_CONFIG__ = ${runtimeConfig};`,
+          }}
+        />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

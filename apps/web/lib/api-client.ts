@@ -1,4 +1,5 @@
 import { AuthTokens } from "./auth-session";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 
 type AuthBindings = {
   getTokens: () => AuthTokens | null;
@@ -7,9 +8,6 @@ type AuthBindings = {
 };
 
 let bindings: AuthBindings | null = null;
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1";
 
 export const configureApiClient = (authBindings: AuthBindings) => {
   bindings = authBindings;
@@ -20,7 +18,7 @@ const buildUrl = (path: string) => {
     return path;
   }
 
-  return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 };
 
 const withAuthHeader = (init: RequestInit, accessToken: string): RequestInit => {

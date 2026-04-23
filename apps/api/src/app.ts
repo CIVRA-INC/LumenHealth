@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { config } from '@lumen/config';
+import { config, getConfigDiagnostics } from '@lumen/config';
 import { connectDB } from './config/db';
 import { startPaymentVerificationWorker } from './modules/payments/worker';
 import { patientRoutes } from './modules/patients/patients.controller';
@@ -33,9 +33,13 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/clinics', clinicOnboardingRoutes);
 app.use('/api/v1/clinics', clinicSettingsRoutes);
 app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/payments', paymentRoutes);
-app.use('/api/v1/ai', aiRoutes);
-app.use('/api/v1/ai', aiDraftRoutes);
+if (config.featureFlags.stellarBilling) {
+  app.use('/api/v1/payments', paymentRoutes);
+}
+if (config.featureFlags.aiSummaries) {
+  app.use('/api/v1/ai', aiRoutes);
+  app.use('/api/v1/ai', aiDraftRoutes);
+}
 app.use('/api/v1/queue', queueRoutes);
 app.use('/api/v1', diagnosisRoutes);
 app.use('/api/v1/patients', patientRoutes);
@@ -46,13 +50,27 @@ app.use('/api/v1/notes', notesRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
+  const diagnostics = getConfigDiagnostics();
+  res.json({
+    status: 'ok',
+    timestamp: new Date(),
+    featureFlags: config.featureFlags,
+    diagnostics: {
+      present: diagnostics.environment.filter((item) => item.status === 'present').length,
+      missing: diagnostics.environment.filter((item) => item.status === 'missing').length,
+      defaulted: diagnostics.environment.filter((item) => item.status === 'defaulted').length,
+    },
+  });
 });
 
 const start = async () => {
   await connectDB();
-  startPaymentVerificationWorker();
-  startCdsWorker();
+  if (config.featureFlags.stellarBilling) {
+    startPaymentVerificationWorker();
+  }
+  if (config.featureFlags.aiSummaries) {
+    startCdsWorker();
+  }
 
   app.listen(config.port, () => {
     console.log(`🚀 API running on http://localhost:${config.port}`);

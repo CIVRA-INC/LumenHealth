@@ -18,6 +18,7 @@ import {
   saveTokens,
 } from "@/lib/auth-session";
 import { configureApiClient } from "@/lib/api-client";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 
 type AuthState = {
   user: AuthUser | null;
@@ -55,9 +56,6 @@ type AuthContextValue = AuthState & {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1";
 
 const parseTokensFromResponse = (raw: unknown): AuthTokens | null => {
   if (!raw || typeof raw !== "object") {
@@ -115,7 +113,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return null;
     }
 
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken }),
@@ -149,7 +147,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     async (credentials: LoginCredentials) => {
       let response: Response;
       try {
-        response = await fetch(`${API_BASE_URL}/auth/login`, {
+        response = await fetch(`${getApiBaseUrl()}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(credentials),

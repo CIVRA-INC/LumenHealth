@@ -7,6 +7,11 @@
     "packages/*"
   ],
   "scripts": {
+    "setup": "node packages/config/bootstrap.cjs",
+    "setup:seed-demo": "node packages/config/bootstrap.cjs --seed-demo",
+    "check:env": "node packages/config/bootstrap.cjs",
+    "check:boundaries": "npm run check:boundaries -w packages/config",
+    "check:boundaries:fixtures": "npm run check:boundaries:fixtures -w packages/config",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "turbo run start",
