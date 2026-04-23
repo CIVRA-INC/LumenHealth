@@ -4,6 +4,7 @@ import { validateRequest } from "../../middlewares/validate.middleware";
 import { splitTextForSse, toSsePayload } from "./stream.utils";
 import { StreamSummaryQueryDto, streamSummaryQuerySchema } from "./stream.validation";
 import { ClinicalAlertModel } from "./models/clinical-alert.model";
+import { config } from "@lumen/config";
 import {
   AlertIdParamsDto,
   EncounterAlertsParamsDto,
@@ -41,7 +42,7 @@ const loadGeminiSdk = async () => {
 };
 
 const streamFromGemini = async (res: Response, encounterId: string) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = config.gemini.apiKey;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured");
   }
@@ -49,7 +50,7 @@ const streamFromGemini = async (res: Response, encounterId: string) => {
   const sdk = await loadGeminiSdk();
   const client = new sdk.GoogleGenerativeAI(apiKey);
   const model = client.getGenerativeModel({
-    model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+    model: config.gemini.model,
   });
 
   const streamMethod = model.streamGenerateContent ?? model.generateContentStream;

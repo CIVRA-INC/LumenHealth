@@ -1,7 +1,7 @@
 import { config } from '@lumen/config';
 
 export default async function Home() {
-  const apiUrl = `http://localhost:${config.port}/health`;
+  const apiUrl = `${config.public.apiBaseUrl.replace(/\/api\/v1$/, '')}/health`;
 
   // DEBUG LOG: Check this in your VS Code terminal when you refresh
   console.log('🔍 Attempting to fetch from:', apiUrl);

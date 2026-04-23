@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 import { useAuth } from "@/providers/AuthProvider";
 
 type QueueStatus = "WAITING" | "TRIAGE" | "CONSULTATION";
@@ -15,8 +16,6 @@ type QueueItem = {
   openedAt: string;
   waitMinutes: number;
 };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1";
 
 const COLUMNS: Array<{ key: QueueStatus; label: string }> = [
   { key: "WAITING", label: "Waiting Room" },
@@ -97,7 +96,7 @@ export default function QueuePage() {
     }
 
     const stream = new EventSource(
-      `${API_BASE}/queue/stream?token=${encodeURIComponent(tokens.accessToken)}`,
+      `${getApiBaseUrl()}/queue/stream?token=${encodeURIComponent(tokens.accessToken)}`,
     );
 
     const onUpdate = (event: MessageEvent) => {

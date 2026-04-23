@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/providers/AuthProvider";
+import { getApiBaseUrl } from "@/lib/runtime-config";
 
 const onboardingSchema = z.object({
   clinicName: z
@@ -43,9 +44,6 @@ const stepFields: Array<Array<keyof OnboardingForm>> = [
   ["clinicName", "location", "contactNumber"],
   ["adminName", "adminEmail", "adminPassword"],
 ];
-
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -95,7 +93,7 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/clinics/register`, {
+      const response = await fetch(`${getApiBaseUrl()}/clinics/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

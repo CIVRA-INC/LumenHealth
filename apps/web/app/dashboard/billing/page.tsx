@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { isFeatureEnabled } from "@/lib/runtime-config";
 import { useAuth } from "@/providers/AuthProvider";
 import { useSubscription } from "@/providers/SubscriptionProvider";
 
@@ -36,6 +37,7 @@ const getStellarUri = (intent: PaymentIntent) =>
   )}&memo=${encodeURIComponent(intent.memo)}&memo_type=${encodeURIComponent(intent.memoType)}`;
 
 export default function BillingPage() {
+  const billingEnabled = isFeatureEnabled("stellarBilling");
   const { user } = useAuth();
   const { expiryDate, daysRemaining, isWriteLocked, refresh } = useSubscription();
 
@@ -159,6 +161,14 @@ export default function BillingPage() {
         <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">Billing</h1>
       </header>
 
+      {!billingEnabled ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Billing Unavailable</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Stellar billing is currently disabled by runtime configuration.
+          </p>
+        </section>
+      ) : (
       <section className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
@@ -325,6 +335,7 @@ export default function BillingPage() {
           ) : null}
         </article>
       </section>
+      )}
     </main>
   );
 }
