@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Architecture or RFC Escalation
+    url: https://github.com/CIVRA-INC/LumenHealth/discussions
+    about: Use Discussions first when the proposed issue changes architecture or long-lived public contracts.

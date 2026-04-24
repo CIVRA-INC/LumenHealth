@@ -9,6 +9,7 @@
     "./workspace-boundaries": "./workspace-boundaries.ts"
   },
   "scripts": {
+    "check:architecture": "node architecture-check.cjs",
     "check:boundaries": "node check-workspace-boundaries.cjs",
     "check:boundaries:fixtures": "node check-workspace-boundaries.cjs --fixtures"
   },

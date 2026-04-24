@@ -1,0 +1,36 @@
+name: Data Model Change
+description: Use for new collections, schema changes, indexes, or retention-related work.
+title: "[data-model] "
+labels:
+  - backend
+  - data-model
+  - enhancement
+body:
+  - type: textarea
+    id: schema
+    attributes:
+      label: Schema Change
+      description: Describe the new or updated fields, indexes, and invariants.
+    validations:
+      required: true
+  - type: textarea
+    id: tenancy
+    attributes:
+      label: Tenancy, Privacy, and Retention
+      description: Explain clinic scoping, PHI handling, and retention expectations.
+    validations:
+      required: true
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration or Backfill Plan
+      description: Describe data migration, compatibility, or rollout needs.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation and Review
+      description: Note tests, query checks, and ADR/RFC requirements.
+    validations:
+      required: true
