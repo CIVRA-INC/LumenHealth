@@ -1,22 +1,10 @@
 import { RequestHandler } from "express";
-import { verifyAccessToken } from "../modules/auth/token.service";
+import { paymentRequiredProblem } from "../core/problem";
 import { ClinicModel } from "../modules/clinics/models/clinic.model";
+import { getRequestContext } from "./request-context.middleware";
 
 const EXEMPT_MUTATION_PREFIXES = ["/api/v1/auth", "/api/v1/payments", "/api/v1/billing"];
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
-const getTokenFromAuthorizationHeader = (authorization: unknown): string | null => {
-  if (typeof authorization !== "string") {
-    return null;
-  }
-
-  const [scheme, token] = authorization.split(" ");
-  if (scheme !== "Bearer" || !token) {
-    return null;
-  }
-
-  return token;
-};
 
 const isExemptPath = (path: string) =>
   EXEMPT_MUTATION_PREFIXES.some((prefix) => path.startsWith(prefix));
@@ -31,15 +19,7 @@ export const requireActiveSubscription: RequestHandler = async (req, res, next) 
     return next();
   }
 
-  if (!req.user) {
-    const token = getTokenFromAuthorizationHeader(req.headers.authorization);
-    if (token) {
-      const decodedUser = verifyAccessToken(token);
-      if (decodedUser) {
-        req.user = decodedUser;
-      }
-    }
-  }
+  const context = getRequestContext(req);
 
   if (!req.user?.clinicId) {
     return next();
@@ -51,18 +31,17 @@ export const requireActiveSubscription: RequestHandler = async (req, res, next) 
       .lean();
 
     if (!clinic?.subscriptionExpiryDate) {
+      context.subscription.status = "active";
       return next();
     }
 
     const expiryTime = new Date(clinic.subscriptionExpiryDate).getTime();
     if (Date.now() > expiryTime) {
-      return res.status(402).json({
-        error: "PaymentRequired",
-        message:
-          "Subscription expired. Write access is disabled. Please renew billing to continue.",
-      });
+      context.subscription.status = "expired";
+      return next(paymentRequiredProblem());
     }
 
+    context.subscription.status = "active";
     return next();
   } catch (error) {
     return next(error);

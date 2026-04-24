@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
 import { z, ZodError, ZodTypeAny } from "zod";
+import { validationProblem } from "../core/problem";
 
 type RequestSchema = {
   body?: ZodTypeAny;
@@ -15,13 +16,6 @@ export type TypedRequestHandler<TSchema extends RequestSchema> = RequestHandler<
   InferOrUnknown<TSchema["body"]>,
   Record<string, unknown>
 >;
-
-const formatValidationIssues = (error: ZodError) =>
-  error.issues.map((issue) => ({
-    field: issue.path.length > 0 ? issue.path.join(".") : "root",
-    message: issue.message,
-    code: issue.code,
-  }));
 
 export const validateRequest = <TSchema extends RequestSchema>(
   schema: TSchema,
@@ -51,11 +45,7 @@ export const validateRequest = <TSchema extends RequestSchema>(
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        return res.status(400).json({
-          error: "ValidationError",
-          message: "Request validation failed",
-          issues: formatValidationIssues(error),
-        });
+        return next(validationProblem(error));
       }
 
       next(error);

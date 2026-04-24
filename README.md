@@ -96,6 +96,8 @@ Architecture-sensitive issue intake now uses GitHub issue templates under `.gith
 
 Maintainers should use [.github/MAINTAINER_TRIAGE.md](./.github/MAINTAINER_TRIAGE.md) to decide when to redirect work into an ADR or RFC.
 
+For a maintainer-oriented overview of runtime seams and preferred extension patterns, see [docs/contributor-architecture-handbook.md](./docs/contributor-architecture-handbook.md).
+
 ## Current MVP Surface
 
 The repository already contains:

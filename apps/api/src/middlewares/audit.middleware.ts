@@ -1,6 +1,6 @@
 import { RequestHandler } from "express";
 import { AuditAction, AuditLogModel } from "../modules/audit/models/audit-log.model";
-import { verifyAccessToken } from "../modules/auth/token.service";
+import { getRequestContext } from "./request-context.middleware";
 
 const MUTATING_METHOD_TO_ACTION: Record<string, AuditAction> = {
   POST: AuditAction.CREATE,
@@ -10,19 +10,6 @@ const MUTATING_METHOD_TO_ACTION: Record<string, AuditAction> = {
 };
 
 const getAction = (method: string): AuditAction | null => MUTATING_METHOD_TO_ACTION[method] ?? null;
-
-const getTokenFromAuthorizationHeader = (authorization: unknown): string | null => {
-  if (typeof authorization !== "string") {
-    return null;
-  }
-
-  const [scheme, token] = authorization.split(" ");
-  if (scheme !== "Bearer" || !token) {
-    return null;
-  }
-
-  return token;
-};
 
 const getResourceFromPath = (baseUrl: string, path: string): string => {
   const normalized = `${baseUrl}${path}`.replace(/^\/+|\/+$/g, "");
@@ -62,18 +49,9 @@ export const auditMiddleware: RequestHandler = (req, res, next) => {
     return next();
   }
 
-  if (!req.user) {
-    const token = getTokenFromAuthorizationHeader(req.headers.authorization);
-    if (token) {
-      const decodedUser = verifyAccessToken(token);
-      if (decodedUser) {
-        req.user = decodedUser;
-      }
-    }
-  }
-
-  const userId = req.user?.userId;
-  const clinicId = req.user?.clinicId;
+  const context = getRequestContext(req);
+  const userId = context.actor?.userId;
+  const clinicId = context.clinicId;
   if (!userId || !clinicId) {
     return next();
   }

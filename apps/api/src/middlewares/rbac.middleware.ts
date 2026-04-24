@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
-import { verifyAccessToken } from "../modules/auth/token.service";
+import { forbiddenProblem, unauthorizedProblem } from "../core/problem";
+import { getRequestContext } from "./request-context.middleware";
 
 export enum Roles {
   SUPER_ADMIN = "SUPER_ADMIN",
@@ -12,44 +13,20 @@ export enum Roles {
 
 const ROLE_SET = new Set(Object.values(Roles));
 
-const getBearerToken = (authorization: unknown): string | null => {
-  if (typeof authorization !== "string") {
-    return null;
-  }
-
-  const [scheme, token] = authorization.split(" ");
-  if (scheme !== "Bearer" || !token) {
-    return null;
-  }
-
-  return token;
-};
-
 export const authorize = (allowedRoles: Roles[]): RequestHandler => {
   return (req, res, next) => {
-    const token = getBearerToken(req.headers.authorization);
-    if (!token) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Authentication required",
-      });
+    getRequestContext(req);
+
+    if (!req.user) {
+      return next(unauthorizedProblem());
     }
 
-    const decodedUser = verifyAccessToken(token);
-    if (!decodedUser || !ROLE_SET.has(decodedUser.role as Roles)) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Invalid or expired token",
-      });
+    if (!ROLE_SET.has(req.user.role as Roles)) {
+      return next(unauthorizedProblem('Invalid or expired token'));
     }
 
-    req.user = decodedUser;
-
-    if (!allowedRoles.includes(decodedUser.role as Roles)) {
-      return res.status(403).json({
-        error: "Forbidden",
-        message: "Insufficient permissions",
-      });
+    if (!allowedRoles.includes(req.user.role as Roles)) {
+      return next(forbiddenProblem());
     }
 
     return next();
