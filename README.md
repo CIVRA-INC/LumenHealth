@@ -74,7 +74,27 @@ Use the boundary checker before merging architecture-sensitive work:
 ```bash
 npm run check:boundaries
 npm run check:boundaries:fixtures
+npm run check:architecture
 ```
+
+## Shared Contract Versioning
+
+Shared packages and public API contracts must follow the policy in [CONTRACT_VERSIONING.md](./CONTRACT_VERSIONING.md).
+
+- use additive changes where possible
+- document compatibility-sensitive or breaking changes in [CONTRACT_CHANGELOG_TEMPLATE.md](./CONTRACT_CHANGELOG_TEMPLATE.md)
+- complete the contract section in the pull request template for shared package or API changes
+
+## Contributor Intake
+
+Architecture-sensitive issue intake now uses GitHub issue templates under `.github/ISSUE_TEMPLATE/`.
+
+- backend module work
+- frontend workflow work
+- security or compliance change
+- data model change
+
+Maintainers should use [.github/MAINTAINER_TRIAGE.md](./.github/MAINTAINER_TRIAGE.md) to decide when to redirect work into an ADR or RFC.
 
 ## Current MVP Surface
 

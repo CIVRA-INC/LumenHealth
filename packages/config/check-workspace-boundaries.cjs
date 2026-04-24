@@ -45,7 +45,10 @@ function collectFiles(dir) {
   return entries.flatMap((entry) => {
     const next = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (['node_modules', 'dist', '.next', '.turbo', '.git'].includes(entry.name)) {
+      if (
+        ['node_modules', 'dist', '.next', '.turbo', '.git'].includes(entry.name) ||
+        (!fixtureMode && entry.name === 'fixtures')
+      ) {
         return [];
       }
       return collectFiles(next);

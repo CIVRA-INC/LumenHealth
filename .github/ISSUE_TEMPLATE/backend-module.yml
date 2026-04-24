@@ -1,0 +1,43 @@
+name: Backend Module Work
+description: Propose or refine backend/API work that affects domain logic, persistence, or route contracts.
+title: "[backend] "
+labels:
+  - backend
+  - api
+  - enhancement
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the backend capability or bug clearly.
+    validations:
+      required: true
+  - type: textarea
+    id: domain-impact
+    attributes:
+      label: Domain Impact
+      description: What entities, flows, or modules are affected?
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy and Audit Considerations
+      description: Note PHI, audit, tenancy, or retention concerns.
+    validations:
+      required: true
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing Impact
+      description: What validation, integration, or regression tests are expected?
+    validations:
+      required: true
+  - type: textarea
+    id: architecture
+    attributes:
+      label: ADR or RFC Need
+      description: State whether this should link to an ADR/RFC before implementation.
+    validations:
+      required: true

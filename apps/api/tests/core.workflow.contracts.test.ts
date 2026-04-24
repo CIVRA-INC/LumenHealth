@@ -3,6 +3,11 @@ import { loginSchema } from "../src/modules/auth/auth.validation";
 import { createEncounterSchema } from "../src/modules/encounters/encounters.validation";
 import { createPatientSchema } from "../src/modules/patients/patients.validation";
 import {
+  makeEncounterFixture,
+  makePatientFixture,
+  makeStaffFixture,
+} from "./fixtures";
+import {
   queueStreamQuerySchema,
   routeQueueEncounterBodySchema,
   routeQueueEncounterParamsSchema,
@@ -19,23 +24,26 @@ describe("core workflow request contracts", () => {
   });
 
   it("accepts a valid patient registration payload", () => {
+    const patient = makePatientFixture();
     const result = createPatientSchema.safeParse({
-      firstName: "Amina",
-      lastName: "Kato",
-      dateOfBirth: "1994-01-03T00:00:00.000Z",
-      sex: "F",
-      contactNumber: "+256700000000",
-      address: "Kampala",
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      dateOfBirth: patient.dateOfBirth,
+      sex: patient.sex,
+      contactNumber: patient.contactNumber,
+      address: patient.address,
     });
 
     expect(result.success).toBe(true);
   });
 
   it("accepts encounter creation with and without a patient id", () => {
+    const encounter = makeEncounterFixture();
+    const provider = makeStaffFixture();
+
     expect(createEncounterSchema.safeParse({}).success).toBe(true);
-    expect(
-      createEncounterSchema.safeParse({ patientId: "507f1f77bcf86cd799439011" }).success,
-    ).toBe(true);
+    expect(createEncounterSchema.safeParse({ patientId: encounter.patientId }).success).toBe(true);
+    expect(provider.role).toBe("PROVIDER");
   });
 
   it("accepts valid queue routing and streaming inputs", () => {
