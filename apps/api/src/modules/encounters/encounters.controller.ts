@@ -1,4 +1,4 @@
-import { Request, Response, Router } from 'express';
+import { Request, RequestHandler, Response, Router } from 'express';
 import { authorize, Roles } from '../../middlewares/rbac.middleware';
 import { validateRequest } from '../../middlewares/validate.middleware';
 import { EncounterModel } from './models/encounter.model';
@@ -72,7 +72,7 @@ router.get(
   '/',
   authorize(CREATE_ROLES),
   validateRequest({ query: encounterListQuerySchema }),
-  async (req: EncounterListRequest, res: Response) => {
+  (async (req: EncounterListRequest, res: Response): Promise<Response> => {
     const clinicId = req.user?.clinicId;
 
     if (!clinicId) {
@@ -99,7 +99,7 @@ router.get(
         toPayload(encounter as Parameters<typeof toPayload>[0]),
       ),
     });
-  },
+  }) as unknown as RequestHandler,
 );
 
 router.post(
