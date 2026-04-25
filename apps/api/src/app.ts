@@ -1,14 +1,29 @@
-/**
- * Entry point – delegates all startup logic to server.ts.
- * Keep this file minimal so the process boundary is easy to trace.
- */
-import { startServer } from './server';
-import { logger } from './core/logger';
+import { config } from '@lumen/config';
+import { connectDB } from './config/db';
+import { createApp } from './app.factory';
+import { setupGracefulShutdown } from './shutdown';
+import { startPaymentVerificationWorker } from './modules/payments/worker';
+import { startCdsWorker } from './modules/ai/cds.worker';
 
-void startServer().catch((err: unknown) => {
-  logger.error('fatal startup error', {
-    error: err instanceof Error ? err.message : String(err),
-    stack: err instanceof Error ? err.stack : undefined,
+export { setupGracefulShutdown } from './shutdown';
+
+const app = createApp();
+
+const start = async () => {
+  await connectDB();
+
+  if (config.featureFlags.stellarBilling) {
+    startPaymentVerificationWorker();
+  }
+  if (config.featureFlags.aiSummaries) {
+    startCdsWorker();
+  }
+
+  const server = app.listen(config.port, () => {
+    console.log(`🚀 API running on http://localhost:${config.port}`);
   });
-  process.exit(1);
-});
+
+  setupGracefulShutdown(server);
+};
+
+void start();

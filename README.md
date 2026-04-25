@@ -98,6 +98,15 @@ Maintainers should use [.github/MAINTAINER_TRIAGE.md](./.github/MAINTAINER_TRIAG
 
 For a maintainer-oriented overview of runtime seams and preferred extension patterns, see [docs/contributor-architecture-handbook.md](./docs/contributor-architecture-handbook.md).
 
+## Architecture Standards
+
+| Document | Description |
+| --- | --- |
+| [docs/backend-module-template.md](./docs/backend-module-template.md) | Standard layout, naming, and implementation boundaries for Express domain modules |
+| [docs/domain-glossary.md](./docs/domain-glossary.md) | Canonical terminology for all domain entities across product, engineering, and blockchain |
+| [docs/data-ownership-boundaries.md](./docs/data-ownership-boundaries.md) | Source-of-truth assignments for MongoDB, Stellar, and future Redis |
+| [docs/non-functional-requirements.md](./docs/non-functional-requirements.md) | Latency budgets, uptime targets, transaction reliability, and data retention rules |
+
 ## Current MVP Surface
 
 The repository already contains:
