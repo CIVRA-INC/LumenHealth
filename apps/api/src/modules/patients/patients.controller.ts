@@ -1,5 +1,10 @@
 import { Request, Response, Router } from "express";
+import {
+  notFoundProblem,
+  unauthorizedProblem,
+} from "../../core/problem";
 import { authorize, Roles } from "../../middlewares/rbac.middleware";
+import { getRequestContext } from "../../middlewares/request-context.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
 import {
   createPatient,
@@ -32,12 +37,9 @@ router.post(
   authorize(ALL_ROLES),
   validateRequest({ body: createPatientSchema }),
   async (req: CreatePatientRequest, res: Response) => {
-    const clinicId = req.user?.clinicId;
+    const clinicId = getRequestContext(req).clinicId;
     if (!clinicId) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Authentication required",
-      });
+      throw unauthorizedProblem();
     }
 
     const patient = await createPatient({
@@ -57,12 +59,9 @@ router.get(
   authorize(ALL_ROLES),
   validateRequest({ query: patientSearchQuerySchema }),
   async (req: SearchPatientsRequest, res: Response) => {
-    const clinicId = req.user?.clinicId;
+    const clinicId = getRequestContext(req).clinicId;
     if (!clinicId) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Authentication required",
-      });
+      throw unauthorizedProblem();
     }
 
     const results = await searchPatients(req.query.q, clinicId);
@@ -79,20 +78,14 @@ router.get(
   authorize(ALL_ROLES),
   validateRequest({ params: patientIdParamsSchema }),
   async (req: GetPatientByIdRequest, res: Response) => {
-    const clinicId = req.user?.clinicId;
+    const clinicId = getRequestContext(req).clinicId;
     if (!clinicId) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Authentication required",
-      });
+      throw unauthorizedProblem();
     }
 
     const patient = await getPatientById(req.params.id, clinicId);
     if (!patient) {
-      return res.status(404).json({
-        error: "NotFound",
-        message: "Patient not found",
-      });
+      throw notFoundProblem("Patient not found");
     }
 
     return res.json({

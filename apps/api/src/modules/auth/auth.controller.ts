@@ -1,5 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Request, Response, Router } from "express";
+import { unauthorizedProblem } from "../../core/problem";
+import { getRequestContext } from "../../middlewares/request-context.middleware";
 import { validateRequest } from "../../middlewares/validate.middleware";
 import {
   LoginDto,
@@ -26,22 +28,17 @@ router.post(
   "/login",
   validateRequest({ body: loginSchema }),
   async (req: LoginRequest, res: Response) => {
+    getRequestContext(req);
     const email = req.body.email.toLowerCase().trim();
     const user = await UserModel.findOne({ email });
 
     if (!user || !user.isActive) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: INVALID_CREDENTIALS,
-      });
+      throw unauthorizedProblem(INVALID_CREDENTIALS);
     }
 
     const isPasswordValid = await bcrypt.compare(req.body.password, user.password);
     if (!isPasswordValid) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: INVALID_CREDENTIALS,
-      });
+      throw unauthorizedProblem(INVALID_CREDENTIALS);
     }
 
     const tokenUser = {
@@ -64,20 +61,15 @@ router.post(
   "/refresh",
   validateRequest({ body: refreshSchema }),
   async (req: RefreshRequest, res: Response) => {
+    getRequestContext(req);
     const decoded = verifyRefreshToken(req.body.refreshToken);
     if (!decoded) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Invalid refresh token",
-      });
+      throw unauthorizedProblem("Invalid refresh token");
     }
 
     const user = await UserModel.findById(decoded.userId);
     if (!user || !user.isActive) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Invalid refresh token",
-      });
+      throw unauthorizedProblem("Invalid refresh token");
     }
 
     return res.json({
