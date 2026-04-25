@@ -20,6 +20,8 @@ import { paymentRoutes } from './modules/payments/payments.controller';
 import { queueRoutes } from './modules/queue/queue.controller';
 import { userRoutes } from './modules/users/users.controller';
 import { vitalsRoutes } from './modules/vitals/vitals.controller';
+import './openapi/openapi.routes'; // side-effect: registers route contracts
+import { openApiRoutes } from './openapi/openapi.routes';
 
 export const createApp = (): Express => {
   const app = express();
@@ -31,6 +33,7 @@ export const createApp = (): Express => {
   app.use(requireActiveSubscription);
 
   app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1', openApiRoutes);
   app.use('/api/v1/clinics', clinicOnboardingRoutes);
   app.use('/api/v1/clinics', clinicSettingsRoutes);
   app.use('/api/v1/users', userRoutes);
