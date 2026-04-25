@@ -98,6 +98,15 @@ Maintainers should use [.github/MAINTAINER_TRIAGE.md](./.github/MAINTAINER_TRIAG
 
 For a maintainer-oriented overview of runtime seams and preferred extension patterns, see [docs/contributor-architecture-handbook.md](./docs/contributor-architecture-handbook.md).
 
+## Architecture Standards
+
+| Document | Description |
+| --- | --- |
+| [docs/request-tracing-strategy.md](./docs/request-tracing-strategy.md) | Correlation ID generation and propagation across HTTP, SSE, and background jobs |
+| [docs/domain-event-schema.md](./docs/domain-event-schema.md) | Standard event naming convention, envelope schema, and canonical event catalogue |
+| [docs/file-media-storage-strategy.md](./docs/file-media-storage-strategy.md) | Storage adapter boundary, allowed formats, image transformations, and retention |
+| [docs/privacy-data-retention-baseline.md](./docs/privacy-data-retention-baseline.md) | PII field inventory, retention windows, deletion behaviour, and export requirements |
+
 ## Current MVP Surface
 
 The repository already contains:
