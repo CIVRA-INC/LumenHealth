@@ -106,10 +106,6 @@ For a maintainer-oriented overview of runtime seams and preferred extension patt
 | [docs/domain-event-schema.md](./docs/domain-event-schema.md) | Standard event naming convention, envelope schema, and canonical event catalogue |
 | [docs/file-media-storage-strategy.md](./docs/file-media-storage-strategy.md) | Storage adapter boundary, allowed formats, image transformations, and retention |
 | [docs/privacy-data-retention-baseline.md](./docs/privacy-data-retention-baseline.md) | PII field inventory, retention windows, deletion behaviour, and export requirements |
-| [docs/backend-module-template.md](./docs/backend-module-template.md) | Standard layout, naming, and implementation boundaries for Express domain modules |
-| [docs/domain-glossary.md](./docs/domain-glossary.md) | Canonical terminology for all domain entities across product, engineering, and blockchain |
-| [docs/data-ownership-boundaries.md](./docs/data-ownership-boundaries.md) | Source-of-truth assignments for MongoDB, Stellar, and future Redis |
-| [docs/non-functional-requirements.md](./docs/non-functional-requirements.md) | Latency budgets, uptime targets, transaction reliability, and data retention rules |
 
 ## Current MVP Surface
 
