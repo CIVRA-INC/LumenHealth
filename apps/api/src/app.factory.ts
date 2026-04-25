@@ -4,6 +4,7 @@ import { config, getConfigDiagnostics } from '@lumen/config';
 import { auditMiddleware } from './middlewares/audit.middleware';
 import { errorMiddleware } from './middlewares/error.middleware';
 import { requestContextMiddleware } from './middlewares/request-context.middleware';
+import { requestLoggerMiddleware } from './middlewares/request-logger.middleware';
 import { requireActiveSubscription } from './middlewares/subscription.middleware';
 import { aiDraftRoutes } from './modules/ai/drafts.controller';
 import { aiRoutes } from './modules/ai/stream.controller';
@@ -27,6 +28,7 @@ export const createApp = (): Express => {
   app.use(cors());
   app.use(express.json());
   app.use(requestContextMiddleware);
+  app.use(requestLoggerMiddleware);
   app.use(auditMiddleware);
   app.use(requireActiveSubscription);
 
