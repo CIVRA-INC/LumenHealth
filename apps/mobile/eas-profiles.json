@@ -1,0 +1,18 @@
+{
+  "development": {
+    "distribution": "internal",
+    "android": {
+      "buildType": "apk"
+    },
+    "ios": {
+      "simulator": true
+    }
+  },
+  "preview": {
+    "distribution": "internal"
+  },
+  "production": {
+    "distribution": "store",
+    "autoIncrement": true
+  }
+}
