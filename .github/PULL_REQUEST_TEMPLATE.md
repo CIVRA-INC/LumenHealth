@@ -32,6 +32,14 @@ If any contract changed, include:
 - [ ] Relevant tests
 - [ ] Manual flow verification
 
+## Auth Abuse-Case Review
+
+_Required for any PR touching auth, sessions, tokens, or authorization. See [docs/auth-abuse-checklist.md](../docs/auth-abuse-checklist.md)._
+
+- [ ] I have reviewed the auth abuse-case checklist
+- [ ] All relevant abuse cases have been addressed or explicitly marked as out-of-scope with justification
+- [ ] No new unprotected attack surfaces introduced
+
 ## Maintainer Notes
 
 - ADR/RFC required:
