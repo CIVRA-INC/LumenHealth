@@ -1,0 +1,9 @@
+{
+  "name": "@lumen/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": "node -e \"console.log('mobile lint: scaffold only')\"",
+    "typecheck": "node -e \"console.log('mobile typecheck: scaffold only')\""
+  }
+}

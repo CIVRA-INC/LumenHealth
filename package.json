@@ -1,5 +1,5 @@
 {
-  "name": "lumen-health",
+  "name": "lumenhealth",
   "private": true,
   "packageManager": "npm@10.9.2",
   "workspaces": [
@@ -7,20 +7,19 @@
     "packages/*"
   ],
   "scripts": {
-    "setup": "node packages/config/bootstrap.cjs",
-    "setup:seed-demo": "node packages/config/bootstrap.cjs --seed-demo",
-    "check:architecture": "npm run check:architecture -w packages/config",
-    "check:env": "node packages/config/bootstrap.cjs",
-    "check:boundaries": "npm run check:boundaries -w packages/config",
-    "check:boundaries:fixtures": "npm run check:boundaries:fixtures -w packages/config",
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "start": "turbo run start",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "check:boundaries": "node packages/config/check-workspace-boundaries.cjs",
+    "check:architecture": "node packages/config/architecture-check.cjs",
+    "issues:preview": "node scripts/issues/render-batch.mjs",
+    "issues:publish": "node scripts/issues/publish-batch.mjs"
   },
   "devDependencies": {
-    "turbo": "latest",
-    "typescript": "latest",
-    "@types/node": "latest"
+    "@types/node": "^24.10.1",
+    "turbo": "^2.6.1",
+    "typescript": "^5.9.3"
   }
 }

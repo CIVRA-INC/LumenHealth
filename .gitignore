@@ -1,21 +1,19 @@
-node_modules
 node_modules/
-packages/backend/node_modules/
-packages/frontend/node_modules/
+.next/
 dist/
-packages/backend/dist/
-packages/frontend/dist/
+.turbo/
+.expo/
+coverage/
 .env
-packages/backend/.env
-packages/frontend/.env
+.env.local
 .DS_Store
-.vscode/
-.idea/
-npm-debug.log*
-yarn-error.log*
-lerna-debug.log*
-packages/backend/coverage/
-packages/frontend/coverage/
 *.log
-packages/frontend/.next
-.turbo
+
+# Planning and backlog artifacts
+docs/
+scripts/issues/
+
+# Repo management and contributor process files
+.github/
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md

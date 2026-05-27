@@ -1,23 +1,23 @@
 {
   "name": "@lumen/config",
-  "version": "1.0.0",
-  "main": "index.ts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
   "exports": {
-    ".": "./index.ts",
-    "./public": "./public.ts",
-    "./feature-flags": "./feature-flags.ts",
-    "./workspace-boundaries": "./workspace-boundaries.ts"
+    ".": "./dist/index.js",
+    "./public": "./dist/public.js",
+    "./workspace-boundaries": "./dist/workspace-boundaries.js"
   },
   "scripts": {
-    "check:architecture": "node architecture-check.cjs",
-    "check:boundaries": "node check-workspace-boundaries.cjs",
-    "check:boundaries:fixtures": "node check-workspace-boundaries.cjs --fixtures"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "node -e \"console.log('config lint: add stronger checks in milestone work')\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

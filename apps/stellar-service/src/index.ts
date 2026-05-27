@@ -1,24 +1,23 @@
-import { PlatformWalletService } from "./services/wallet.service";
+import { Horizon, Networks } from "@stellar/stellar-sdk";
+import { serverConfig } from "@lumen/config";
 
-const run = async () => {
-  console.log("🚀 Starting Stellar Service Health Check...");
-  
-  const wallet = new PlatformWalletService();
+const networkPassphrase =
+  serverConfig.stellarNetwork === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+
+const server = new Horizon.Server(serverConfig.stellarHorizonUrl);
+
+async function main() {
+  console.log("LumenHealth Stellar service starter");
+  console.log(`Network: ${serverConfig.stellarNetwork}`);
+  console.log(`Passphrase: ${networkPassphrase}`);
 
   try {
-    const publicKey = wallet.getPublicKey();
-    console.log(`Checking balance for: ${publicKey}`);
-
-    const balance = await wallet.getNativeBalance();
-    console.log(`✅ Success! Balance: ${balance} XLM`);
-    
-    if (parseFloat(balance) < 5) {
-      console.warn("⚠️ Warning: Low balance. Please fund your testnet account.");
-    }
-
-  } catch (error: any) {
-    console.error("❌ Failed:", error.message);
+    await server.feeStats();
+    console.log("Horizon diagnostics reachable");
+  } catch (error) {
+    console.error("Unable to reach Horizon diagnostics");
+    console.error(error);
   }
-};
+}
 
-run();
+void main();

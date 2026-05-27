@@ -1,26 +1,39 @@
-import { config } from '@lumen/config';
+import Link from "next/link";
 
-export default async function Home() {
-  const apiUrl = `${config.public.apiBaseUrl.replace(/\/api\/v1$/, '')}/health`;
+const tracks = [
+  "Authentication-first MVP",
+  "Express + Next.js + mobile + Stellar monorepo",
+  "Open source contributor-ready roadmap",
+];
 
-  // DEBUG LOG: Check this in your VS Code terminal when you refresh
-  console.log('🔍 Attempting to fetch from:', apiUrl);
-
-  const res = await fetch(apiUrl, { cache: 'no-store' });
-
-  // If the API sends HTML (error page), this throws the error you saw
-  if (!res.ok) {
-    throw new Error(`API returned status: ${res.status}`);
-  }
-
-  const data = await res.json();
-
+export default function HomePage() {
   return (
-    <main style={{ padding: '2rem' }}>
-      <h1>LumenHealth Dashboard</h1>
-      <p>
-        Backend Status: <strong>{data.status}</strong>
-      </p>
+    <main className="shell">
+      <section className="hero">
+        <p className="eyebrow">LumenHealth Reset</p>
+        <h1>Fresh starter repo for an open source healthcare hackathon.</h1>
+        <p className="lede">
+          This repository has been reset to a clean baseline so contributors can build the MVP in
+          public, starting with authentication and moving milestone by milestone.
+        </p>
+        <div className="actions">
+          <Link href="/auth/login" className="primary">
+            View auth starter
+          </Link>
+          <a href="https://stellar.org" className="secondary">
+            Stellar track
+          </a>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Current tracks</h2>
+        <ul>
+          {tracks.map((track) => (
+            <li key={track}>{track}</li>
+          ))}
+        </ul>
+      </section>
     </main>
   );
 }

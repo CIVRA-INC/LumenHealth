@@ -1,21 +1,21 @@
 {
-  "name": "@lumen/stellar",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "@lumen/stellar-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "devDependencies": {
-    "@types/node": "^25.0.10",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "node -e \"console.log('stellar lint: add stronger checks in milestone work')\""
   },
   "dependencies": {
-    "@lumen/config": "^1.0.0",
-    "@stellar/stellar-sdk": "^14.4.3"
+    "@lumen/config": "^0.1.0",
+    "@stellar/stellar-sdk": "^14.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }
