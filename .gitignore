@@ -10,7 +10,6 @@ coverage/
 *.log
 
 # Planning and backlog artifacts
-docs/
 scripts/issues/
 
 # Repo management and contributor process files
