@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { LoginRequest, LoginResponse, LogoutResponse, MeResponse } from "@lumen/types";
+import { authErrorStatus, normalizeAuthError } from "./errors.js";
 
 // Placeholder router — full implementation in subsequent auth milestones.
 const router = Router();
@@ -7,7 +8,8 @@ const router = Router();
 router.post("/login", (req, res) => {
   const body = req.body as Partial<LoginRequest>;
   if (!body.email || !body.password) {
-    res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: "email and password are required" });
+    const err = { error: "AUTH_MISSING_CREDENTIALS" as const, message: "email and password are required" };
+    res.status(authErrorStatus(err.error)).json(err);
     return;
   }
   const payload: LoginResponse = {
@@ -29,7 +31,8 @@ router.post("/logout", (_req, res) => {
 router.get("/me", (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
-    res.status(401).json({ error: "AUTH_TOKEN_INVALID", message: "missing bearer token" });
+    const err = { error: "AUTH_TOKEN_INVALID" as const, message: "missing bearer token" };
+    res.status(authErrorStatus(err.error)).json(err);
     return;
   }
   // Stub — real JWT validation in milestone 1
@@ -40,6 +43,12 @@ router.get("/me", (req, res) => {
     email: "owner@clinic.test",
   };
   res.json(payload);
+});
+
+// Catch-all error handler for auth routes
+router.use((err: unknown, _req: import("express").Request, res: import("express").Response, _next: import("express").NextFunction) => {
+  const normalized = normalizeAuthError(err);
+  res.status(authErrorStatus(normalized.error)).json(normalized);
 });
 
 export { router as authRouter };

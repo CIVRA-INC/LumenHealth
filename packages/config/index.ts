@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getPublicRuntimeConfig } from "./public";
+import { getPublicRuntimeConfig } from "./public.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,5 +28,13 @@ export const serverConfig = {
   public: getPublicRuntimeConfig(),
 };
 
-export { getPublicRuntimeConfig } from "./public";
-export { workspaceBoundaries, workspaceBoundarySummary } from "./workspace-boundaries";
+// Auth-specific config — Closes #441
+export const authConfig = {
+  jwtSecret: read("JWT_SECRET"),
+  accessTokenTtl: Number(read("JWT_ACCESS_TTL", "900")),
+  refreshTokenTtl: Number(read("JWT_REFRESH_TTL", "604800")),
+  bcryptRounds: Number(read("BCRYPT_ROUNDS", "12")),
+};
+
+export { getPublicRuntimeConfig } from "./public.js";
+export { workspaceBoundaries, workspaceBoundarySummary } from "./workspace-boundaries.js";

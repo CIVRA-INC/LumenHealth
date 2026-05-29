@@ -50,6 +50,28 @@ export type MeResponse = {
   email: string;
 };
 
+// ── Events ───────────────────────────────────────────────────────────────────
+// Closes #440
+
+export type AuthEventType =
+  | "auth.login.success"
+  | "auth.login.failure"
+  | "auth.logout"
+  | "auth.token.refreshed"
+  | "auth.token.expired"
+  | "auth.recovery.requested"
+  | "auth.recovery.completed"
+  | "auth.account.locked";
+
+export type AuthEvent = {
+  type: AuthEventType;
+  userId?: string;
+  clinicId?: string;
+  /** ISO-8601 timestamp */
+  timestamp: string;
+  meta?: Record<string, unknown>;
+};
+
 // ── Errors ───────────────────────────────────────────────────────────────────
 
 export type AuthErrorCode =
