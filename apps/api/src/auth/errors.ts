@@ -10,6 +10,7 @@ const HTTP_STATUS: Record<AuthErrorCode, number> = {
   AUTH_TOKEN_INVALID: 401,
   AUTH_FORBIDDEN: 403,
   AUTH_ACCOUNT_LOCKED: 423,
+  AUTH_EMAIL_TAKEN: 409,
 };
 
 export function authErrorStatus(code: AuthErrorCode): number {

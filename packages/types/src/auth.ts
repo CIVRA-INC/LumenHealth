@@ -21,6 +21,16 @@ export type LoginRequest = {
   password: string;
 };
 
+export type RegisterRequest = {
+  email: string;
+  password: string;
+  clinicName: string;
+};
+
+export type RegisterResponse = {
+  session: AuthSession;
+};
+
 export type LogoutRequest = {
   accessToken: string;
 };
@@ -80,7 +90,8 @@ export type AuthErrorCode =
   | "AUTH_TOKEN_EXPIRED"
   | "AUTH_TOKEN_INVALID"
   | "AUTH_FORBIDDEN"
-  | "AUTH_ACCOUNT_LOCKED";
+  | "AUTH_ACCOUNT_LOCKED"
+  | "AUTH_EMAIL_TAKEN";
 
 export type AuthError = {
   error: AuthErrorCode;
