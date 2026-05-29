@@ -1,9 +1,28 @@
 import { Router } from "express";
-import type { LoginRequest, LoginResponse, LogoutResponse, MeResponse } from "@lumen/types";
+import type { LoginRequest, LoginResponse, LogoutResponse, MeResponse, RegisterRequest, RegisterResponse } from "@lumen/types";
 import { authErrorStatus, normalizeAuthError } from "./errors.js";
 
 // Placeholder router — full implementation in subsequent auth milestones.
 const router = Router();
+
+router.post("/register", (req, res) => {
+  const body = req.body as Partial<RegisterRequest>;
+  if (!body.email || !body.password || !body.clinicName) {
+    const err = { error: "AUTH_MISSING_CREDENTIALS" as const, message: "email, password, and clinicName are required" };
+    res.status(authErrorStatus(err.error)).json(err);
+    return;
+  }
+  // Stub — real uniqueness check and password hashing in milestone 1
+  const payload: RegisterResponse = {
+    session: {
+      userId: "new-user",
+      clinicId: "new-clinic",
+      role: "owner",
+      accessToken: "replace-in-milestone-1",
+    },
+  };
+  res.status(201).json(payload);
+});
 
 router.post("/login", (req, res) => {
   const body = req.body as Partial<LoginRequest>;
