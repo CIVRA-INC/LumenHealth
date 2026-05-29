@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "node -e \"console.log('api lint: add eslint in Milestone 0 issues')\""
+    "lint": "node -e \"console.log('api lint: add eslint in Milestone 0 issues')\"",
+    "test": "vitest run"
   },
   "dependencies": {
     "@lumen/config": "^0.1.0",
@@ -16,9 +17,12 @@
     "express": "^5.2.1"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.6",
     "@types/node": "^24.10.1",
+    "bcryptjs": "^3.0.3",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.7"
   }
 }
