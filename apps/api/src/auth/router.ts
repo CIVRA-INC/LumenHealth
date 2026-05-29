@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { LoginRequest, LoginResponse, LogoutResponse, MeResponse, RegisterRequest, RegisterResponse } from "@lumen/types";
 import { authErrorStatus, normalizeAuthError } from "./errors.js";
+import { authLogger } from "./logger.js";
 
 // Placeholder router — full implementation in subsequent auth milestones.
 const router = Router();
@@ -26,11 +27,16 @@ router.post("/register", (req, res) => {
 
 router.post("/login", (req, res) => {
   const body = req.body as Partial<LoginRequest>;
-  if (!body.email || !body.password) {
+
+  if (!body.email || typeof body.email !== "string" ||
+      !body.password || typeof body.password !== "string") {
     const err = { error: "AUTH_MISSING_CREDENTIALS" as const, message: "email and password are required" };
+    authLogger.warn("auth.login.failure", { meta: { reason: err.error } });
     res.status(authErrorStatus(err.error)).json(err);
     return;
   }
+
+  // Stub — real credential lookup and password verification in milestone 1
   const payload: LoginResponse = {
     session: {
       userId: "starter-user",
@@ -39,6 +45,12 @@ router.post("/login", (req, res) => {
       accessToken: "replace-in-milestone-1",
     },
   };
+
+  authLogger.info("auth.login.success", {
+    userId: payload.session.userId,
+    clinicId: payload.session.clinicId,
+  });
+
   res.json(payload);
 });
 
