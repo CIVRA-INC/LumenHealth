@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { LoginRequest, LoginResponse, LogoutResponse, MeResponse, RegisterRequest, RegisterResponse } from "@lumen/types";
 import { authErrorStatus, normalizeAuthError } from "./errors.js";
 import { authLogger } from "./logger.js";
+import { getAuthMetricsSnapshot, incrementMetric } from "./metrics.js";
 import { accessTokenSigner } from "./token-signer.js";
 import { makeSession, sessionStore } from "./session-store.js";
 import { validatePassword } from "./password-policy.js";
@@ -117,8 +118,11 @@ router.post("/verify/complete", (req, res) => {
 });
 
 router.post("/login", (req, res) => {
+  const requestId = req.header("x-request-id") ?? randomUUID();
   if (limited(`login:${req.ip ?? "unknown"}`, 10)) {
     const err = { error: "AUTH_RATE_LIMITED" as const, message: "too many login attempts" };
+    incrementMetric("auth_login_failure_total");
+    incrementMetric("auth_account_lockout_total");
     res.status(429).json(err);
     return;
   }
@@ -127,7 +131,8 @@ router.post("/login", (req, res) => {
   if (!body.email || typeof body.email !== "string" ||
       !body.password || typeof body.password !== "string") {
     const err = { error: "AUTH_MISSING_CREDENTIALS" as const, message: "email and password are required" };
-    authLogger.warn("auth.login.failure", { meta: { reason: err.error } });
+    incrementMetric("auth_login_failure_total");
+    authLogger.warn("auth.login.failure", { requestId, meta: { reason: err.error } });
     res.status(authErrorStatus(err.error)).json(err);
     return;
   }
@@ -153,7 +158,9 @@ router.post("/login", (req, res) => {
   );
   seenRefreshTokens.add(refreshToken);
 
+  incrementMetric("auth_login_success_total");
   authLogger.info("auth.login.success", {
+    requestId,
     userId: payload.session.userId,
     clinicId: payload.session.clinicId,
   });
@@ -162,14 +169,17 @@ router.post("/login", (req, res) => {
 });
 
 router.post("/refresh", (req, res) => {
+  const requestId = req.header("x-request-id") ?? randomUUID();
   if (limited(`refresh:${req.ip ?? "unknown"}`, 20)) {
     const err = { error: "AUTH_RATE_LIMITED" as const, message: "too many refresh attempts" };
+    incrementMetric("auth_refresh_failure_total");
     res.status(429).json(err);
     return;
   }
   const refreshToken = (req.body as { refreshToken?: string }).refreshToken;
   if (!refreshToken) {
     const err = { error: "AUTH_TOKEN_INVALID" as const, message: "refreshToken is required" };
+    incrementMetric("auth_refresh_failure_total");
     res.status(authErrorStatus(err.error)).json(err);
     return;
   }
@@ -180,6 +190,7 @@ router.post("/refresh", (req, res) => {
       authLogger.warn("auth.login.failure", { meta: { reason: "suspicious_reuse" } });
     }
     const err = { error: "AUTH_TOKEN_INVALID" as const, message: "invalid refresh token" };
+    incrementMetric("auth_refresh_failure_total");
     res.status(authErrorStatus(err.error)).json(err);
     return;
   }
@@ -196,8 +207,13 @@ router.post("/refresh", (req, res) => {
       refreshToken: nextRefresh,
     })
   );
-  authLogger.info("auth.token.refreshed", { userId: existing.userId, clinicId: existing.clinicId, meta: { fp: `${req.ip ?? "unknown"}:${req.headers["user-agent"] ?? "na"}` } });
+  incrementMetric("auth_refresh_success_total");
+  authLogger.info("auth.token.refreshed", { requestId, userId: existing.userId, clinicId: existing.clinicId, meta: { fp: `${req.ip ?? "unknown"}:${req.headers["user-agent"] ?? "na"}` } });
   res.json({ ok: true, accessToken: nextAccess, refreshToken: nextRefresh });
+});
+
+router.get("/metrics", (_req, res) => {
+  res.json({ ok: true, metrics: getAuthMetricsSnapshot() });
 });
 
 router.post("/logout", (_req, res) => {

@@ -10,6 +10,7 @@ interface AuthLogEntry {
   userId?: string;
   clinicId?: string;
   durationMs?: number;
+  requestId?: string;
   meta?: Record<string, unknown>;
 }
 
@@ -21,6 +22,7 @@ function write(level: LogLevel, entry: AuthLogEntry): void {
     ...(entry.clinicId !== undefined && { clinicId: entry.clinicId }),
     timestamp: new Date().toISOString(),
     ...(entry.durationMs !== undefined && { durationMs: entry.durationMs }),
+    ...(entry.requestId !== undefined && { requestId: entry.requestId }),
     meta: entry.meta ?? {},
   });
   console.log(line);
