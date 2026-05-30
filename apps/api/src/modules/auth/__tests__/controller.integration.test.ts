@@ -185,3 +185,11 @@ describe("POST /api/v1/auth/password-reset/request", () => {
     expect((body as { ok: boolean }).ok).toBe(true);
   });
 });
+
+describe("GET /api/v1/auth/owner-only", () => {
+  const app = buildApp();
+  it("returns 401 without bearer token", async () => {
+    const { status } = await request(app, "GET", "/api/v1/auth/owner-only");
+    expect(status).toBe(401);
+  });
+});
