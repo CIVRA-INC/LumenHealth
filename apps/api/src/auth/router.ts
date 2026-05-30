@@ -5,11 +5,14 @@ import { authErrorStatus, normalizeAuthError } from "./errors.js";
 import { authLogger } from "./logger.js";
 import { accessTokenSigner } from "./token-signer.js";
 import { makeSession, sessionStore } from "./session-store.js";
+import { validatePassword } from "./password-policy.js";
 
 // Placeholder router — full implementation in subsequent auth milestones.
 const router = Router();
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 const seenRefreshTokens = new Set<string>();
+const resetTokens = new Map<string, { userId: string; expiresAt: number }>();
+const verifyTokens = new Map<string, { userId: string; email: string; expiresAt: number }>();
 function limited(key: string, limit: number, windowMs = 60_000): boolean {
   const now = Date.now();
   const b = rateBuckets.get(key);
@@ -28,6 +31,12 @@ router.post("/register", (req, res) => {
     res.status(authErrorStatus(err.error)).json(err);
     return;
   }
+  const pwdErr = validatePassword(body.password);
+  if (pwdErr) {
+    const err = { error: "AUTH_MISSING_CREDENTIALS" as const, message: pwdErr };
+    res.status(400).json(err);
+    return;
+  }
   // Stub — real uniqueness check and password hashing in milestone 1
   const payload: RegisterResponse = {
     session: {
@@ -38,6 +47,71 @@ router.post("/register", (req, res) => {
     },
   };
   res.status(201).json(payload);
+});
+
+router.post("/password-reset/request", (req, res) => {
+  if (limited(`recovery:${req.ip ?? "unknown"}`, 10)) {
+    res.status(429).json({ error: "AUTH_RATE_LIMITED", message: "too many recovery requests" });
+    return;
+  }
+  const email = (req.body as { email?: string }).email;
+  if (!email) {
+    res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: "email is required" });
+    return;
+  }
+  const token = randomUUID();
+  resetTokens.set(token, { userId: "starter-user", expiresAt: Date.now() + 15 * 60_000 });
+  authLogger.info("auth.recovery.requested", { meta: { tokenPreview: token.slice(0, 8) } });
+  res.json({ ok: true });
+});
+
+router.post("/password-reset/confirm", (req, res) => {
+  const { token, password } = req.body as { token?: string; password?: string };
+  if (!token || !password) {
+    res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: "token and password are required" });
+    return;
+  }
+  const pwdErr = validatePassword(password);
+  if (pwdErr) {
+    res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: pwdErr });
+    return;
+  }
+  const reset = resetTokens.get(token);
+  if (!reset || Date.now() > reset.expiresAt) {
+    resetTokens.delete(token);
+    res.status(401).json({ error: "AUTH_TOKEN_INVALID", message: "invalid or expired reset token" });
+    return;
+  }
+  resetTokens.delete(token);
+  authLogger.info("auth.recovery.completed", { userId: reset.userId });
+  res.json({ ok: true });
+});
+
+router.post("/verify/request", (req, res) => {
+  const email = (req.body as { email?: string }).email;
+  if (!email) {
+    res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: "email is required" });
+    return;
+  }
+  const token = randomUUID();
+  verifyTokens.set(token, { userId: "starter-user", email, expiresAt: Date.now() + 24 * 60 * 60_000 });
+  res.json({ ok: true });
+});
+
+router.post("/verify/complete", (req, res) => {
+  const token = (req.body as { token?: string }).token;
+  if (!token) {
+    res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: "token is required" });
+    return;
+  }
+  const verify = verifyTokens.get(token);
+  if (!verify || Date.now() > verify.expiresAt) {
+    verifyTokens.delete(token);
+    res.status(401).json({ error: "AUTH_TOKEN_INVALID", message: "invalid or expired verification token" });
+    return;
+  }
+  verifyTokens.delete(token);
+  res.json({ ok: true, email: verify.email, userId: verify.userId });
 });
 
 router.post("/login", (req, res) => {

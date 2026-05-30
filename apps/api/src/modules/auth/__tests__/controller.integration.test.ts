@@ -153,3 +153,14 @@ describe("POST /api/v1/auth/refresh — basic validation and replay signal", () 
     expect((body as { error: string }).error).toBe("AUTH_TOKEN_INVALID");
   });
 });
+
+describe("POST /api/v1/auth/password-reset/request", () => {
+  const app = buildApp();
+  it("returns 200 ok for reset request", async () => {
+    const { status, body } = await request(app, "POST", "/api/v1/auth/password-reset/request", {
+      email: "owner@clinic.test",
+    });
+    expect(status).toBe(200);
+    expect((body as { ok: boolean }).ok).toBe(true);
+  });
+});
