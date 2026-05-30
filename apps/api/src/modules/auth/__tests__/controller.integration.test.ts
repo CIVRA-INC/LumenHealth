@@ -143,3 +143,13 @@ describe("GET /api/v1/auth/me — token validation failures", () => {
     expect(typeof err.message).toBe("string");
   });
 });
+
+describe("POST /api/v1/auth/refresh — basic validation and replay signal", () => {
+  const app = buildApp();
+
+  it("returns 401 when refresh token is missing", async () => {
+    const { status, body } = await request(app, "POST", "/api/v1/auth/refresh", {});
+    expect(status).toBe(401);
+    expect((body as { error: string }).error).toBe("AUTH_TOKEN_INVALID");
+  });
+});
