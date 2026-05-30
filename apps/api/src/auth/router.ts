@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { LoginRequest, LoginResponse, LogoutResponse, MeResponse, RegisterRequest, RegisterResponse } from "@lumen/types";
 import { authErrorStatus, normalizeAuthError } from "./errors.js";
 import { authLogger } from "./logger.js";
+import { accessTokenSigner } from "./token-signer.js";
 
 // Placeholder router — full implementation in subsequent auth milestones.
 const router = Router();
@@ -19,7 +20,7 @@ router.post("/register", (req, res) => {
       userId: "new-user",
       clinicId: "new-clinic",
       role: "owner",
-      accessToken: "replace-in-milestone-1",
+      accessToken: accessTokenSigner.sign({ sub: "new-user", clinicId: "new-clinic", role: "owner" }),
     },
   };
   res.status(201).json(payload);
@@ -42,7 +43,7 @@ router.post("/login", (req, res) => {
       userId: "starter-user",
       clinicId: "starter-clinic",
       role: "owner",
-      accessToken: "replace-in-milestone-1",
+      accessToken: accessTokenSigner.sign({ sub: "starter-user", clinicId: "starter-clinic", role: "owner" }),
     },
   };
 
