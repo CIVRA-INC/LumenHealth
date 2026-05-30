@@ -6,6 +6,8 @@ import { authLogger } from "./logger.js";
 import { accessTokenSigner } from "./token-signer.js";
 import { makeSession, sessionStore } from "./session-store.js";
 import { validatePassword } from "./password-policy.js";
+import { resolveAuthContext } from "./auth-context-middleware.js";
+import { forbidden, unauthorized } from "./response-helpers.js";
 
 // Placeholder router — full implementation in subsequent auth milestones.
 const router = Router();
@@ -175,6 +177,7 @@ router.post("/refresh", (req, res) => {
   if (!existing) {
     if (seenRefreshTokens.has(refreshToken)) {
       authLogger.warn("auth.token.expired", { meta: { reason: "refresh_reuse_detected" } });
+      authLogger.warn("auth.login.failure", { meta: { reason: "suspicious_reuse" } });
     }
     const err = { error: "AUTH_TOKEN_INVALID" as const, message: "invalid refresh token" };
     res.status(authErrorStatus(err.error)).json(err);
@@ -222,6 +225,12 @@ router.get("/me", (req, res) => {
     email: "owner@clinic.test",
   };
   res.json(payload);
+});
+
+router.get("/owner-only", resolveAuthContext, (req, res) => {
+  if (!req.auth) return unauthorized(res);
+  if (req.auth.role !== "owner") return forbidden(res, "owner role required");
+  res.json({ ok: true, userId: req.auth.userId, clinicId: req.auth.clinicId });
 });
 
 // Catch-all error handler for auth routes
