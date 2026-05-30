@@ -15,10 +15,12 @@ export type SessionRecord = {
 };
 
 const store = new Map<string, SessionRecord>();
+const refreshIndex = new Map<string, string>();
 
 export const sessionStore = {
   save(session: SessionRecord): void {
     store.set(session.sessionId, session);
+    refreshIndex.set(session.refreshToken, session.sessionId);
   },
 
   findBySessionId(sessionId: string): SessionRecord | undefined {
@@ -30,7 +32,19 @@ export const sessionStore = {
   },
 
   delete(sessionId: string): void {
+    const session = store.get(sessionId);
+    if (session) refreshIndex.delete(session.refreshToken);
     store.delete(sessionId);
+  },
+
+  findByRefreshToken(refreshToken: string): SessionRecord | undefined {
+    const sessionId = refreshIndex.get(refreshToken);
+    return sessionId ? store.get(sessionId) : undefined;
+  },
+
+  revokeByRefreshToken(refreshToken: string): void {
+    const sessionId = refreshIndex.get(refreshToken);
+    if (sessionId) this.delete(sessionId);
   },
 
   /** Returns true if the session exists and has not expired. */
@@ -51,6 +65,7 @@ export const sessionStore = {
   /** Exposed for tests only. */
   _reset(): void {
     store.clear();
+    refreshIndex.clear();
   },
 };
 
