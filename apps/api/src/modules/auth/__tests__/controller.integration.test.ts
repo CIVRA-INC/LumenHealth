@@ -152,6 +152,27 @@ describe("POST /api/v1/auth/refresh — basic validation and replay signal", () 
     expect(status).toBe(401);
     expect((body as { error: string }).error).toBe("AUTH_TOKEN_INVALID");
   });
+
+  it("returns 401 for invalid refresh token", async () => {
+    const { status, body } = await request(app, "POST", "/api/v1/auth/refresh", { refreshToken: "bad-token" });
+    expect(status).toBe(401);
+    expect((body as { error: string }).error).toBe("AUTH_TOKEN_INVALID");
+  });
+});
+
+describe("POST /api/v1/auth/login — lockout/rate-limit edge", () => {
+  const app = buildApp();
+
+  it("returns 429 after repeated requests from same source", async () => {
+    let lastStatus = 200;
+    for (let i = 0; i < 11; i += 1) {
+      const { status } = await request(app, "POST", "/api/v1/auth/login", {}, {
+        "x-forwarded-for": "9.9.9.9",
+      });
+      lastStatus = status;
+    }
+    expect(lastStatus).toBe(429);
+  });
 });
 
 describe("POST /api/v1/auth/password-reset/request", () => {
@@ -162,5 +183,13 @@ describe("POST /api/v1/auth/password-reset/request", () => {
     });
     expect(status).toBe(200);
     expect((body as { ok: boolean }).ok).toBe(true);
+  });
+});
+
+describe("GET /api/v1/auth/owner-only", () => {
+  const app = buildApp();
+  it("returns 401 without bearer token", async () => {
+    const { status } = await request(app, "GET", "/api/v1/auth/owner-only");
+    expect(status).toBe(401);
   });
 });
