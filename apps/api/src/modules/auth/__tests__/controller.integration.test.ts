@@ -142,6 +142,15 @@ describe("GET /api/v1/auth/me — token validation failures", () => {
     expect(typeof err.error).toBe("string");
     expect(typeof err.message).toBe("string");
   });
+
+  it("returns 403 forbidden when role header lacks auth:read permission", async () => {
+    const { status, body } = await request(app, "GET", "/api/v1/auth/me", undefined, {
+      Authorization: "Bearer starter-token",
+      "x-role": "cashier",
+    });
+    expect(status).toBe(403);
+    expect((body as { error: string }).error).toBe("AUTH_FORBIDDEN");
+  });
 });
 
 describe("POST /api/v1/auth/refresh — basic validation and replay signal", () => {
