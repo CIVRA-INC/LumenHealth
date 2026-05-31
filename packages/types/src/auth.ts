@@ -5,6 +5,19 @@
 
 export type UserRole = "owner" | "admin" | "clinician" | "cashier";
 
+export type Permission =
+  | "auth:read"
+  | "auth:write"
+  | "billing:read"
+  | "billing:write"
+  | "patient:read"
+  | "patient:write";
+
+export type RolePolicy = {
+  role: UserRole;
+  permissions: Permission[];
+};
+
 // ── Session ──────────────────────────────────────────────────────────────────
 
 export type AuthSession = {

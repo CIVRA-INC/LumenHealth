@@ -226,7 +226,7 @@ router.post("/logout", (_req, res) => {
   res.json(payload);
 });
 
-router.get("/me", (req, res) => {
+router.get("/me", requirePermission("auth:read"), (req, res) => {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
     const err = { error: "AUTH_TOKEN_INVALID" as const, message: "missing bearer token" };
