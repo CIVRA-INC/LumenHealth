@@ -62,6 +62,7 @@ npm run check:boundaries
 - [MVP Scope](./docs/mvp-scope.md)
 - [Contributor Guide](./CONTRIBUTING.md)
 - [Reset Roadmap](./docs/reset-roadmap.md)
+- [Local Auth Setup](./docs/auth-local-setup.md)
 
 ## Current Baseline
 

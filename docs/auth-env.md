@@ -31,4 +31,6 @@ Copy `.env.example` to `.env` at the repo root and fill in the required values:
 cp .env.example .env
 ```
 
+See `auth-local-setup.md` for workspace-by-workspace examples covering the API, web, and the current mobile scaffold.
+
 For production, inject secrets via your deployment platform's secret manager (e.g., AWS Secrets Manager, GitHub Actions secrets). Do not commit `.env` to source control — it is listed in `.gitignore`.
