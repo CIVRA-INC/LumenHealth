@@ -202,7 +202,13 @@ a {
 @media (max-width: 720px) {
   .hero,
   .panel,
-  .authCard {
+  .authCard,
+  .authLanding {
     padding: 24px;
+  }
+
+  .authFooter {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
