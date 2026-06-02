@@ -152,6 +152,35 @@ a {
   background: rgba(255, 255, 255, 0.88);
 }
 
+.authLead {
+  margin: 0;
+}
+
+.authStatus {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.authStatus p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.authStatus--success {
+  border-color: rgba(0, 109, 119, 0.22);
+  background: rgba(0, 109, 119, 0.08);
+}
+
+.authFooter {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 720px) {
   .hero,
   .panel,

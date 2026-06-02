@@ -30,7 +30,8 @@ apps/api/src/
 apps/web/app/
   auth/
     login/page.tsx     # Login page (already scaffolded)
-    logout/            # Logout route handler
+    logout/page.tsx    # Logout page that clears the stored session
+    session.ts         # Local auth session storage helpers
 
 apps/mobile/
   auth/                # Placeholder for mobile auth screens
