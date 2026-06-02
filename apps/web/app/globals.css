@@ -131,10 +131,15 @@ a {
   width: min(100%, 720px);
 }
 
+.authCardContent {
+  display: grid;
+  gap: 10px;
+}
+
 .authForm {
   display: grid;
   gap: 16px;
-  margin: 28px 0 32px;
+  margin: 16px 0 24px;
 }
 
 .authForm label {
@@ -150,6 +155,51 @@ a {
   border-radius: 14px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.88);
+}
+
+.authField {
+  gap: 6px;
+}
+
+.authFieldLabel {
+  color: var(--ink);
+}
+
+.authFieldHint {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.authRoadmap {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.authRoadmap h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.authRoadmap ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.authRoadmap li {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.authCardFooter {
+  padding-top: 8px;
+  border-top: 1px solid rgba(19, 32, 43, 0.08);
+}
+
+.authCardFooter p {
+  margin: 0;
+  color: var(--muted);
 }
 
 @media (max-width: 720px) {
