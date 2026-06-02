@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthSessionSummary } from "./auth/session-summary";
 
 const tracks = [
   "Authentication-first MVP",
@@ -34,6 +35,8 @@ export default function HomePage() {
           ))}
         </ul>
       </section>
+
+      <AuthSessionSummary />
     </main>
   );
 }

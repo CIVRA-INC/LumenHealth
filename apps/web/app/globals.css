@@ -121,6 +121,24 @@ a {
   padding-left: 20px;
 }
 
+.authSessionPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.authSessionPanel h2 {
+  margin: 0;
+}
+
+.authSessionMeta {
+  margin: 0;
+  color: var(--muted);
+}
+
+.authSessionActions {
+  margin-top: 8px;
+}
+
 .authPage {
   display: flex;
   align-items: center;
