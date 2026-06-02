@@ -121,6 +121,24 @@ a {
   padding-left: 20px;
 }
 
+.authSessionPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.authSessionPanel h2 {
+  margin: 0;
+}
+
+.authSessionMeta {
+  margin: 0;
+  color: var(--muted);
+}
+
+.authSessionActions {
+  margin-top: 8px;
+}
+
 .authPage {
   display: flex;
   align-items: center;
@@ -173,22 +191,6 @@ a {
 .authStatus--success {
   border-color: rgba(0, 109, 119, 0.22);
   background: rgba(0, 109, 119, 0.08);
-}
-
-.authStatus--error {
-  border-color: rgba(151, 39, 39, 0.18);
-  background: rgba(151, 39, 39, 0.08);
-}
-
-.authRetry {
-  width: fit-content;
-  min-height: 42px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: white;
-  font-weight: 600;
-  color: var(--ink);
 }
 
 .authFooter {
