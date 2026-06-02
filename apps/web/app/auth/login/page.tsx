@@ -1,18 +1,4 @@
-"use client";
-
-// Closes #525
-import { useState } from "react";
-import type { LoginRequest, LoginResponse, AuthError } from "@lumen/types";
-
-type DemoState = "idle" | "loading" | "success" | "error" | "locked";
-
-const DEMO_STATES: { label: string; state: DemoState }[] = [
-  { label: "Idle", state: "idle" },
-  { label: "Loading", state: "loading" },
-  { label: "Success", state: "success" },
-  { label: "Error", state: "error" },
-  { label: "Locked", state: "locked" },
-];
+import { AuthScreen } from "../_components/auth-screen";
 
 const DEMO_SESSION = {
   userId: "demo-user",
@@ -68,73 +54,7 @@ export default function LoginPage() {
 
   return (
     <main className="authPage">
-      <div className="authCard">
-        <p className="eyebrow">Milestone 1 · Authentication</p>
-        <h1>Sign in to LumenHealth</h1>
-
-        {uiState === "success" && (
-          <div role="status" className="authSuccess">
-            <p>Signed in as <strong>{DEMO_SESSION.role}</strong> — redirecting…</p>
-          </div>
-        )}
-
-        {(uiState === "error" || uiState === "locked") && errorMsg && (
-          <div role="alert" className="authError">
-            <p>{errorMsg}</p>
-          </div>
-        )}
-
-        <form className="authForm" onSubmit={handleSubmit}>
-          <label>
-            Email
-            <input
-              name="email"
-              type="email"
-              placeholder="owner@clinic.test"
-              autoComplete="email"
-              disabled={uiState === "loading" || uiState === "success"}
-              required
-            />
-          </label>
-          <label>
-            Password
-            <input
-              name="password"
-              type="password"
-              placeholder="••••••••"
-              autoComplete="current-password"
-              disabled={uiState === "loading" || uiState === "success"}
-              required
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={uiState === "loading" || uiState === "success"}
-            aria-busy={uiState === "loading"}
-          >
-            {uiState === "loading" ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-
-        {/* Demo state switcher — visible only in development for hackathon screenshots */}
-        {process.env.NODE_ENV !== "production" && (
-          <div className="demoStates" aria-label="Demo state switcher">
-            <p className="eyebrow">Demo states</p>
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              {DEMO_STATES.map(({ label, state }) => (
-                <button
-                  key={state}
-                  type="button"
-                  onClick={() => activateDemoState(state)}
-                  style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <AuthScreen mode="login" />
     </main>
   );
 }
