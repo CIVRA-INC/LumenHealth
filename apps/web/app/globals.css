@@ -149,10 +149,15 @@ a {
   width: min(100%, 720px);
 }
 
+.authCardContent {
+  display: grid;
+  gap: 10px;
+}
+
 .authForm {
   display: grid;
   gap: 16px;
-  margin: 28px 0 32px;
+  margin: 16px 0 24px;
 }
 
 .authForm label {
