@@ -9,6 +9,7 @@ import { makeSession, sessionStore } from "./session-store.js";
 import { validatePassword } from "./password-policy.js";
 import { resolveAuthContext } from "./auth-context-middleware.js";
 import { forbidden, unauthorized } from "./response-helpers.js";
+import { requirePermission } from "./role-guard.js";
 
 // Placeholder router — full implementation in subsequent auth milestones.
 const router = Router();
