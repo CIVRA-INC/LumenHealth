@@ -30,6 +30,7 @@ apps/api/src/
 apps/web/app/
   auth/
     login/page.tsx     # Login page (already scaffolded)
+    register/page.tsx  # Clinic-owner signup page
     logout/            # Logout route handler
 
 apps/mobile/
