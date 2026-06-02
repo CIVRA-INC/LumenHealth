@@ -20,6 +20,9 @@ export default function HomePage() {
           <Link href="/auth/login" className="primary">
             View auth starter
           </Link>
+          <Link href="/auth/register" className="secondary">
+            Create account
+          </Link>
           <a href="https://stellar.org" className="secondary">
             Stellar track
           </a>

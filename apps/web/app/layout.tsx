@@ -3,7 +3,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "LumenHealth",
-  description: "Open source hackathon starter for healthcare workflows and Stellar payments.",
+  description:
+    "Open source hackathon starter for healthcare workflows, auth submissions, and Stellar payments.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
