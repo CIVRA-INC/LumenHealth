@@ -29,11 +29,10 @@ apps/api/src/
 
 apps/web/app/
   auth/
-    page.tsx           # Auth landing page with login/register entry points
-    login/page.tsx     # Login page with submission states
-    register/page.tsx  # Registration page with submission states
-    _components/
-      auth-screen.tsx  # Shared client auth form shell and retry handling
+    login/page.tsx     # Login page (already scaffolded)
+    session-provider.tsx # Shared auth session boundary for the web shell
+    session-summary.tsx # Session-aware shell summary component
+    session.ts         # Local storage session helpers and subscriptions
     logout/            # Logout route handler
 
 apps/mobile/

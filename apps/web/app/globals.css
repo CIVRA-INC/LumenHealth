@@ -121,6 +121,24 @@ a {
   padding-left: 20px;
 }
 
+.authSessionPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.authSessionPanel h2 {
+  margin: 0;
+}
+
+.authSessionMeta {
+  margin: 0;
+  color: var(--muted);
+}
+
+.authSessionActions {
+  margin-top: 8px;
+}
+
 .authPage {
   display: flex;
   align-items: center;
@@ -152,66 +170,8 @@ a {
   background: rgba(255, 255, 255, 0.88);
 }
 
-.authCard {
-  display: grid;
-  gap: 18px;
-}
-
 .authLead {
   margin: 0;
-}
-
-.authField {
-  display: grid;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.authField input {
-  color: var(--ink);
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
-}
-
-.authField input:focus {
-  outline: none;
-  border-color: rgba(0, 109, 119, 0.45);
-  box-shadow: 0 0 0 4px rgba(0, 109, 119, 0.12);
-}
-
-.authForm,
-.authStatus,
-.authFooter,
-.authLanding {
-  width: 100%;
-}
-
-.authForm button,
-.authRetry,
-.primary,
-.secondary,
-.authSwitchLink {
-  transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease,
-    opacity 180ms ease;
-}
-
-.authForm button:hover,
-.authRetry:hover,
-.primary:hover,
-.secondary:hover,
-.authSwitchLink:hover {
-  transform: translateY(-1px);
-}
-
-.authForm button:disabled {
-  opacity: 0.72;
-  cursor: progress;
-  transform: none;
 }
 
 .authStatus {
@@ -225,9 +185,6 @@ a {
 
 .authStatus p {
   margin: 0;
-}
-
-.authStatusDetail {
   color: var(--muted);
 }
 
@@ -236,66 +193,10 @@ a {
   background: rgba(0, 109, 119, 0.08);
 }
 
-.authStatus--error {
-  border-color: rgba(151, 39, 39, 0.18);
-  background: rgba(151, 39, 39, 0.08);
-}
-
-.authRetry {
-  width: fit-content;
-  min-height: 42px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: white;
-  font-weight: 600;
-  color: var(--ink);
-}
-
 .authFooter {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-.authFooter p {
-  margin: 0;
-  color: var(--muted);
-}
-
-.authSwitchLink {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.authLanding {
-  width: min(100%, 720px);
-  display: grid;
-  gap: 24px;
-  padding: 40px;
-  background: var(--surface);
-  backdrop-filter: blur(18px);
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  box-shadow: 0 24px 60px rgba(19, 32, 43, 0.08);
-}
-
-.authLandingCopy h1 {
-  margin: 0 0 16px;
-  font-size: clamp(2.1rem, 4vw, 3.8rem);
-  line-height: 1;
-}
-
-.authLandingActions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.secondary {
-  color: var(--ink);
 }
 
 @media (max-width: 720px) {
