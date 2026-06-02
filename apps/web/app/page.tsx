@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthSessionSummary } from "./auth/session-summary";
 
 const tracks = [
   "Authentication-first MVP",
@@ -20,6 +21,9 @@ export default function HomePage() {
           <Link href="/auth/login" className="primary">
             View auth starter
           </Link>
+          <Link href="/auth/register" className="secondary">
+            Create account
+          </Link>
           <a href="https://stellar.org" className="secondary">
             Stellar track
           </a>
@@ -34,6 +38,8 @@ export default function HomePage() {
           ))}
         </ul>
       </section>
+
+      <AuthSessionSummary />
     </main>
   );
 }

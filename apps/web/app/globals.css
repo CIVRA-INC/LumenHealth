@@ -121,6 +121,24 @@ a {
   padding-left: 20px;
 }
 
+.authSessionPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.authSessionPanel h2 {
+  margin: 0;
+}
+
+.authSessionMeta {
+  margin: 0;
+  color: var(--muted);
+}
+
+.authSessionActions {
+  margin-top: 8px;
+}
+
 .authPage {
   display: flex;
   align-items: center;
@@ -157,55 +175,45 @@ a {
   background: rgba(255, 255, 255, 0.88);
 }
 
-.authField {
-  gap: 6px;
+.authLead {
+  margin: 0;
 }
 
-.authFieldLabel {
-  color: var(--ink);
-}
-
-.authFieldHint {
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.authRoadmap {
+.authStatus {
   display: grid;
   gap: 10px;
-  padding-top: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.58);
 }
 
-.authRoadmap h2 {
-  margin: 0;
-  font-size: 1.15rem;
-}
-
-.authRoadmap ul {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.authRoadmap li {
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.authCardFooter {
-  padding-top: 8px;
-  border-top: 1px solid rgba(19, 32, 43, 0.08);
-}
-
-.authCardFooter p {
+.authStatus p {
   margin: 0;
   color: var(--muted);
+}
+
+.authStatus--success {
+  border-color: rgba(0, 109, 119, 0.22);
+  background: rgba(0, 109, 119, 0.08);
+}
+
+.authFooter {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 720px) {
   .hero,
   .panel,
-  .authCard {
+  .authCard,
+  .authLanding {
     padding: 24px;
+  }
+
+  .authFooter {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

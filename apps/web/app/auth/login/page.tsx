@@ -1,40 +1,60 @@
-import { AuthCard } from "../_components/auth-card";
-import { AuthField } from "../_components/auth-field";
-import { AuthRoadmap } from "../_components/auth-roadmap";
+import { AuthScreen } from "../_components/auth-screen";
 
-const roadmap = [
-  "registration flow",
-  "forgot-password flow",
-  "session persistence",
-  "role-aware redirects",
-  "audit trail integration",
-];
+const DEMO_SESSION = {
+  userId: "demo-user",
+  clinicId: "demo-clinic",
+  role: "owner" as const,
+  accessToken: "demo.jwt.token",
+};
 
 export default function LoginPage() {
+  const [uiState, setUiState] = useState<DemoState>("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (demoMode) return;
+    const form = new FormData(e.currentTarget);
+    const body: LoginRequest = {
+      email: form.get("email") as string,
+      password: form.get("password") as string,
+    };
+    setUiState("loading");
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const data: LoginResponse = await res.json();
+        void data; // store token in real implementation
+        setUiState("success");
+      } else {
+        const err: AuthError = await res.json();
+        if (err.error === "AUTH_ACCOUNT_LOCKED") setUiState("locked");
+        else setUiState("error");
+        setErrorMsg(err.message);
+      }
+    } catch {
+      setUiState("error");
+      setErrorMsg("Network error — could not reach the server.");
+    }
+  }
+
+  function activateDemoState(state: DemoState) {
+    setDemoMode(true);
+    setUiState(state);
+    if (state === "error") setErrorMsg("Invalid email or password.");
+    else if (state === "locked") setErrorMsg("Account locked after too many attempts.");
+    else setErrorMsg(null);
+  }
+
   return (
     <main className="authPage">
-      <AuthCard
-        eyebrow="Milestone 1"
-        title="Authentication starts here."
-        description="These primitives now break the auth shell into reusable pieces for future login, recovery, and stateful auth screens."
-        footer={
-          <p>
-            The same card, field, and roadmap primitives can power the next auth states without
-            restyling the whole screen.
-          </p>
-        }
-      >
-        <form className="authForm">
-          <AuthField label="Email" hint="Use the clinic owner account for this starter.">
-            <input type="email" placeholder="owner@clinic.test" autoComplete="email" />
-          </AuthField>
-          <AuthField label="Password" hint="At least 8 characters in the next milestone.">
-            <input type="password" placeholder="********" autoComplete="current-password" />
-          </AuthField>
-          <button type="button">Connect this flow in Milestone 1</button>
-        </form>
-        <AuthRoadmap title="Coming next" items={roadmap} />
-      </AuthCard>
+      <AuthScreen mode="login" />
     </main>
   );
 }

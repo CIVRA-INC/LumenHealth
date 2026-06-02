@@ -29,11 +29,10 @@ apps/api/src/
 
 apps/web/app/
   auth/
-    login/page.tsx     # Login page built from reusable primitives
-    _components/
-      auth-card.tsx    # Shared auth shell surface and copy frame
-      auth-field.tsx   # Shared labeled field primitive
-      auth-roadmap.tsx # Shared roadmap/list primitive for auth milestones
+    login/page.tsx     # Login page (already scaffolded)
+    session-provider.tsx # Shared auth session boundary for the web shell
+    session-summary.tsx # Session-aware shell summary component
+    session.ts         # Local storage session helpers and subscriptions
     logout/            # Logout route handler
 
 apps/mobile/
