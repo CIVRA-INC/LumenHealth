@@ -143,13 +143,12 @@ describe("GET /api/v1/auth/me — token validation failures", () => {
     expect(typeof err.message).toBe("string");
   });
 
-  it("returns 403 forbidden when role header lacks auth:read permission", async () => {
+  it("returns 401 for an unrecognised bearer token", async () => {
     const { status, body } = await request(app, "GET", "/api/v1/auth/me", undefined, {
-      Authorization: "Bearer starter-token",
-      "x-role": "cashier",
+      Authorization: "Bearer not-a-real-session-token",
     });
-    expect(status).toBe(403);
-    expect((body as { error: string }).error).toBe("AUTH_FORBIDDEN");
+    expect(status).toBe(401);
+    expect((body as { error: string }).error).toBe("AUTH_TOKEN_INVALID");
   });
 });
 

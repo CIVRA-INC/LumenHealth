@@ -1,11 +1,13 @@
 import type { NextFunction, Request, Response } from "express";
+import type { UserRole } from "@lumen/types";
 import { sessionStore } from "./session-store.js";
+import { identityStore } from "./identity-store.js";
 import { unauthorized } from "./response-helpers.js";
 
 export type AuthContext = {
   userId: string;
   clinicId: string;
-  role: "owner";
+  role: UserRole;
   accessToken: string;
 };
 
@@ -21,10 +23,11 @@ export function resolveAuthContext(req: Request, res: Response, next: NextFuncti
   const accessToken = auth.slice("Bearer ".length);
   const session = sessionStore.findByAccessToken(accessToken);
   if (!session || !sessionStore.isValid(session.sessionId)) return unauthorized(res, "expired or invalid token");
+  const identity = identityStore.findById(session.userId);
   req.auth = {
     userId: session.userId,
     clinicId: session.clinicId,
-    role: "owner",
+    role: identity?.role ?? "clinician",
     accessToken: session.accessToken,
   };
   next();
