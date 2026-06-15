@@ -246,3 +246,10 @@ router.use((err: unknown, _req: import("express").Request, res: import("express"
 });
 
 export { router as authRouter };
+
+export function _resetAuthRouterForTests(): void {
+  rateBuckets.clear();
+  seenRefreshTokens.clear();
+  resetTokens.clear();
+  verifyTokens.clear();
+}

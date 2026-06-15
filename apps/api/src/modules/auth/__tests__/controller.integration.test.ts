@@ -1,10 +1,12 @@
 // Auth 025 — Controller integration tests for invalid credentials and validation failures
 // Closes #460
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import express from "express";
 import type { Express } from "express";
-import { authRouter } from "../router.js";
+import { authRouter, _resetAuthRouterForTests } from "../router.js";
+import { identityStore } from "../identity-store.js";
+import { sessionStore } from "../session-store.js";
 
 function buildApp(): Express {
   const app = express();
@@ -199,5 +201,84 @@ describe("GET /api/v1/auth/owner-only", () => {
   it("returns 401 without bearer token", async () => {
     const { status } = await request(app, "GET", "/api/v1/auth/owner-only");
     expect(status).toBe(401);
+  });
+});
+
+describe("POST /api/v1/auth/register — success path", () => {
+  const app = buildApp();
+
+  beforeEach(() => {
+    _resetAuthRouterForTests();
+    identityStore._reset();
+    sessionStore._reset();
+  });
+
+  it("returns 201 with a session on valid registration", async () => {
+    const { status, body } = await request(app, "POST", "/api/v1/auth/register", {
+      email: "new@clinic.test",
+      password: "Passw0rd!",
+      clinicName: "Test Clinic",
+    });
+    expect(status).toBe(201);
+    const session = (body as { session: { userId: string; accessToken: string } }).session;
+    expect(typeof session.userId).toBe("string");
+    expect(typeof session.accessToken).toBe("string");
+    expect(session.accessToken.split(".").length).toBe(3);
+  });
+
+  it("returns 409 AUTH_EMAIL_TAKEN when the same email is registered twice", async () => {
+    const payload = { email: "dup@clinic.test", password: "Passw0rd!", clinicName: "Dup Clinic" };
+    await request(app, "POST", "/api/v1/auth/register", payload);
+    const { status, body } = await request(app, "POST", "/api/v1/auth/register", payload);
+    expect(status).toBe(409);
+    expect((body as { error: string }).error).toBe("AUTH_EMAIL_TAKEN");
+  });
+});
+
+describe("POST /api/v1/auth/login — success and failure paths", () => {
+  const app = buildApp();
+
+  beforeEach(() => {
+    _resetAuthRouterForTests();
+    identityStore._reset();
+    sessionStore._reset();
+  });
+
+  it("returns 200 with a session after registering and logging in", async () => {
+    await request(app, "POST", "/api/v1/auth/register", {
+      email: "login@clinic.test",
+      password: "Passw0rd!",
+      clinicName: "Login Clinic",
+    });
+    const { status, body } = await request(app, "POST", "/api/v1/auth/login", {
+      email: "login@clinic.test",
+      password: "Passw0rd!",
+    });
+    expect(status).toBe(200);
+    const session = (body as { session: { userId: string; accessToken: string } }).session;
+    expect(typeof session.accessToken).toBe("string");
+  });
+
+  it("returns 401 AUTH_INVALID_CREDENTIALS for wrong password", async () => {
+    await request(app, "POST", "/api/v1/auth/register", {
+      email: "wrongpw@clinic.test",
+      password: "Passw0rd!",
+      clinicName: "Wrong PW Clinic",
+    });
+    const { status, body } = await request(app, "POST", "/api/v1/auth/login", {
+      email: "wrongpw@clinic.test",
+      password: "WrongPassword!",
+    });
+    expect(status).toBe(401);
+    expect((body as { error: string }).error).toBe("AUTH_INVALID_CREDENTIALS");
+  });
+
+  it("returns 401 AUTH_INVALID_CREDENTIALS for a non-existent account", async () => {
+    const { status, body } = await request(app, "POST", "/api/v1/auth/login", {
+      email: "ghost@clinic.test",
+      password: "Passw0rd!",
+    });
+    expect(status).toBe(401);
+    expect((body as { error: string }).error).toBe("AUTH_INVALID_CREDENTIALS");
   });
 });
