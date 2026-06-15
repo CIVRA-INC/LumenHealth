@@ -22,7 +22,6 @@ async function request(
   body?: unknown,
   headers?: Record<string, string>
 ): Promise<{ status: number; body: unknown }> {
-  const url = `http://localhost`;
   const init: RequestInit = {
     method,
     headers: { "Content-Type": "application/json", ...headers },

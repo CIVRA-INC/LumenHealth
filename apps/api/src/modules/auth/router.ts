@@ -240,7 +240,7 @@ router.get("/owner-only", resolveAuthContext, (req, res) => {
   res.json({ ok: true, userId: req.auth.userId, clinicId: req.auth.clinicId });
 });
 
-router.use((err: unknown, _req: import("express").Request, res: import("express").Response, _next: import("express").NextFunction) => {
+router.use((err: unknown, _req: import("express").Request, res: import("express").Response, _next: import("express").NextFunction): void => {
   const normalized = normalizeAuthError(err);
   res.status(authErrorStatus(normalized.error)).json(normalized);
 });
