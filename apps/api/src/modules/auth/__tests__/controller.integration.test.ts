@@ -4,7 +4,7 @@
 import { describe, it, expect } from "vitest";
 import express from "express";
 import type { Express } from "express";
-import { authRouter } from "../../../auth/router.js";
+import { authRouter } from "../router.js";
 
 function buildApp(): Express {
   const app = express();
