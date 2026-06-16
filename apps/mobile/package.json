@@ -2,16 +2,20 @@
   "name": "@lumen/mobile",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts,.tsx --no-error-on-unmatched-pattern"
+    "lint": "eslint src"
   },
   "dependencies": {
     "@lumen/types": "^0.1.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@types/react": "^19.2.2",
     "@types/react-native": "^0.73.0",
-    "typescript": "^5.9.3"
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.0.0"
   }
 }
