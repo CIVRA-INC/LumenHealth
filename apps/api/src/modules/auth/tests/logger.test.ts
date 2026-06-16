@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { authLogger } from "../logger.js";
+import { authLogger } from "../../../shared/logger/index.js";
 
 describe("auth logger", () => {
   it("serializes the auth event with metadata", () => {

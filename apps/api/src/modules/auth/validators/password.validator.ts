@@ -10,7 +10,10 @@ export const defaultPasswordPolicy: PasswordPolicyConfig = {
   requireNumber: false,
 };
 
-export function validatePassword(password: string, cfg: PasswordPolicyConfig = defaultPasswordPolicy): string | null {
+export function validatePassword(
+  password: string,
+  cfg: PasswordPolicyConfig = defaultPasswordPolicy
+): string | null {
   if (password.length < cfg.minLength) return `password must be at least ${cfg.minLength} characters`;
   if (cfg.requireUpper && !/[A-Z]/.test(password)) return "password must include an uppercase letter";
   if (cfg.requireNumber && !/[0-9]/.test(password)) return "password must include a number";

@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "node -e \"console.log('config lint: add stronger checks in milestone work')\""
+    "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "dotenv": "^17.2.3"

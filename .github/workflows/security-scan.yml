@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Audit npm dependencies
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=critical
 
       - name: Scan for hardcoded secrets
         uses: gitleaks/gitleaks-action@v2

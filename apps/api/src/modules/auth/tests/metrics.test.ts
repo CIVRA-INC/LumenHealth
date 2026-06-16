@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAuthMetricsSnapshot, incrementMetric } from "../metrics.js";
+import { getAuthMetricsSnapshot, incrementMetric } from "../services/metrics.service.js";
 
 describe("auth metrics", () => {
   it("increments counters and returns a defensive snapshot", () => {

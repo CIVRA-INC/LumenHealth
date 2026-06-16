@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main
-      - "codex/**"
+      - "feat/**"
+      - "fix/**"
   pull_request:
     branches:
       - main
@@ -14,43 +15,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  api:
+    name: API — lint / test / build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run architecture checks
+      - run: npm ci
+      - name: Build shared packages
+        run: npm run build -w packages/config && npm run build -w packages/types
+      - name: Architecture checks
         run: npm run check:architecture
-
-      - name: Test API
+      - name: Lint
+        run: npm run lint -w apps/api
+      - name: Test
         run: npm run test -w apps/api
+      - name: Build
+        run: npm run build -w apps/api
 
-      - name: Start mock health endpoint for web build
-        run: |
-          node -e "const http=require('http');const server=http.createServer((req,res)=>{if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({status:'ok'}));return;}res.writeHead(404);res.end('Not Found');});server.listen(4000,'127.0.0.1');setInterval(()=>{},1<<30);" > /tmp/mock-health.log 2>&1 &
-          echo $! > /tmp/mock-health.pid
+  web:
+    name: Web — lint / test / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build shared packages
+        run: npm run build -w packages/config && npm run build -w packages/types
+      - name: Test
+        run: npm run test -w apps/web
+      - name: Lint
+        run: npm run lint -w apps/web
+      - name: Build
+        run: npm run build -w apps/web
 
-      - name: Build monorepo
-        env:
-          NEXT_TELEMETRY_DISABLED: "1"
-          CI: "true"
-        run: npm run build
-
-      - name: Stop mock health endpoint
-        if: always()
-        run: |
-          if [ -f /tmp/mock-health.pid ]; then
-            kill "$(cat /tmp/mock-health.pid)" || true
-          fi
+  packages:
+    name: Packages — build / lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build config
+        run: npm run build -w packages/config
+      - name: Build types
+        run: npm run build -w packages/types

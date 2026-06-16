@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authErrorStatus, normalizeAuthError } from "../errors.js";
+import { authErrorStatus, normalizeAuthError } from "../../../shared/errors/index.js";
 
 describe("auth error normalization", () => {
   it("maps auth error codes to the expected HTTP status", () => {

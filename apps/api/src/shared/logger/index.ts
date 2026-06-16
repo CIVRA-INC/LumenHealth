@@ -1,6 +1,3 @@
-// Auth observability baseline — Closes #444
-// Structured JSON logger for auth events. No external dependencies.
-
 import type { AuthEventType } from "@lumen/types";
 
 type LogLevel = "info" | "warn" | "error";

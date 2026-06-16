@@ -1,6 +1,3 @@
-// Auth error normalization — Closes #442
-// Converts any thrown value into a typed AuthError response body.
-
 import type { AuthError, AuthErrorCode } from "@lumen/types";
 
 const HTTP_STATUS: Record<AuthErrorCode, number> = {
