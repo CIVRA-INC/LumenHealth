@@ -2,8 +2,20 @@
   "name": "@lumen/mobile",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "lint": "node -e \"console.log('mobile lint: scaffold only')\"",
-    "typecheck": "node -e \"console.log('mobile typecheck: scaffold only')\""
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@lumen/types": "^0.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/react": "^19.2.2",
+    "@types/react-native": "^0.73.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.0.0"
   }
 }
