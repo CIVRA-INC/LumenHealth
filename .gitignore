@@ -11,8 +11,11 @@ coverage/
 
 # Planning and backlog artifacts
 scripts/issues/
+SPRINTS.md
 
 # Repo management and contributor process files
 .github/
 CONTRIBUTING.md
 CODE_OF_CONDUCT.md
+memory/MEMORY.md
+memory/feedback_learning_workflow.md

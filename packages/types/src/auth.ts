@@ -11,7 +11,11 @@ export type Permission =
   | "billing:read"
   | "billing:write"
   | "patient:read"
-  | "patient:write";
+  | "patient:write"
+  | "clinic:read"
+  | "clinic:write"
+  | "staff:read"
+  | "staff:write";
 
 export type RolePolicy = {
   role: UserRole;
