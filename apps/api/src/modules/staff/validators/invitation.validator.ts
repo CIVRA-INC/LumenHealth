@@ -37,6 +37,15 @@ export function validateAcceptInvitation(body: unknown): ValidationResult {
   if (!b.password || typeof b.password !== "string") {
     return { ok: false, field: "password", message: "password is required" };
   }
+  if (b.password.length < 8) {
+    return { ok: false, field: "password", message: "password must be at least 8 characters" };
+  }
+  if (!/[A-Z]/.test(b.password)) {
+    return { ok: false, field: "password", message: "password must contain at least one uppercase letter" };
+  }
+  if (!/[0-9]/.test(b.password)) {
+    return { ok: false, field: "password", message: "password must contain at least one number" };
+  }
 
   return { ok: true };
 }

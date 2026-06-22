@@ -132,6 +132,48 @@ describe("POST /api/v1/staff/invitations/accept — accept", () => {
     expect(typeof (body as { userId: string }).userId).toBe("string");
   });
 
+  it("returns 400 when password is too short", async () => {
+    const { a } = buildTwoClinicFixture();
+    const { body: sent } = await req(app, "POST", "/api/v1/staff/invitations", VALID_INVITE, a.token);
+    const token = (sent as { invitation: { token: string } }).invitation.token;
+
+    const { status, body } = await req(app, "POST", "/api/v1/staff/invitations/accept", {
+      token,
+      password: "Ab1",
+      name: "Dr. Okafor",
+    });
+    expect(status).toBe(400);
+    expect((body as { field: string }).field).toBe("password");
+  });
+
+  it("returns 400 when password has no uppercase letter", async () => {
+    const { a } = buildTwoClinicFixture();
+    const { body: sent } = await req(app, "POST", "/api/v1/staff/invitations", VALID_INVITE, a.token);
+    const token = (sent as { invitation: { token: string } }).invitation.token;
+
+    const { status, body } = await req(app, "POST", "/api/v1/staff/invitations/accept", {
+      token,
+      password: "securepass1",
+      name: "Dr. Okafor",
+    });
+    expect(status).toBe(400);
+    expect((body as { field: string }).field).toBe("password");
+  });
+
+  it("returns 400 when password has no number", async () => {
+    const { a } = buildTwoClinicFixture();
+    const { body: sent } = await req(app, "POST", "/api/v1/staff/invitations", VALID_INVITE, a.token);
+    const token = (sent as { invitation: { token: string } }).invitation.token;
+
+    const { status, body } = await req(app, "POST", "/api/v1/staff/invitations/accept", {
+      token,
+      password: "SecurePass",
+      name: "Dr. Okafor",
+    });
+    expect(status).toBe(400);
+    expect((body as { field: string }).field).toBe("password");
+  });
+
   it("returns 404 for an unknown token", async () => {
     const { status, body } = await req(app, "POST", "/api/v1/staff/invitations/accept", {
       token: "a".repeat(64),
