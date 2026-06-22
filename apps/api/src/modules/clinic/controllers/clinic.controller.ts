@@ -25,7 +25,7 @@ export function create(req: Request, res: Response): void {
 }
 
 export function get(req: Request, res: Response): void {
-  const clinic = getClinic(req.params.clinicId, req.auth!.clinicId);
+  const clinic = getClinic(String(req.params.clinicId), req.auth!.clinicId);
   if (!clinic) {
     res.status(404).json({ error: "CLINIC_NOT_FOUND", message: "clinic not found" });
     return;
@@ -51,7 +51,7 @@ export function update(req: Request, res: Response): void {
   }
 
   const patch = req.body as UpdateClinicRequest;
-  const clinic = updateClinic(req.params.clinicId, req.auth!.clinicId, patch);
+  const clinic = updateClinic(String(req.params.clinicId), req.auth!.clinicId, patch);
   if (!clinic) {
     res.status(404).json({ error: "CLINIC_NOT_FOUND", message: "clinic not found" });
     return;
@@ -65,7 +65,7 @@ export function archive(req: Request, res: Response): void {
     return;
   }
 
-  const clinic = archiveClinic(req.params.clinicId, req.auth!.clinicId);
+  const clinic = archiveClinic(String(req.params.clinicId), req.auth!.clinicId);
   if (!clinic) {
     res.status(404).json({ error: "CLINIC_NOT_FOUND", message: "clinic not found" });
     return;

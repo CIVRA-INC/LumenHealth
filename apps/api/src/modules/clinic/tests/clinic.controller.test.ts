@@ -7,6 +7,15 @@ import { identityStore } from "../../auth/repositories/identity.repository.js";
 import { sessionStore } from "../../auth/repositories/session.repository.js";
 import { _resetAuthStateForTests } from "../../auth/controllers/auth.controller.js";
 import { buildTwoClinicFixture } from "../../auth/tests/fixtures.js";
+import { accessTokenSigner } from "../../auth/services/token.service.js";
+import type { UserRole } from "@lumen/types";
+
+// Build a token for a given role scoped to the same clinicId as fixture A.
+// Used for role-guard tests where the caller is in the right clinic but
+// lacks the permission to perform the action.
+function tokenWithRole(clinicId: string, role: UserRole): string {
+  return accessTokenSigner.sign({ sub: `user-${role}`, clinicId, role });
+}
 
 function buildApp(): Express {
   const app = express();
@@ -127,7 +136,7 @@ describe("GET /api/v1/clinics/:clinicId — read", () => {
     expect((body as { clinic: { clinicId: string } }).clinic.clinicId).toBe(clinicId);
   });
 
-  it("returns 404 when a different clinic's token is used", async () => {
+  it("returns 403 when a different clinic's token is used (requireClinicScope fires before repo)", async () => {
     const { a, b } = buildTwoClinicFixture();
     const { body: created } = await req(app, "POST", "/api/v1/clinics", VALID_BODY, a.token);
     const clinicId = (created as { clinic: { clinicId: string } }).clinic.clinicId;
@@ -165,6 +174,17 @@ describe("PATCH /api/v1/clinics/:clinicId — update", () => {
     const { status } = await req(app, "PATCH", `/api/v1/clinics/${clinicId}`, { email: "bad" }, a.token);
     expect(status).toBe(400);
   });
+
+  it("returns 403 when a clinician tries to update the clinic", async () => {
+    const { a } = buildTwoClinicFixture();
+    const { body: created } = await req(app, "POST", "/api/v1/clinics", VALID_BODY, a.token);
+    const clinicId = (created as { clinic: { clinicId: string } }).clinic.clinicId;
+
+    const clinicianToken = tokenWithRole(a.clinicId, "clinician");
+    const { status, body } = await req(app, "PATCH", `/api/v1/clinics/${clinicId}`, { name: "Hacked" }, clinicianToken);
+    expect(status).toBe(403);
+    expect((body as { error: string }).error).toBe("AUTH_FORBIDDEN");
+  });
 });
 
 describe("DELETE /api/v1/clinics/:clinicId — archive", () => {
@@ -188,5 +208,16 @@ describe("DELETE /api/v1/clinics/:clinicId — archive", () => {
 
     const stored = clinicStore.findById(clinicId);
     expect(stored?.status).toBe("archived");
+  });
+
+  it("returns 403 when an admin tries to archive the clinic — only owner may", async () => {
+    const { a } = buildTwoClinicFixture();
+    const { body: created } = await req(app, "POST", "/api/v1/clinics", VALID_BODY, a.token);
+    const clinicId = (created as { clinic: { clinicId: string } }).clinic.clinicId;
+
+    const adminToken = tokenWithRole(a.clinicId, "admin");
+    const { status, body } = await req(app, "DELETE", `/api/v1/clinics/${clinicId}`, undefined, adminToken);
+    expect(status).toBe(403);
+    expect((body as { error: string }).error).toBe("AUTH_FORBIDDEN");
   });
 });
