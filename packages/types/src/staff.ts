@@ -17,7 +17,7 @@ export type StaffMember = {
 };
 
 export type UpdateStaffRoleRequest = {
-  role: UserRole;
+  role: Exclude<UserRole, "owner">;
 };
 
 // ── Invitations ───────────────────────────────────────────────────────────────
