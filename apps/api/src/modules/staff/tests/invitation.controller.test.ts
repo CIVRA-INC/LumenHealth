@@ -142,6 +142,41 @@ describe("POST /api/v1/staff/invitations/accept — accept", () => {
     expect((body as { error: string }).error).toBe("INVITATION_NOT_FOUND");
   });
 
+  it("returns 410 when the invitation token has expired", async () => {
+    const { a } = buildTwoClinicFixture();
+    const { body: sent } = await req(app, "POST", "/api/v1/staff/invitations", VALID_INVITE, a.token);
+    const token = (sent as { invitation: { token: string; invitationId: string } }).invitation.token;
+    const invitationId = (sent as { invitation: { token: string; invitationId: string } }).invitation.invitationId;
+
+    // Backdate the expiry to simulate expiration
+    const existing = invitationStore.findById(invitationId)!;
+    invitationStore.save({ ...existing, expiresAt: new Date(Date.now() - 1000).toISOString() });
+
+    const { status, body } = await req(app, "POST", "/api/v1/staff/invitations/accept", {
+      token,
+      password: "SecurePass1!",
+      name: "Dr. Okafor",
+    });
+    expect(status).toBe(410);
+    expect((body as { error: string }).error).toBe("INVITATION_EXPIRED");
+  });
+
+  it("returns 409 when trying to accept a revoked invitation", async () => {
+    const { a } = buildTwoClinicFixture();
+    const { body: sent } = await req(app, "POST", "/api/v1/staff/invitations", VALID_INVITE, a.token);
+    const invitation = (sent as { invitation: { token: string; invitationId: string } }).invitation;
+
+    await req(app, "DELETE", `/api/v1/staff/invitations/${invitation.invitationId}`, undefined, a.token);
+
+    const { status, body } = await req(app, "POST", "/api/v1/staff/invitations/accept", {
+      token: invitation.token,
+      password: "SecurePass1!",
+      name: "Dr. Okafor",
+    });
+    expect(status).toBe(409);
+    expect((body as { error: string }).error).toBe("INVITATION_REVOKED");
+  });
+
   it("returns 409 when trying to accept an already-accepted invitation", async () => {
     const { a } = buildTwoClinicFixture();
     const { body: sent } = await req(app, "POST", "/api/v1/staff/invitations", VALID_INVITE, a.token);
