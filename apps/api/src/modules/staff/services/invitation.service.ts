@@ -59,7 +59,7 @@ export function sendInvitation(
 export async function acceptInvitation(
   token: string,
   password: string,
-  name: string,
+  _name: string,
 ): Promise<{ ok: true; userId: string } | { error: string; message: string }> {
   const invitation = invitationStore.findByToken(token);
 
