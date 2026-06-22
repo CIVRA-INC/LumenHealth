@@ -102,6 +102,27 @@ Do not create partial implementations or placeholder endpoints for future module
 
 ---
 
+## Clinic isolation rules
+
+All data in LumenHealth is scoped to a clinic. When implementing a new module follow these rules without exception:
+
+1. **Extract `clinicId` from `req.auth.clinicId`** — never from `req.body` or `req.params` alone. The JWT is the source of truth for which clinic a request belongs to.
+
+2. **Pass `clinicId` as the first argument to every repository list method.** No list query should ever return records from multiple clinics.
+
+3. **On `findById`, verify `record.clinicId === req.auth.clinicId` before returning.** If the record belongs to a different clinic, return `undefined` — let the controller respond with 404.
+
+4. **Return 404 (not 403) for cross-clinic resource access.** Returning 403 would confirm that the resource exists in another clinic, which is a data enumeration risk. A foreign resource must look identical to a missing one.
+
+5. **Apply `requireClinicScope` to any route with `:clinicId` in the URL path.** Import it from `src/shared/middleware/clinic-scope.ts` and place it after `resolveAuthContext`:
+   ```ts
+   router.get("/:clinicId", resolveAuthContext, requireClinicScope("clinicId"), handler);
+   ```
+
+6. **Use `buildTwoClinicFixture()` in your integration tests** to verify your module enforces isolation. Import it from `src/modules/auth/tests/fixtures.ts`.
+
+---
+
 ## Pull requests
 
 - One PR per milestone scope
