@@ -88,7 +88,10 @@ export type AuthEventType =
   | "auth.token.expired"
   | "auth.recovery.requested"
   | "auth.recovery.completed"
-  | "auth.account.locked";
+  | "auth.account.locked"
+  | "invitation.sent"
+  | "invitation.accepted"
+  | "invitation.revoked";
 
 export type AuthEvent = {
   type: AuthEventType;
