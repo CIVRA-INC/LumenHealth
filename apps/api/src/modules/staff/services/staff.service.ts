@@ -10,11 +10,16 @@ export function updateStaffRole(
   staffId: string,
   body: UpdateStaffRoleRequest,
   callerClinicId: string,
+  callerUserId: string,
 ): StaffMember | { error: string; message: string } {
   const member = staffStore.findById(staffId);
 
   if (!member || member.clinicId !== callerClinicId) {
     return { error: "STAFF_NOT_FOUND", message: "staff member not found" };
+  }
+
+  if (member.userId === callerUserId) {
+    return { error: "STAFF_CANNOT_SELF_UPDATE", message: "you cannot change your own role" };
   }
 
   const updated: StaffMember = {

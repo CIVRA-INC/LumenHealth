@@ -20,10 +20,11 @@ export function updateRole(req: Request, res: Response): void {
     return;
   }
 
-  const result = updateStaffRole(String(req.params.staffId), body, req.auth!.clinicId);
+  const result = updateStaffRole(String(req.params.staffId), body, req.auth!.clinicId, req.auth!.userId);
 
   if ("error" in result) {
-    res.status(404).json(result);
+    const status = result.error === "STAFF_NOT_FOUND" ? 404 : 403;
+    res.status(status).json(result);
     return;
   }
 

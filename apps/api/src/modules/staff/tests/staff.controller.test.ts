@@ -167,6 +167,22 @@ describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
     expect(status).toBe(404);
   });
 
+  it("returns 403 when an admin tries to change their own role", async () => {
+    const { a } = buildTwoClinicFixture();
+    // a.userId is "user-isolation-a" — create a staff record tied to that same userId
+    const self = createStaffFromInvitation(a.userId, a.clinicId, "owner@a.test", "Owner A", "admin");
+
+    const { status, body } = await req(
+      app,
+      "PATCH",
+      `/api/v1/staff/${self.staffId}/role`,
+      { role: "clinician" },
+      a.token,
+    );
+    expect(status).toBe(403);
+    expect((body as { error: string }).error).toBe("STAFF_CANNOT_SELF_UPDATE");
+  });
+
   it("returns 401 with no token", async () => {
     const { status } = await req(app, "PATCH", "/api/v1/staff/any-id/role", { role: "admin" });
     expect(status).toBe(401);
