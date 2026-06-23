@@ -1,6 +1,7 @@
 import express from "express";
 import { authRouter } from "./modules/auth/routes/index.js";
 import { invitationRouter } from "./modules/staff/routes/index.js";
+import { staffRouter } from "./modules/staff/routes/staff.routes.js";
 import { clinicRouter } from "./modules/clinic/routes/index.js";
 
 const app = express();
@@ -13,6 +14,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/staff/invitations", invitationRouter);
+app.use("/api/v1/staff", staffRouter);
 app.use("/api/v1/clinics", clinicRouter);
 
 export { app };
