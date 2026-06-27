@@ -10,7 +10,7 @@ type Status = "idle" | "loading" | "saving" | "success" | "error";
 export function ClinicSettingsForm() {
   const { session } = useAuthSession();
   const [clinic, setClinic] = useState<Clinic | null>(null);
-  const [status, setStatus] = useState<Status>("idle");
+  const [status, setStatus] = useState<Status>(session ? "loading" : "idle");
   const [errorMessage, setErrorMessage] = useState("");
 
   const [name, setName] = useState("");
@@ -20,9 +20,10 @@ export function ClinicSettingsForm() {
 
   useEffect(() => {
     if (!session) return;
-    setStatus("loading");
+    let cancelled = false;
     fetchClinic(session.clinicId, session.accessToken)
       .then((c) => {
+        if (cancelled) return;
         setClinic(c);
         setName(c.name);
         setAddress(c.address);
@@ -31,9 +32,11 @@ export function ClinicSettingsForm() {
         setStatus("idle");
       })
       .catch((err) => {
+        if (cancelled) return;
         setErrorMessage(err instanceof Error ? err.message : "Failed to load clinic");
         setStatus("error");
       });
+    return () => { cancelled = true; };
   }, [session]);
 
   const handleSubmit = useCallback(
