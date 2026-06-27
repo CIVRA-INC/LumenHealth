@@ -471,6 +471,42 @@ a {
   color: var(--danger);
 }
 
+.staffDirectory {
+  margin-top: 16px;
+}
+
+.staffTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.staffTable th,
+.staffTable td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.staffTable th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.staffTable select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.muted {
+  color: var(--muted);
+}
+
 @media (max-width: 720px) {
   .hero,
   .panel,
