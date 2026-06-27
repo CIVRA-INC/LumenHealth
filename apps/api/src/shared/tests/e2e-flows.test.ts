@@ -6,7 +6,6 @@ import { sessionStore } from "../../modules/auth/repositories/session.repository
 import { _resetAuthStateForTests } from "../../modules/auth/controllers/auth.controller.js";
 import { invitationStore } from "../../modules/staff/repositories/invitation.repository.js";
 import { staffStore } from "../../modules/staff/repositories/staff.repository.js";
-import { auditStore } from "../../modules/audit/repositories/audit.repository.js";
 import { clinicStore } from "../../modules/clinic/repositories/clinic.repository.js";
 
 type Body = Record<string, unknown>;
@@ -50,7 +49,6 @@ function resetAll() {
   sessionStore._reset();
   invitationStore._reset();
   staffStore._reset();
-  auditStore._reset();
   clinicStore._reset();
 }
 
@@ -270,15 +268,15 @@ describe("E2E: role-based access control", () => {
     );
     expect(sendInv.status).toBe(403);
 
-    // Clinician cannot view audit logs
-    const audit = await request(
+    // Clinician can list staff (read-only access)
+    const staffList = await request(
       app,
       "GET",
-      "/api/v1/audit",
+      "/api/v1/staff",
       undefined,
       clinicianToken,
     );
-    expect(audit.status).toBe(403);
+    expect(staffList.status).toBe(200);
   });
 });
 
