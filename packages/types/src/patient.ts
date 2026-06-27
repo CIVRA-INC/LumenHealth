@@ -18,6 +18,8 @@ export type Patient = {
   status: PatientStatus;
   createdAt: string;
   updatedAt: string;
+  /** ISO-8601 timestamp; set automatically when status transitions to 'archived'. */
+  archivedAt?: string;
 };
 
 export type CreatePatientRequest = {
@@ -46,6 +48,14 @@ export type PatientListItem = Pick<
   | "familyName"
   | "status"
 >;
+
+/** A page of patients returned by paginated list endpoints. */
+export type PatientListPage = {
+  items: PatientListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+};
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 

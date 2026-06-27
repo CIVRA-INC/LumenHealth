@@ -175,3 +175,314 @@ describe("validateUpdatePatient", () => {
     expect(validateUpdatePatient({ address: "" }).ok).toBe(false);
   });
 });
+
+describe("findByClinicAndName", () => {
+  beforeEach(() => {
+    patientStore._reset();
+  });
+
+  it("returns partial matches scoped to clinicId", () => {
+    patientStore.save(
+      makePatient({
+        patientId: "p1",
+        clinicId: "a",
+        givenName: "Ada",
+        familyName: "Lovelace",
+      }),
+    );
+    patientStore.save(
+      makePatient({
+        patientId: "p2",
+        clinicId: "a",
+        givenName: "Alan",
+        familyName: "Turing",
+      }),
+    );
+    patientStore.save(
+      makePatient({
+        patientId: "p3",
+        clinicId: "b",
+        givenName: "Ada",
+        familyName: "Byron",
+      }),
+    );
+
+    expect(
+      patientStore.findByClinicAndName("a", "ada").map((p) => p.patientId),
+    ).toEqual(["p1"]);
+    expect(
+      patientStore.findByClinicAndName("b", "ada").map((p) => p.patientId),
+    ).toEqual(["p3"]);
+  });
+
+  it("is case-insensitive across given and family names", () => {
+    patientStore.save(
+      makePatient({
+        patientId: "p1",
+        clinicId: "clinic_a",
+        givenName: "Ada",
+        familyName: "Lovelace",
+      }),
+    );
+    expect(
+      patientStore
+        .findByClinicAndName("clinic_a", "ADA")
+        .map((p) => p.patientId),
+    ).toEqual(["p1"]);
+    expect(
+      patientStore
+        .findByClinicAndName("clinic_a", "ada")
+        .map((p) => p.patientId),
+    ).toEqual(["p1"]);
+    expect(
+      patientStore
+        .findByClinicAndName("clinic_a", "lovelace")
+        .map((p) => p.patientId),
+    ).toEqual(["p1"]);
+  });
+
+  it("matches partial names by substring", () => {
+    patientStore.save(
+      makePatient({
+        patientId: "p1",
+        clinicId: "clinic_a",
+        givenName: "Augusta",
+        familyName: "Byron",
+      }),
+    );
+    patientStore.save(
+      makePatient({
+        patientId: "p2",
+        clinicId: "clinic_a",
+        givenName: "Algernon",
+        familyName: "Blackwood",
+      }),
+    );
+    expect(
+      patientStore
+        .findByClinicAndName("clinic_a", "al")
+        .map((p) => p.patientId),
+    ).toEqual(["p2"]);
+    expect(
+      patientStore
+        .findByClinicAndName("clinic_a", "au")
+        .map((p) => p.patientId),
+    ).toEqual(["p1"]);
+  });
+
+  it("returns empty for empty or whitespace queries", () => {
+    patientStore.save(makePatient({}));
+    expect(
+      patientStore.findByClinicAndName("clinic_a", ""),
+    ).toEqual([]);
+    expect(
+      patientStore.findByClinicAndName("clinic_a", "   "),
+    ).toEqual([]);
+  });
+
+  it("caps results at the limit", () => {
+    for (let i = 0; i < 60; i++) {
+      patientStore.save(
+        makePatient({
+          patientId: `p${i}`,
+          identifier: `mrn-${i}`,
+          givenName: "Same",
+          familyName: "Name",
+        }),
+      );
+    }
+    expect(
+      patientStore.findByClinicAndName("clinic_a", "same").length,
+    ).toBe(50);
+    expect(
+      patientStore.findByClinicAndName("clinic_a", "same", 5).length,
+    ).toBe(5);
+  });
+});
+
+describe("listPaginated", () => {
+  beforeEach(() => {
+    patientStore._reset();
+  });
+
+  it("paginates and reports total", () => {
+    for (let i = 0; i < 30; i++) {
+      patientStore.save(
+        makePatient({ patientId: `p${i}`, identifier: `mrn-${i}` }),
+      );
+    }
+    const page1 = patientStore.listPaginated("clinic_a", {
+      limit: 10,
+      offset: 0,
+    });
+    expect(page1.items.length).toBe(10);
+    expect(page1.total).toBe(30);
+    expect(page1.limit).toBe(10);
+
+    const page2 = patientStore.listPaginated("clinic_a", {
+      limit: 10,
+      offset: 25,
+    });
+    expect(page2.items.length).toBe(5);
+  });
+
+  it("clamps limit between 1 and 50 and offset ≥ 0", () => {
+    for (let i = 0; i < 60; i++) {
+      patientStore.save(
+        makePatient({ patientId: `p${i}`, identifier: `mrn-${i}` }),
+      );
+    }
+    expect(patientStore.listPaginated("clinic_a", { limit: 0 }).limit).toBe(1);
+    expect(
+      patientStore.listPaginated("clinic_a", { limit: 100 }).limit,
+    ).toBe(50);
+    expect(
+      patientStore.listPaginated("clinic_a", { offset: -5 }).offset,
+    ).toBe(0);
+  });
+
+  it("scopes to clinicId before paginating", () => {
+    patientStore.save(
+      makePatient({ patientId: "p1", clinicId: "a", identifier: "mrn-1" }),
+    );
+    patientStore.save(
+      makePatient({ patientId: "p2", clinicId: "b", identifier: "mrn-2" }),
+    );
+    expect(
+      patientStore.listPaginated("a", { limit: 10 }).total,
+    ).toBe(1);
+    expect(
+      patientStore.listPaginated("b", { limit: 10 }).total,
+    ).toBe(1);
+  });
+});
+
+describe("saveStrict", () => {
+  beforeEach(() => {
+    patientStore._reset();
+  });
+
+  it("returns ok when the (clinicId, identifier) pair is unused", () => {
+    const result = patientStore.saveStrict(makePatient({ patientId: "p1" }));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.patient.patientId).toBe("p1");
+  });
+
+  it("returns ok when re-saving the same patient with same identifier", () => {
+    patientStore.saveStrict(makePatient({ patientId: "p1" }));
+    const result = patientStore.saveStrict(
+      makePatient({ patientId: "p1" }),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects when a different patient claims the same identifier in the same clinic", () => {
+    patientStore.saveStrict(
+      makePatient({ patientId: "p1", identifier: "MRN-1" }),
+    );
+    const result = patientStore.saveStrict(
+      makePatient({ patientId: "p2", identifier: "MRN-1" }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("PATIENT_IDENTIFIER_TAKEN");
+  });
+
+  it("allows the same identifier across different clinics", () => {
+    patientStore.saveStrict(
+      makePatient({ patientId: "p1", clinicId: "a", identifier: "X" }),
+    );
+    const result = patientStore.saveStrict(
+      makePatient({ patientId: "p2", clinicId: "b", identifier: "X" }),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("returns PATIENT_IDENTIFIER_TAKEN with a non-empty message on rejection", () => {
+    patientStore.saveStrict(
+      makePatient({ patientId: "p1", identifier: "MRN-1" }),
+    );
+    const result = patientStore.saveStrict(
+      makePatient({ patientId: "p2", identifier: "MRN-1" }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("PATIENT_IDENTIFIER_TAKEN");
+      expect(typeof result.message).toBe("string");
+      expect(result.message.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+it("saveStrict preserves the identifier index when rejecting a duplicate", () => {
+  patientStore.saveStrict(
+    makePatient({ patientId: "p1", identifier: "MRN-1" }),
+  );
+  patientStore.saveStrict(
+    makePatient({ patientId: "p2", identifier: "MRN-1" }),
+  );
+  expect(
+    patientStore.findByIdentifier("clinic_a", "MRN-1")?.patientId,
+  ).toBe("p1");
+});
+
+it("archiveById preserves the identifier index", () => {
+  patientStore.save(makePatient({ patientId: "p1", identifier: "MRN-1" }));
+  patientStore.archiveById("p1");
+  expect(
+    patientStore.findByIdentifier("clinic_a", "MRN-1")?.patientId,
+  ).toBe("p1");
+  expect(patientStore.findById("p1")?.status).toBe("archived");
+});
+
+it("listPaginated returns results in stable insertion order", () => {
+  patientStore.save(makePatient({ patientId: "p1", identifier: "mrn-1" }));
+  patientStore.save(makePatient({ patientId: "p2", identifier: "mrn-2" }));
+  patientStore.save(makePatient({ patientId: "p3", identifier: "mrn-3" }));
+  const page = patientStore.listPaginated("clinic_a", {
+    limit: 10,
+    offset: 0,
+  });
+  expect(page.items.map((x) => x.patientId)).toEqual(["p1", "p2", "p3"]);
+});
+
+it("findByClinicAndName returns only the sanitized PatientListItem shape", () => {
+  patientStore._reset();
+  patientStore.save(makePatient({ patientId: "p1" }));
+  const result = patientStore.findByClinicAndName("clinic_a", "ada");
+  expect(result).toHaveLength(1);
+  const item = result[0];
+  expect(item.patientId).toBe("p1");
+  // Structural absence of disallowed PII fields. PatientListItem should only
+  // expose patientId, clinicId, identifier, givenName, familyName, status.
+  const allowedKeys = [
+    "patientId",
+    "clinicId",
+    "identifier",
+    "givenName",
+    "familyName",
+    "status",
+  ];
+  const itemKeys = Object.keys(item);
+  expect(itemKeys.sort()).toEqual(allowedKeys.sort());
+});
+
+describe("archiveById", () => {
+  beforeEach(() => {
+    patientStore._reset();
+  });
+
+  it("returns null for an unknown id", () => {
+    expect(patientStore.archiveById("missing")).toBeNull();
+  });
+
+  it("sets status='archived' and stamps archivedAt", () => {
+    patientStore.save(
+      makePatient({ patientId: "p1", status: "active" }),
+    );
+    const archived = patientStore.archiveById("p1");
+    expect(archived).not.toBeNull();
+    expect(archived!.status).toBe("archived");
+    expect(typeof archived!.archivedAt).toBe("string");
+    expect(archived!.archivedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});

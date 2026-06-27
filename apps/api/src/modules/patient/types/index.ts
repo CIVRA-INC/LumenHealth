@@ -4,6 +4,7 @@ export type {
   CreatePatientRequest,
   UpdatePatientRequest,
   PatientListItem,
+  PatientListPage,
   PatientErrorCode,
   PatientError,
 } from "@lumen/types";
