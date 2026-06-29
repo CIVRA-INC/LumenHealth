@@ -4,6 +4,7 @@ import { invitationRouter } from "./modules/staff/routes/index.js";
 import { staffRouter } from "./modules/staff/routes/staff.routes.js";
 import { clinicRouter } from "./modules/clinic/routes/index.js";
 import { patientRouter } from "./modules/patient/routes/index.js";
+import { consentRouter } from "./modules/consent/routes/index.js";
 
 const app = express();
 
@@ -18,5 +19,6 @@ app.use("/api/v1/staff/invitations", invitationRouter);
 app.use("/api/v1/staff", staffRouter);
 app.use("/api/v1/clinics", clinicRouter);
 app.use("/api/v1/patients", patientRouter);
+app.use("/api/v1/patients/:patientId/consent", consentRouter);
 
 export { app };
