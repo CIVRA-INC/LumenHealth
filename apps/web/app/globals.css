@@ -7,7 +7,6 @@
   --accent: #006d77;
   --accent-soft: #83c5be;
   --line: rgba(19, 32, 43, 0.12);
-  --danger: rgba(180, 35, 24, 0.95);
 }
 
 * {
@@ -45,8 +44,7 @@ a {
 
 .hero,
 .panel,
-.authCard,
-.patientCard {
+.authCard {
   background: var(--surface);
   backdrop-filter: blur(18px);
   border: 1px solid var(--line);
@@ -59,8 +57,7 @@ a {
 }
 
 .hero h1,
-.authCard h1,
-.patientCard h1 {
+.authCard h1 {
   margin: 0 0 16px;
   font-size: clamp(2.4rem, 5vw, 4.6rem);
   line-height: 0.95;
@@ -92,8 +89,7 @@ a {
 
 .primary,
 .secondary,
-.authForm button,
-.patientActionsArchive {
+.authForm button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -102,25 +98,20 @@ a {
   border-radius: 999px;
   border: 1px solid transparent;
   font-weight: 600;
-  cursor: pointer;
-  font: inherit;
 }
 
 .primary,
 .authForm button {
   background: var(--accent);
   color: white;
-  border-color: var(--accent);
 }
 
 .secondary {
   border-color: var(--line);
-  background: rgba(255, 255, 255, 0.6);
 }
 
 .panel,
-.authCard,
-.patientCard {
+.authCard {
   padding: 32px;
 }
 
@@ -158,8 +149,7 @@ a {
   width: min(100%, 720px);
 }
 
-.authCardContent,
-.patientCardContent {
+.authCardContent {
   display: grid;
   gap: 10px;
 }
@@ -183,7 +173,6 @@ a {
   border-radius: 14px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.88);
-  font: inherit;
 }
 
 .authLead {
@@ -209,266 +198,10 @@ a {
   background: rgba(0, 109, 119, 0.08);
 }
 
-.authStatus--loading {
-  border-color: rgba(93, 106, 115, 0.22);
-  background: rgba(93, 106, 115, 0.08);
-}
-
-.authStatus--error {
-  border-color: rgba(180, 35, 24, 0.22);
-  background: rgba(180, 35, 24, 0.05);
-}
-
-.authStatusDetail {
-  font-size: 0.95rem;
-}
-
-.authStatus button {
-  align-self: start;
-}
-
 .authFooter {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 16px;
-}
-
-.authRetry {
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid var(--line);
-}
-
-.authSwitchLink {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-/* Patient records */
-
-.patientCard {
-  width: min(100%, 880px);
-}
-
-.patientToolbar {
-  display: flex;
-  gap: 12px;
-  margin: 16px 0 24px;
-  flex-wrap: wrap;
-}
-
-.patientTable {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.58);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-}
-
-.patientTableHead {
-  display: grid;
-  grid-template-columns: 200px 1fr 120px;
-  gap: 12px;
-  padding: 8px 12px;
-  font-weight: 700;
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.patientRow {
-  display: grid;
-  grid-template-columns: 200px 1fr 120px;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid transparent;
-  transition:
-    border-color 120ms ease,
-    transform 120ms ease,
-    background 120ms ease;
-}
-
-.patientRow:hover {
-  border-color: var(--accent-soft);
-  transform: translateY(-1px);
-  background: rgba(0, 109, 119, 0.06);
-}
-
-.patientCell {
-  display: flex;
-  align-items: center;
-  font-size: 1rem;
-  min-width: 0;
-}
-
-.patientCell--mrn {
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  color: var(--accent);
-}
-
-.patientCell--name {
-  font-weight: 600;
-}
-
-.patientCell--status {
-  justify-content: flex-end;
-}
-
-.patientStatusBadge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.patientStatusBadge--active {
-  background: rgba(0, 109, 119, 0.16);
-  color: var(--accent);
-}
-
-.patientStatusBadge--inactive {
-  background: rgba(93, 106, 115, 0.16);
-  color: var(--muted);
-}
-
-.patientStatusBadge--archived {
-  background: rgba(19, 32, 43, 0.04);
-  color: var(--muted);
-}
-
-.patientEmpty {
-  margin: 0;
-  padding: 24px 12px;
-  text-align: center;
-  color: var(--muted);
-}
-
-.patientPagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 16px 0 24px;
-  flex-wrap: wrap;
-}
-
-.patientPaginationText {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
-.patientPagination button[disabled] {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.patientField {
-  display: grid;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.patientFieldLabel {
-  font-weight: 600;
-}
-
-.patientField input,
-.patientField select,
-.patientField textarea {
-  width: 100%;
-  min-height: 48px;
-  padding: 8px 14px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.88);
-  font: inherit;
-}
-
-.patientField textarea {
-  min-height: 96px;
-  resize: vertical;
-}
-
-.patientField--invalid input,
-.patientField--invalid select,
-.patientField--invalid textarea {
-  border-color: rgba(180, 35, 24, 0.7);
-  background: rgba(180, 35, 24, 0.04);
-}
-
-.patientFieldError {
-  color: var(--danger);
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.patientFacts dl {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px 24px;
-  margin: 16px 0 24px;
-}
-
-.patientFacts dt {
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.patientFacts dd {
-  margin: 4px 0 0;
-  font-size: 1rem;
-}
-
-.patientEditSection,
-.patientArchiveSection {
-  margin: 16px 0;
-}
-
-.patientEditSection h2,
-.patientArchiveSection h2 {
-  margin: 0 0 8px;
-  font-size: 1.1rem;
-}
-
-.patientActions {
-  display: grid;
-  gap: 10px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.58);
-}
-
-.patientActionsHint {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.patientActionsNotice {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-.patientActionsNotice--success {
-  color: var(--accent);
-}
-
-.patientActionsNotice--error {
-  color: var(--danger);
 }
 
 .staffDirectory {
@@ -511,22 +244,12 @@ a {
   .hero,
   .panel,
   .authCard,
-  .authLanding,
-  .patientCard {
+  .authLanding {
     padding: 24px;
   }
 
   .authFooter {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .patientTableHead,
-  .patientRow {
-    grid-template-columns: 1fr;
-  }
-
-  .patientCell--status {
-    justify-content: flex-start;
   }
 }

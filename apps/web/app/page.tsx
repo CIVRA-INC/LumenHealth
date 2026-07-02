@@ -24,9 +24,6 @@ export default function HomePage() {
           <Link href="/auth/register" className="secondary">
             Create account
           </Link>
-          <Link href="/patients" className="secondary">
-            Open patients
-          </Link>
           <a href="https://stellar.org" className="secondary">
             Stellar track
           </a>
