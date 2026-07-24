@@ -1,4 +1,4 @@
-import type { AuditEntry, AuditQuery } from "@lumen/types";
+import type { AuditEntry, AuditQuery, BatchAnchorResult } from "@lumen/types";
 
 const store = new Map<string, AuditEntry>();
 
@@ -11,6 +11,37 @@ function findById(auditId: string): AuditEntry | undefined {
   return store.get(auditId);
 }
 
+function findUnanchored(): AuditEntry[] {
+  return [...store.values()].filter((entry) => !entry.stellarTxHash);
+}
+
+/**
+ * Applies a completed batch anchor result: stamps `stellarTxHash`,
+ * `merkleRoot`, `anchoredAt`, and the per-entry `merkleProof` onto each
+ * entry named in the result. Entries not found in the store are skipped —
+ * the caller decides whether that's an error.
+ */
+function applyAnchorResult(result: BatchAnchorResult): AuditEntry[] {
+  const updated: AuditEntry[] = [];
+
+  for (const { auditId, merkleProof } of result.entries) {
+    const entry = store.get(auditId);
+    if (!entry) continue;
+
+    const anchored: AuditEntry = {
+      ...entry,
+      stellarTxHash: result.stellarTxHash,
+      merkleRoot: result.merkleRoot,
+      anchoredAt: result.anchoredAt,
+      merkleProof,
+    };
+    store.set(auditId, anchored);
+    updated.push(anchored);
+  }
+
+  return updated;
+}
+
 function query(q: AuditQuery): { entries: AuditEntry[]; total: number } {
   let results: AuditEntry[] = [];
 
@@ -21,6 +52,7 @@ function query(q: AuditQuery): { entries: AuditEntry[]; total: number } {
     if (q.targetId && entry.targetId !== q.targetId) continue;
     if (q.from && entry.createdAt < q.from) continue;
     if (q.to && entry.createdAt > q.to) continue;
+    if (q.anchored !== undefined && Boolean(entry.stellarTxHash) !== q.anchored) continue;
     results.push(entry);
   }
 
@@ -39,4 +71,4 @@ function _reset(): void {
   store.clear();
 }
 
-export const auditStore = { save, findById, query, _reset };
+export const auditStore = { save, findById, findUnanchored, applyAnchorResult, query, _reset };

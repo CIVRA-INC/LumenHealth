@@ -10,7 +10,14 @@ export type AuditAction =
   | "clinic.updated"
   | "clinic.archived"
   | "auth.password_reset_requested"
-  | "auth.password_reset_completed";
+  | "auth.password_reset_completed"
+  | "batch.anchored";
+
+/** One step of a Merkle inclusion proof: the sibling hash and which side it sits on. */
+export type MerkleProofStep = {
+  hash: string;
+  position: "left" | "right";
+};
 
 export type AuditEntry = {
   auditId: string;
@@ -32,10 +39,24 @@ export type AuditEntry = {
    * other field.
    */
   sha256Hash: string;
+  /** Stellar transaction hash of the batch anchor that included this entry. */
+  stellarTxHash?: string;
+  /** Merkle root written on-chain for the batch that included this entry. */
+  merkleRoot?: string;
+  /** When this entry's batch was anchored to Stellar. */
+  anchoredAt?: string;
+  /**
+   * Sibling hashes (bottom-up) proving `sha256Hash` is included under
+   * `merkleRoot`, without needing to re-anchor or re-fetch the whole batch.
+   */
+  merkleProof?: MerkleProofStep[];
 };
 
 /** Fields hashed to derive `AuditEntry.sha256Hash`. */
-export type HashableAuditEntry = Omit<AuditEntry, "sha256Hash">;
+export type HashableAuditEntry = Omit<
+  AuditEntry,
+  "sha256Hash" | "stellarTxHash" | "merkleRoot" | "anchoredAt" | "merkleProof"
+>;
 
 export type AuditQuery = {
   clinicId: string;
@@ -46,4 +67,17 @@ export type AuditQuery = {
   to?: string;
   page?: number;
   limit?: number;
+  /** Filter by anchor status: true = anchored entries only, false = unanchored only. */
+  anchored?: boolean;
+};
+
+/** Result of anchoring one Merkle-batch of audit entries to Stellar. */
+export type BatchAnchorResult = {
+  merkleRoot: string;
+  stellarTxHash: string;
+  anchoredAt: string;
+  entries: {
+    auditId: string;
+    merkleProof: MerkleProofStep[];
+  }[];
 };
