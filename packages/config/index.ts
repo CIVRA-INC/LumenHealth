@@ -29,6 +29,10 @@ export const serverConfig = {
   // apps/stellar-service pulling unanchored audit entries from apps/api).
   // Dev-only fallback — set INTERNAL_SERVICE_TOKEN in every real environment.
   internalServiceToken: read("INTERNAL_SERVICE_TOKEN", "dev-internal-token"),
+  // Base URL apps/api uses to reach apps/stellar-service's internal HTTP API
+  // (e.g. to fetch the on-chain Merkle root for an anchored batch).
+  stellarServiceUrl: read("STELLAR_SERVICE_URL", "http://localhost:4100"),
+  stellarServicePort: Number(read("STELLAR_SERVICE_PORT", "4100")),
   public: getPublicRuntimeConfig(),
 };
 

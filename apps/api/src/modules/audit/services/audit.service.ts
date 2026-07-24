@@ -1,13 +1,16 @@
 import { randomUUID } from "crypto";
 import {
   hashAuditEntry,
+  verifyMerkleProof,
   type AuditAction,
   type AuditEntry,
   type AuditQuery,
+  type AuditVerifyResponse,
   type BatchAnchorResult,
   type UserRole,
 } from "@lumen/types";
 import { auditStore } from "../repositories/audit.repository.js";
+import { fetchAnchoredMerkleRoot } from "./stellar-verifier.client.js";
 
 export type RecordAuditParams = {
   clinicId: string;
@@ -82,4 +85,77 @@ export function applyBatchAnchorResult(result: BatchAnchorResult): AuditEntry[] 
   }
 
   return updated;
+}
+
+/**
+ * Recomputes an entry's hash from its currently stored content and, if
+ * anchored, walks its Merkle proof against the root actually written on
+ * Stellar. Returns `null` if the entry doesn't exist or belongs to a
+ * different clinic (caller should treat that as a 404 — never leak that a
+ * given auditId exists under someone else's clinic).
+ *
+ * `fetchAnchoredRoot` is injectable for tests; defaults to the real
+ * stellar-service HTTP client.
+ */
+export async function verifyAuditEntry(
+  clinicId: string,
+  auditId: string,
+  fetchAnchoredRoot: (txHash: string) => Promise<string | null> = fetchAnchoredMerkleRoot,
+): Promise<AuditVerifyResponse | null> {
+  const entry = auditStore.findById(auditId);
+  if (!entry || entry.clinicId !== clinicId) {
+    return null;
+  }
+
+  const { sha256Hash: storedHash, stellarTxHash, merkleRoot, anchoredAt, merkleProof, ...hashable } = entry;
+  void anchoredAt;
+  const recomputedHash = hashAuditEntry(hashable);
+  const checkedAt = new Date().toISOString();
+
+  if (recomputedHash !== storedHash) {
+    return {
+      auditId,
+      status: "tampered",
+      recomputedHash,
+      storedHash,
+      merkleRoot,
+      stellarTxHash,
+      checkedAt,
+      reason: "stored content no longer matches its recorded hash",
+    };
+  }
+
+  if (!stellarTxHash || !merkleRoot || !merkleProof) {
+    return { auditId, status: "unanchored", recomputedHash, storedHash, checkedAt };
+  }
+
+  const chainRoot = await fetchAnchoredRoot(stellarTxHash);
+
+  if (chainRoot === null || chainRoot !== merkleRoot) {
+    return {
+      auditId,
+      status: "tampered",
+      recomputedHash,
+      storedHash,
+      merkleRoot,
+      stellarTxHash,
+      checkedAt,
+      reason: "stored merkle root does not match the root anchored on Stellar",
+    };
+  }
+
+  if (!verifyMerkleProof(recomputedHash, merkleProof, chainRoot)) {
+    return {
+      auditId,
+      status: "tampered",
+      recomputedHash,
+      storedHash,
+      merkleRoot,
+      stellarTxHash,
+      checkedAt,
+      reason: "merkle proof does not resolve to the on-chain root",
+    };
+  }
+
+  return { auditId, status: "verified", recomputedHash, storedHash, merkleRoot, stellarTxHash, checkedAt };
 }

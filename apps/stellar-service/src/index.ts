@@ -12,6 +12,8 @@ export type { MerkleTree } from "./merkle.js";
 export { AnchoringService, MERKLE_ROOT_DATA_NAME } from "./anchoring.js";
 export type { UnanchoredEntry, FetchUnanchoredEntries, PersistAnchorResult } from "./anchoring.js";
 export { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
+export { createInternalApp } from "./internal-app.js";
+export type { GetMerkleRootForTx } from "./internal-app.js";
 
 async function runDiagnostics() {
   const network = loadNetworkConfig();
