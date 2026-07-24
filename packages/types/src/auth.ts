@@ -3,7 +3,7 @@
 
 // ── Roles ────────────────────────────────────────────────────────────────────
 
-export type UserRole = "owner" | "admin" | "clinician" | "cashier";
+export type UserRole = "owner" | "admin" | "clinician" | "cashier" | "system";
 
 export type Permission =
   | "auth:read"

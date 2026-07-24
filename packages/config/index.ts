@@ -25,6 +25,10 @@ export const serverConfig = {
   apiPort: Number(read("API_PORT", "4000")),
   stellarNetwork: read("STELLAR_NETWORK", "testnet"),
   stellarHorizonUrl: read("STELLAR_HORIZON_URL", "https://horizon-testnet.stellar.org"),
+  // Shared secret used to authenticate service-to-service calls (e.g.
+  // apps/stellar-service pulling unanchored audit entries from apps/api).
+  // Dev-only fallback — set INTERNAL_SERVICE_TOKEN in every real environment.
+  internalServiceToken: read("INTERNAL_SERVICE_TOKEN", "dev-internal-token"),
   public: getPublicRuntimeConfig(),
 };
 
