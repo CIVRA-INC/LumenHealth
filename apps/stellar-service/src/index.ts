@@ -13,7 +13,11 @@ export { AnchoringService, MERKLE_ROOT_DATA_NAME } from "./anchoring.js";
 export type { UnanchoredEntry, FetchUnanchoredEntries, PersistAnchorResult } from "./anchoring.js";
 export { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
 export { createInternalApp } from "./internal-app.js";
-export type { GetMerkleRootForTx } from "./internal-app.js";
+export type { GetMerkleRootForTx, SignPayload } from "./internal-app.js";
+export { signPayload, verifyPayloadSignature } from "./signing.js";
+export type { SignedPayload } from "./signing.js";
+export { verifyExportBundle } from "./verify-export.js";
+export type { ExportVerificationReport, ExportEntryResult } from "./verify-export.js";
 
 async function runDiagnostics() {
   const network = loadNetworkConfig();

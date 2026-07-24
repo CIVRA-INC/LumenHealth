@@ -24,3 +24,31 @@ export async function fetchAnchoredMerkleRoot(txHash: string): Promise<string | 
   const body = (await res.json()) as { merkleRoot: string };
   return body.merkleRoot;
 }
+
+export type SignedPayload = {
+  signature: string;
+  publicKey: string;
+};
+
+/**
+ * Asks apps/stellar-service to sign `payload` with its anchor keypair —
+ * the same keypair that signs anchoring transactions, so an export's
+ * signature can later be cross-checked against on-chain transaction
+ * source accounts by a third party.
+ */
+export async function signExportManifest(payload: string): Promise<SignedPayload> {
+  const res = await fetch(`${serverConfig.stellarServiceUrl}/internal/sign`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-internal-service-token": serverConfig.internalServiceToken,
+    },
+    body: JSON.stringify({ payload }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`[audit] failed to sign export manifest: ${res.status}`);
+  }
+
+  return (await res.json()) as SignedPayload;
+}

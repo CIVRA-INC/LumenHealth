@@ -1,16 +1,21 @@
 import { randomUUID } from "crypto";
 import {
+  canonicalize,
   hashAuditEntry,
+  sha256Hash,
   verifyMerkleProof,
   type AuditAction,
   type AuditEntry,
+  type AuditExportBundle,
+  type AuditExportManifest,
   type AuditQuery,
   type AuditVerifyResponse,
   type BatchAnchorResult,
   type UserRole,
 } from "@lumen/types";
 import { auditStore } from "../repositories/audit.repository.js";
-import { fetchAnchoredMerkleRoot } from "./stellar-verifier.client.js";
+import { fetchAnchoredMerkleRoot, signExportManifest } from "./stellar-verifier.client.js";
+import type { SignedPayload } from "./stellar-verifier.client.js";
 
 export type RecordAuditParams = {
   clinicId: string;
@@ -158,4 +163,42 @@ export async function verifyAuditEntry(
   }
 
   return { auditId, status: "verified", recomputedHash, storedHash, merkleRoot, stellarTxHash, checkedAt };
+}
+
+function computeEntriesDigest(entries: AuditEntry[]): string {
+  const sorted = entries
+    .map((entry) => ({ auditId: entry.auditId, sha256Hash: entry.sha256Hash }))
+    .sort((a, b) => a.auditId.localeCompare(b.auditId));
+  return sha256Hash(sorted);
+}
+
+/**
+ * Builds a signed, externally-verifiable compliance export: every audit
+ * entry in the clinic's range (with its Merkle proof and anchoring tx hash
+ * already attached), plus a manifest signed by the same keypair
+ * stellar-service uses to sign anchoring transactions. A third party with
+ * only this bundle and public Stellar testnet access can independently
+ * re-derive every hash and root — see `apps/stellar-service/src/verify-export.ts`.
+ *
+ * `sign` is injectable for tests; defaults to the real stellar-service call.
+ */
+export async function buildAuditExport(
+  clinicId: string,
+  from?: string,
+  to?: string,
+  sign: (payload: string) => Promise<SignedPayload> = signExportManifest,
+): Promise<AuditExportBundle> {
+  const entries = auditStore.findAllInRange(clinicId, from, to);
+
+  const manifest: AuditExportManifest = {
+    clinicId,
+    generatedAt: new Date().toISOString(),
+    range: { from, to },
+    entryCount: entries.length,
+    entriesDigest: computeEntriesDigest(entries),
+  };
+
+  const { signature, publicKey } = await sign(canonicalize(manifest));
+
+  return { manifest, signature, signingPublicKey: publicKey, entries };
 }

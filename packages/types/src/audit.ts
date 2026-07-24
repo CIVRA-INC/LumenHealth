@@ -103,3 +103,35 @@ export type AuditVerifyResponse = {
   checkedAt: string;
   reason?: string;
 };
+
+/**
+ * Signed manifest for an exported compliance bundle. `entriesDigest` is a
+ * SHA-256 hex digest over the canonicalized, auditId-sorted list of
+ * `{auditId, sha256Hash}` pairs for every entry in the export — lets a
+ * verifier confirm the entry list itself wasn't added to or pruned after
+ * the export was signed.
+ */
+export type AuditExportManifest = {
+  clinicId: string;
+  generatedAt: string;
+  range: { from?: string; to?: string };
+  entryCount: number;
+  entriesDigest: string;
+};
+
+/**
+ * A self-contained, externally-verifiable export: the raw entries (with
+ * their Merkle proofs and anchoring tx hashes already attached), a manifest
+ * summarizing the export, and an ed25519 signature over the manifest from
+ * LumenHealth's service keypair — the same keypair used to sign anchoring
+ * transactions, so a verifier can cross-check `signingPublicKey` against
+ * the source account of the on-chain anchor transactions.
+ */
+export type AuditExportBundle = {
+  manifest: AuditExportManifest;
+  /** Base64-encoded ed25519 signature over the canonicalized manifest. */
+  signature: string;
+  /** Stellar (ed25519) public key of the signer, e.g. "GABC...". */
+  signingPublicKey: string;
+  entries: AuditEntry[];
+};

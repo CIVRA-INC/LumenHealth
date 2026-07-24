@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { AuditEntry, AuditVerifyResponse, AuthSession } from "@lumen/types";
+import type { AuditEntry, AuditExportBundle, AuditVerifyResponse, AuthSession } from "@lumen/types";
 
 vi.mock("@lumen/config/public", () => ({
   getPublicRuntimeConfig: () => ({ apiBaseUrl: "http://localhost:4000" }),
@@ -8,10 +8,12 @@ vi.mock("@lumen/config/public", () => ({
 
 const mockFetchAuditLog = vi.fn();
 const mockVerifyAuditEntry = vi.fn();
+const mockExportAuditLog = vi.fn();
 
 vi.mock("../app/audit/api", () => ({
   fetchAuditLog: (...args: unknown[]) => mockFetchAuditLog(...args),
   verifyAuditEntry: (...args: unknown[]) => mockVerifyAuditEntry(...args),
+  exportAuditLog: (...args: unknown[]) => mockExportAuditLog(...args),
 }));
 
 let mockSessionValue: AuthSession | null = null;
@@ -226,5 +228,52 @@ describe("AuditLog", () => {
       expect.objectContaining({ actorId: "actor-9" }),
       "tok",
     );
+  });
+
+  it("downloads a signed export bundle when 'Export compliance report' is clicked", async () => {
+    mockSessionValue = ownerSession;
+    mockFetchAuditLog.mockResolvedValue({ entries: [], total: 0 });
+    const bundle: AuditExportBundle = {
+      manifest: {
+        clinicId: "c1",
+        generatedAt: "2026-01-05T00:00:00.000Z",
+        range: {},
+        entryCount: 1,
+        entriesDigest: "digest-1",
+      },
+      signature: "sig-1",
+      signingPublicKey: "GFAKEPUBLICKEY",
+      entries: [genuineEntry],
+    };
+    mockExportAuditLog.mockResolvedValue(bundle);
+
+    const createObjectURL = vi.fn(() => "blob:fake-url");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+
+    render(<AuditLog />);
+    await screen.findByText(/no audit entries match/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /export compliance report/i }));
+
+    expect(await screen.findByText(/downloaded 1 entries/i)).toBeInTheDocument();
+    expect(mockExportAuditLog).toHaveBeenCalledWith(expect.objectContaining({}), "tok");
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("shows an error message if the export request fails", async () => {
+    mockSessionValue = ownerSession;
+    mockFetchAuditLog.mockResolvedValue({ entries: [], total: 0 });
+    mockExportAuditLog.mockRejectedValue(new Error("Stellar service unavailable"));
+
+    render(<AuditLog />);
+    await screen.findByText(/no audit entries match/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /export compliance report/i }));
+
+    expect(await screen.findByText("Stellar service unavailable")).toBeInTheDocument();
   });
 });

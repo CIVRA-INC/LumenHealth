@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { AuditAction } from "@lumen/types";
-import { queryAuditLog, verifyAuditEntry } from "../services/audit.service.js";
+import { buildAuditExport, queryAuditLog, verifyAuditEntry } from "../services/audit.service.js";
 
 export function list(req: Request, res: Response): void {
   const role = req.auth!.role;
@@ -24,6 +24,31 @@ export function list(req: Request, res: Response): void {
   });
 
   res.json(result);
+}
+
+export async function exportAuditLog(req: Request, res: Response): Promise<void> {
+  const role = req.auth!.role;
+  if (role !== "owner" && role !== "admin") {
+    res.status(403).json({ error: "AUTH_FORBIDDEN", message: "only owner or admin can export audit logs" });
+    return;
+  }
+
+  const clinicId = req.auth!.clinicId;
+  const { from, to } = req.query;
+
+  try {
+    const bundle = await buildAuditExport(
+      clinicId,
+      from as string | undefined,
+      to as string | undefined,
+    );
+    res.json(bundle);
+  } catch (error) {
+    res.status(502).json({
+      error: "STELLAR_SERVICE_UNAVAILABLE",
+      message: error instanceof Error ? error.message : "failed to reach stellar-service",
+    });
+  }
 }
 
 export async function verify(req: Request, res: Response): Promise<void> {
