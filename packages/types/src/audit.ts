@@ -25,7 +25,17 @@ export type AuditEntry = {
   ipAddress?: string;
   userAgent?: string;
   createdAt: string;
+  /**
+   * SHA-256 hex digest over the canonical serialization of every other
+   * field on this entry (see `hashAuditEntry` in `./hashing.js`). Lets a
+   * verifier detect any post-write tampering with `before`/`after` or any
+   * other field.
+   */
+  sha256Hash: string;
 };
+
+/** Fields hashed to derive `AuditEntry.sha256Hash`. */
+export type HashableAuditEntry = Omit<AuditEntry, "sha256Hash">;
 
 export type AuditQuery = {
   clinicId: string;
