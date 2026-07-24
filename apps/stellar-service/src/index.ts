@@ -1,23 +1,27 @@
-import { Horizon, Networks } from "@stellar/stellar-sdk";
-import { serverConfig } from "@lumen/config";
+import { loadNetworkConfig } from "./config.js";
+import { StellarClient } from "./client.js";
 
-const networkPassphrase =
-  serverConfig.stellarNetwork === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
-
-const server = new Horizon.Server(serverConfig.stellarHorizonUrl);
+export { loadNetworkConfig, loadAnchorKeypair } from "./config.js";
+export type { StellarNetworkConfig } from "./config.js";
+export { StellarClient } from "./client.js";
+export { canonicalize, sha256Hash, hashAuditEntry } from "./hashing.js";
 
 async function main() {
-  console.log("LumenHealth Stellar service starter");
-  console.log(`Network: ${serverConfig.stellarNetwork}`);
-  console.log(`Passphrase: ${networkPassphrase}`);
+  const network = loadNetworkConfig();
+  const client = new StellarClient(network);
 
-  try {
-    await server.feeStats();
+  console.log("LumenHealth Stellar service starter");
+  console.log(`Network: ${network.network}`);
+  console.log(`Passphrase: ${network.networkPassphrase}`);
+
+  const healthy = await client.isHealthy();
+  if (healthy) {
     console.log("Horizon diagnostics reachable");
-  } catch (error) {
+  } else {
     console.error("Unable to reach Horizon diagnostics");
-    console.error(error);
   }
 }
 
-void main();
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  void main();
+}

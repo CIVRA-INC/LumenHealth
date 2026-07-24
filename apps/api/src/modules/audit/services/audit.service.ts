@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import type { AuditAction, AuditEntry, AuditQuery, UserRole } from "@lumen/types";
+import { hashAuditEntry, type AuditAction, type AuditEntry, type AuditQuery, type UserRole } from "@lumen/types";
 import { auditStore } from "../repositories/audit.repository.js";
 
 export type RecordAuditParams = {
@@ -16,7 +16,7 @@ export type RecordAuditParams = {
 };
 
 export function recordAudit(params: RecordAuditParams): AuditEntry {
-  const entry: AuditEntry = {
+  const unhashed = {
     auditId: randomUUID(),
     clinicId: params.clinicId,
     action: params.action,
@@ -29,6 +29,10 @@ export function recordAudit(params: RecordAuditParams): AuditEntry {
     ipAddress: params.ipAddress,
     userAgent: params.userAgent,
     createdAt: new Date().toISOString(),
+  };
+  const entry: AuditEntry = {
+    ...unhashed,
+    sha256Hash: hashAuditEntry(unhashed),
   };
 
   return auditStore.save(entry);
