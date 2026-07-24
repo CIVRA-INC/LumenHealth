@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AuditAction, AuditEntry, AuditVerifyResponse } from "@lumen/types";
 import { useAuthSession } from "../../auth/session-provider";
-import { fetchAuditLog, verifyAuditEntry } from "../api";
+import { exportAuditLog, fetchAuditLog, verifyAuditEntry } from "../api";
 
 type Status = "loading" | "idle" | "error";
 type VerifyState = AuditVerifyResponse | "loading" | "error";
+type ExportStatus = "idle" | "exporting" | "success" | "error";
 
 const AUDIT_ACTIONS: AuditAction[] = [
   "staff.invited",
@@ -57,6 +58,9 @@ export function AuditLog() {
   const [actorFilter, setActorFilter] = useState("");
   const [fromFilter, setFromFilter] = useState("");
   const [toFilter, setToFilter] = useState("");
+
+  const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
+  const [exportMessage, setExportMessage] = useState("");
 
   const canView = session?.role === "owner" || session?.role === "admin";
 
@@ -116,6 +120,35 @@ export function AuditLog() {
     };
   }, [entries, session]);
 
+  const handleExport = useCallback(async () => {
+    if (!session) return;
+    setExportStatus("exporting");
+    setExportMessage("");
+
+    try {
+      const bundle = await exportAuditLog(
+        { from: fromFilter || undefined, to: toFilter || undefined },
+        session.accessToken,
+      );
+
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `audit-export-${session.clinicId}-${bundle.manifest.generatedAt.slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setExportStatus("success");
+      setExportMessage(`Downloaded ${bundle.manifest.entryCount} entries, signed and ready for independent verification.`);
+    } catch (err) {
+      setExportMessage(err instanceof Error ? err.message : "Failed to export audit log");
+      setExportStatus("error");
+    }
+  }, [session, fromFilter, toFilter]);
+
   if (!session) {
     return <p className="authLead">Sign in to view the audit log.</p>;
   }
@@ -174,6 +207,14 @@ export function AuditLog() {
 
         <button type="submit">Apply filters</button>
       </form>
+
+      <div className="auditExport">
+        <button type="button" onClick={handleExport} disabled={exportStatus === "exporting"}>
+          {exportStatus === "exporting" ? "Preparing export…" : "Export compliance report"}
+        </button>
+        {exportStatus === "success" && <span className="muted">{exportMessage}</span>}
+        {exportStatus === "error" && <span className="muted">{exportMessage}</span>}
+      </div>
 
       {status === "loading" && <p className="authLead">Loading audit log&hellip;</p>}
 

@@ -42,6 +42,21 @@ function applyAnchorResult(result: BatchAnchorResult): AuditEntry[] {
   return updated;
 }
 
+/** All entries for a clinic in a date range, unpaginated — used for compliance exports. */
+function findAllInRange(clinicId: string, from?: string, to?: string): AuditEntry[] {
+  const results: AuditEntry[] = [];
+
+  for (const entry of store.values()) {
+    if (entry.clinicId !== clinicId) continue;
+    if (from && entry.createdAt < from) continue;
+    if (to && entry.createdAt > to) continue;
+    results.push(entry);
+  }
+
+  results.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return results;
+}
+
 function query(q: AuditQuery): { entries: AuditEntry[]; total: number } {
   let results: AuditEntry[] = [];
 
@@ -71,4 +86,12 @@ function _reset(): void {
   store.clear();
 }
 
-export const auditStore = { save, findById, findUnanchored, applyAnchorResult, query, _reset };
+export const auditStore = {
+  save,
+  findById,
+  findUnanchored,
+  findAllInRange,
+  applyAnchorResult,
+  query,
+  _reset,
+};
