@@ -208,25 +208,165 @@ a {
   margin-top: 16px;
 }
 
-.staffTable {
+.staffTable,
+.auditTable {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.95rem;
 }
 
 .staffTable th,
-.staffTable td {
+.staffTable td,
+.auditTable th,
+.auditTable td {
   text-align: left;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
 }
 
-.staffTable th {
+.staffTable th,
+.auditTable th {
   font-weight: 600;
   color: var(--muted);
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.auditLog {
+  margin-top: 16px;
+  display: grid;
+  gap: 20px;
+}
+
+.auditFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: end;
+}
+
+.auditFilters label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.auditFilters input,
+.auditFilters select {
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.auditFilters button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auditRow {
+  cursor: pointer;
+}
+
+.auditRow:hover {
+  background: rgba(0, 109, 119, 0.06);
+}
+
+.verifyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.verifyBadge--verified {
+  background: rgba(0, 109, 119, 0.12);
+  color: var(--accent);
+}
+
+.verifyBadge--unanchored,
+.verifyBadge--pending,
+.verifyBadge--unknown {
+  background: rgba(93, 106, 115, 0.12);
+  color: var(--muted);
+}
+
+.verifyBadge--tampered {
+  background: #b3261e;
+  color: white;
+  box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.25);
+  animation: auditTamperedPulse 1.6s ease-in-out infinite;
+}
+
+.auditRow--tampered {
+  background: rgba(179, 38, 30, 0.1);
+  outline: 2px solid #b3261e;
+  outline-offset: -2px;
+}
+
+.auditDetail {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.6);
+  display: grid;
+  gap: 10px;
+}
+
+.auditDetail--tampered {
+  border-color: #b3261e;
+  border-width: 2px;
+  background: rgba(179, 38, 30, 0.06);
+  box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.2);
+}
+
+.auditDetailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.auditDetailHeader h2 {
+  margin: 0;
+}
+
+.merkleProof {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.merkleProofPosition {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-right: 8px;
+}
+
+@keyframes auditTamperedPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(179, 38, 30, 0.12);
+  }
 }
 
 .staffTable select {
