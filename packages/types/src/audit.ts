@@ -81,3 +81,25 @@ export type BatchAnchorResult = {
     merkleProof: MerkleProofStep[];
   }[];
 };
+
+/**
+ * - `verified`: the entry's stored content hashes to `sha256Hash`, and its
+ *   Merkle proof recomputes to the root actually anchored on Stellar.
+ * - `tampered`: either the stored content no longer hashes to `sha256Hash`,
+ *   or the proof doesn't recompute to the on-chain root — something was
+ *   altered after the entry was written or anchored.
+ * - `unanchored`: the entry hasn't been included in a batch anchor yet, so
+ *   there's nothing on-chain to check it against.
+ */
+export type AuditVerifyStatus = "verified" | "tampered" | "unanchored";
+
+export type AuditVerifyResponse = {
+  auditId: string;
+  status: AuditVerifyStatus;
+  recomputedHash: string;
+  storedHash: string;
+  merkleRoot?: string;
+  stellarTxHash?: string;
+  checkedAt: string;
+  reason?: string;
+};

@@ -28,6 +28,26 @@ export class StellarClient {
     return this.server.loadAccount(publicKey);
   }
 
+  /**
+   * Looks up the value of a `manageData` operation named `dataName` within
+   * transaction `txHash`. Returns `null` if the transaction has no such
+   * operation (or doesn't exist). Values are decoded back to the UTF-8
+   * string that was originally written (Stellar stores them as raw bytes,
+   * base64-encoded over the wire).
+   */
+  async getManageDataValue(txHash: string, dataName: string): Promise<string | null> {
+    const page = await this.server.operations().forTransaction(txHash).call();
+
+    for (const operation of page.records) {
+      if (operation.type === "manage_data" && operation.name === dataName) {
+        const raw = operation.value;
+        return raw ? raw.toString("utf8") : null;
+      }
+    }
+
+    return null;
+  }
+
   /** Escape hatch for calls not yet wrapped by this client. */
   raw(): Horizon.Server {
     return this.server;
