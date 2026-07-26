@@ -1,5 +1,7 @@
 export { ClinicSwitcher } from "./components/ClinicSwitcher";
+export { DocumentCard } from "./components/DocumentCard";
 export { ClinicSwitcherScreen } from "./screens/ClinicSwitcherScreen";
+export { PatientDocumentsScreen } from "./screens/PatientDocumentsScreen";
 export {
   getClinics,
   getActiveClinicId,

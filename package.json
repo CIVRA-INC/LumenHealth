@@ -20,6 +20,7 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "turbo": "^2.6.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
   }
 }

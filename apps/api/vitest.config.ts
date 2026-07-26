@@ -1,6 +1,14 @@
 import { defineConfig } from "vitest/config";
+import path from "node:path";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@qyou/shared": path.resolve(__dirname, "../../packages/shared/src"),
+      "@lumen/types": path.resolve(__dirname, "../../packages/types/src/index.ts"),
+      "@lumen/config": path.resolve(__dirname, "../../packages/config/index.ts"),
+    },
+  },
   test: {
     environment: "node",
     env: {
