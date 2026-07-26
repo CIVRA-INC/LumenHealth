@@ -1,52 +1,35 @@
-import type { GenderCategory } from './patient-demographics-fixtures.types';
+export type PatientIdentityStatus = 'active' | 'inactive' | 'deceased' | 'pending_verification';
+
+export type GenderCategory = 'male' | 'female' | 'non_binary' | 'other' | 'prefer_not_to_say';
 
 export interface PatientIdentity {
   patientId: string;
-  clinicId: string;
   firstName: string;
   lastName: string;
   dateOfBirth: string;
   gender: GenderCategory;
   mrn: string;
-  phone: string;
-  email: string;
-  address: string;
+  status: PatientIdentityStatus;
   identityHash?: string;
-  anchoredAt?: string;
-  stellarTxHash?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface PatientIdentityInput {
+export interface CreatePatientIdentityRequest {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
   gender: GenderCategory;
   mrn: string;
-  phone: string;
-  email: string;
-  address: string;
+  status?: PatientIdentityStatus;
 }
 
-export interface PatientIdentityApiResponse {
+export interface PatientIdentityResponse {
   success: boolean;
-  identity?: PatientIdentity;
-  error?: string;
+  patient: PatientIdentity;
 }
 
-export interface PatientIdentityAnchoredResponse {
-  success: boolean;
-  identityHash?: string;
-  stellarTxHash?: string;
-  anchoredAt?: string;
-  error?: string;
-}
-
-export interface PatientIdentityAnchorStatus {
-  patientId: string;
-  isAnchored: boolean;
-  identityHash?: string;
-  stellarTxHash?: string;
-  anchoredAt?: string;
+export interface PatientIdentityFixtureSeed {
+  seedId: string;
+  records: PatientIdentity[];
 }

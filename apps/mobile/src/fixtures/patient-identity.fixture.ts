@@ -1,28 +1,40 @@
-import type { PatientIdentity, GenderCategory } from '@lumen/types';
+import type { PatientIdentityFixtureSeed } from '@qyou/shared';
 
-export const samplePatientIdentity: PatientIdentity = {
-  patientId: 'patient_831_001',
-  clinicId: 'clinic_831',
-  firstName: 'Elena',
-  lastName: 'Rodriguez',
-  dateOfBirth: '1990-04-15',
-  gender: 'female' as GenderCategory,
-  mrn: 'MRN-20240001',
-  phone: '+1-555-0131',
-  email: 'elena.rodriguez@example.com',
-  address: '742 Evergreen Terrace, Springfield, IL 62704',
-  identityHash: 'sha256_identity_elena_001',
-  createdAt: '2026-01-15T10:00:00.000Z',
-  updatedAt: '2026-06-20T14:30:00.000Z',
-};
-
-export const emptyPatientIdentity = {
-  firstName: '',
-  lastName: '',
-  dateOfBirth: '',
-  gender: 'prefer_not_to_say' as GenderCategory,
-  mrn: '',
-  phone: '',
-  email: '',
-  address: '',
+export const mockMobilePatientIdentityFixture: PatientIdentityFixtureSeed = {
+  seedId: 'identity_seed_mobile_001',
+  records: [
+    {
+      patientId: 'patient_id_101',
+      firstName: 'Ngozi',
+      lastName: 'Adeyemi',
+      dateOfBirth: '1993-06-10',
+      gender: 'female',
+      mrn: 'MRN-20260101',
+      status: 'active',
+      createdAt: '2026-03-12T08:00:00Z',
+      updatedAt: '2026-07-22T11:00:00Z',
+    },
+    {
+      patientId: 'patient_id_102',
+      firstName: 'Emeka',
+      lastName: 'Nwosu',
+      dateOfBirth: '1980-01-28',
+      gender: 'male',
+      mrn: 'MRN-20260102',
+      status: 'inactive',
+      createdAt: '2026-04-01T09:30:00Z',
+      updatedAt: '2026-07-10T15:20:00Z',
+    },
+    {
+      patientId: 'patient_id_103',
+      firstName: 'Aisha',
+      lastName: 'Bello',
+      dateOfBirth: '1975-09-14',
+      gender: 'female',
+      mrn: 'MRN-20260103',
+      status: 'active',
+      createdAt: '2026-05-20T14:00:00Z',
+      updatedAt: '2026-07-24T10:45:00Z',
+    },
+  ],
 };
