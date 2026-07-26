@@ -12,7 +12,7 @@ const app = express();
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
-  res.json({ service: "api", status: "ok", milestone: "staff-invitations" });
+  res.json({ service: "api", status: "ok", milestone: "documents-attachments" });
 });
 
 app.use("/api/v1/auth", authRouter);
@@ -20,6 +20,7 @@ app.use("/api/v1/staff/invitations", invitationRouter);
 app.use("/api/v1/staff", staffRouter);
 app.use("/api/v1/clinics", clinicRouter);
 app.use("/api/v1/audit", auditRouter);
+app.use("/api/v1/patients/:patientId/documents", patientDocumentRouter);
 app.use("/internal/audit", internalAuditRouter);
 app.use("/api/v1", patientDemographicsRouter);
 
