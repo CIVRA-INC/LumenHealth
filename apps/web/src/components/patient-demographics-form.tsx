@@ -1,243 +1,126 @@
-'use client';
-
 import React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  createPatientSchema,
-  updatePatientSchema,
-  type CreatePatientInput,
-  type UpdatePatientInput,
-  type PatientDemographics,
-} from '@qyou/shared';
-
-const genderOptions = [
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'non_binary', label: 'Non-binary' },
-  { value: 'other', label: 'Other' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
-] as const;
+import type { PatientDemographicRecord, GenderCategory } from '@qyou/shared';
+import { patientDemographicRecordSchema } from '@qyou/shared';
 
 interface PatientDemographicsFormProps {
-  patient?: PatientDemographics;
-  onSubmit: (data: CreatePatientInput | UpdatePatientInput) => void | Promise<void>;
-  onCancel?: () => void;
-  isSubmitting?: boolean;
+  initialData: PatientDemographicRecord;
+  onSubmit: (data: PatientDemographicRecord) => void;
+  onCancel: () => void;
 }
 
-const fieldStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: '6px',
-};
+const genderOptions: { value: GenderCategory; label: string }[] = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'non_binary', label: 'Non-Binary' },
+  { value: 'other', label: 'Other' },
+  { value: 'prefer_not_to_say', label: 'Prefer Not to Say' },
+];
 
-const labelStyle: React.CSSProperties = {
-  fontWeight: 600,
-  fontSize: '0.85rem',
-  color: '#1e293b',
-};
+export function PatientDemographicsForm({ initialData, onSubmit, onCancel }: PatientDemographicsFormProps) {
+  const [formData, setFormData] = React.useState<PatientDemographicRecord>({ ...initialData });
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  minHeight: '40px',
-  padding: '0 12px',
-  borderRadius: '10px',
-  border: '1px solid rgba(19, 32, 43, 0.12)',
-  background: 'rgba(255, 255, 255, 0.88)',
-  fontSize: '0.95rem',
-};
+  function handleChange(field: string, value: string) {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
 
-const errorStyle: React.CSSProperties = {
-  color: '#b3261e',
-  fontSize: '0.8rem',
-};
+  function handleContactChange(field: string, value: string) {
+    setFormData((prev) => ({
+      ...prev,
+      emergencyContact: { ...prev.emergencyContact, [field]: value },
+    }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[`emergencyContact.${field}`];
+      return next;
+    });
+  }
 
-const sectionTitleStyle: React.CSSProperties = {
-  margin: '16px 0 8px',
-  fontSize: '0.9rem',
-  fontWeight: 700,
-  color: '#5d6a73',
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-};
-
-export function PatientDemographicsForm({
-  patient,
-  onSubmit,
-  onCancel,
-  isSubmitting = false,
-}: PatientDemographicsFormProps) {
-  const isEditing = !!patient;
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<CreatePatientInput>({
-    resolver: zodResolver(isEditing ? updatePatientSchema : createPatientSchema),
-    defaultValues: patient
-      ? {
-          firstName: patient.firstName,
-          lastName: patient.lastName,
-          dateOfBirth: patient.dateOfBirth,
-          gender: patient.gender,
-          bloodType: patient.bloodType ?? '',
-          phone: patient.phone ?? '',
-          email: patient.email ?? '',
-          address: patient.address ?? undefined,
-          emergencyContact: patient.emergencyContact,
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const result = patientDemographicRecordSchema.safeParse(formData);
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const path = issue.path.join('.');
+        if (path && !fieldErrors[path]) {
+          fieldErrors[path] = issue.message;
         }
-      : undefined,
-  });
+      }
+      setErrors(fieldErrors);
+      return;
+    }
+    onSubmit(result.data);
+  }
+
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' };
+  const labelStyle: React.CSSProperties = { display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '4px' };
+  const errorStyle: React.CSSProperties = { color: '#dc2626', fontSize: '11px', marginTop: '2px' };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'grid', gap: '16px' }}>
-      <h3 style={{ margin: 0, fontSize: '1.2rem' }}>
-        {isEditing ? 'Edit Patient Demographics' : 'New Patient Demographics'}
-      </h3>
-
-      <div style={sectionTitleStyle}>Personal Information</div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>First Name *</label>
-          <input {...register('firstName')} style={inputStyle} placeholder="First name" />
-          {errors.firstName && <span style={errorStyle}>{errors.firstName.message}</span>}
+    <form onSubmit={handleSubmit}>
+      <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#1e293b' }}>Edit Demographics</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <div>
+          <label style={labelStyle}>First Name</label>
+          <input style={inputStyle} value={formData.firstName} onChange={(e) => handleChange('firstName', e.target.value)} />
+          {errors.firstName && <div style={errorStyle}>{errors.firstName}</div>}
         </div>
-
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Last Name *</label>
-          <input {...register('lastName')} style={inputStyle} placeholder="Last name" />
-          {errors.lastName && <span style={errorStyle}>{errors.lastName.message}</span>}
+        <div>
+          <label style={labelStyle}>Last Name</label>
+          <input style={inputStyle} value={formData.lastName} onChange={(e) => handleChange('lastName', e.target.value)} />
+          {errors.lastName && <div style={errorStyle}>{errors.lastName}</div>}
         </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Date of Birth *</label>
-          <input {...register('dateOfBirth')} type="date" style={inputStyle} />
-          {errors.dateOfBirth && <span style={errorStyle}>{errors.dateOfBirth.message}</span>}
+        <div>
+          <label style={labelStyle}>Date of Birth</label>
+          <input style={inputStyle} type="date" value={formData.dateOfBirth} onChange={(e) => handleChange('dateOfBirth', e.target.value)} />
+          {errors.dateOfBirth && <div style={errorStyle}>{errors.dateOfBirth}</div>}
         </div>
-
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Gender *</label>
-          <select {...register('gender')} style={inputStyle}>
-            <option value="">Select gender</option>
+        <div>
+          <label style={labelStyle}>Gender</label>
+          <select style={inputStyle} value={formData.gender} onChange={(e) => handleChange('gender', e.target.value)}>
             {genderOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-          {errors.gender && <span style={errorStyle}>{errors.gender.message}</span>}
+          {errors.gender && <div style={errorStyle}>{errors.gender}</div>}
         </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div style={fieldStyle}>
+        <div>
           <label style={labelStyle}>Blood Type</label>
-          <input {...register('bloodType')} style={inputStyle} placeholder="e.g. O+, A-" />
-        </div>
-
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Phone</label>
-          <input {...register('phone')} style={inputStyle} placeholder="+1-555-0100" />
+          <input style={inputStyle} value={formData.bloodType ?? ''} onChange={(e) => handleChange('bloodType', e.target.value)} placeholder="Optional" />
         </div>
       </div>
-
-      <div style={fieldStyle}>
-        <label style={labelStyle}>Email</label>
-        <input {...register('email')} type="email" style={inputStyle} placeholder="patient@example.com" />
-        {errors.email && <span style={errorStyle}>{errors.email.message}</span>}
-      </div>
-
-      <div style={sectionTitleStyle}>Address</div>
-
-      <div style={fieldStyle}>
-        <label style={labelStyle}>Street</label>
-        <input {...register('address.street')} style={inputStyle} placeholder="123 Main St" />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>City</label>
-          <input {...register('address.city')} style={inputStyle} placeholder="City" />
-        </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>State</label>
-          <input {...register('address.state')} style={inputStyle} placeholder="State" />
-        </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Zip Code</label>
-          <input {...register('address.zipCode')} style={inputStyle} placeholder="12345" />
+      <div style={{ marginTop: '12px', padding: '10px', background: '#f8fafc', borderRadius: '6px' }}>
+        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>Emergency Contact</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+          <div>
+            <label style={labelStyle}>Name</label>
+            <input style={inputStyle} value={formData.emergencyContact.name} onChange={(e) => handleContactChange('name', e.target.value)} />
+            {errors['emergencyContact.name'] && <div style={errorStyle}>{errors['emergencyContact.name']}</div>}
+          </div>
+          <div>
+            <label style={labelStyle}>Relationship</label>
+            <input style={inputStyle} value={formData.emergencyContact.relationship} onChange={(e) => handleContactChange('relationship', e.target.value)} />
+            {errors['emergencyContact.relationship'] && <div style={errorStyle}>{errors['emergencyContact.relationship']}</div>}
+          </div>
+          <div>
+            <label style={labelStyle}>Phone</label>
+            <input style={inputStyle} value={formData.emergencyContact.phoneNumber} onChange={(e) => handleContactChange('phoneNumber', e.target.value)} />
+            {errors['emergencyContact.phoneNumber'] && <div style={errorStyle}>{errors['emergencyContact.phoneNumber']}</div>}
+          </div>
         </div>
       </div>
-
-      <div style={fieldStyle}>
-        <label style={labelStyle}>Country</label>
-        <input {...register('address.country')} style={inputStyle} placeholder="Country" />
-      </div>
-
-      <div style={sectionTitleStyle}>Emergency Contact</div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Contact Name *</label>
-          <input {...register('emergencyContact.name')} style={inputStyle} placeholder="Contact name" />
-          {errors.emergencyContact?.name && (
-            <span style={errorStyle}>{errors.emergencyContact.name.message}</span>
-          )}
-        </div>
-
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Relationship *</label>
-          <input {...register('emergencyContact.relationship')} style={inputStyle} placeholder="Spouse, Parent, etc." />
-          {errors.emergencyContact?.relationship && (
-            <span style={errorStyle}>{errors.emergencyContact.relationship.message}</span>
-          )}
-        </div>
-      </div>
-
-      <div style={fieldStyle}>
-        <label style={labelStyle}>Contact Phone *</label>
-        <input {...register('emergencyContact.phoneNumber')} style={inputStyle} placeholder="+1-555-0100" />
-        {errors.emergencyContact?.phoneNumber && (
-          <span style={errorStyle}>{errors.emergencyContact.phoneNumber.message}</span>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '999px',
-              border: '1px solid rgba(19, 32, 43, 0.12)',
-              background: 'rgba(255, 255, 255, 0.88)',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-          >
-            Cancel
-          </button>
-        )}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '999px',
-            border: '1px solid transparent',
-            background: '#006d77',
-            color: '#fff',
-            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-            fontWeight: 600,
-            opacity: isSubmitting ? 0.6 : 1,
-          }}
-        >
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Patient' : 'Create Patient'}
+      <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+        <button type="submit" style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+          Save
+        </button>
+        <button type="button" onClick={onCancel} style={{ padding: '8px 16px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+          Cancel
         </button>
       </div>
     </form>
