@@ -22,6 +22,6 @@ app.use("/api/v1/clinics", clinicRouter);
 app.use("/api/v1/audit", auditRouter);
 app.use("/api/v1/patients/:patientId/documents", patientDocumentRouter);
 app.use("/internal/audit", internalAuditRouter);
-app.use("/api/v1", patientDemographicsRouter);
+app.use("/api/v1/patients", patientIdentityRouter);
 
 export { app };
