@@ -5,7 +5,7 @@ import { staffRouter } from "./modules/staff/routes/staff.routes.js";
 import { clinicRouter } from "./modules/clinic/routes/index.js";
 import { auditRouter } from "./modules/audit/routes/index.js";
 import { internalAuditRouter } from "./modules/audit/routes/internal.js";
-import { patientDocumentRouter } from "./modules/documents/routes/patient-document.routes.js";
+import { patientDemographicsRouter } from "./modules/records/routes/patient-demographics.routes.js";
 
 const app = express();
 
@@ -22,5 +22,6 @@ app.use("/api/v1/clinics", clinicRouter);
 app.use("/api/v1/audit", auditRouter);
 app.use("/api/v1/patients/:patientId/documents", patientDocumentRouter);
 app.use("/internal/audit", internalAuditRouter);
+app.use("/api/v1", patientDemographicsRouter);
 
 export { app };
