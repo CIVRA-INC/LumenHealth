@@ -1,84 +1,129 @@
 "use client";
 
-import { useState } from "react";
-import type { PatientDemographics, PatientListResponse } from "../../src/types/patient-demographics.types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useAuthSession } from "../../auth/session-provider";
+import { fetchPatients, type PatientSummary } from "./api";
 
-const GENDER_OPTIONS = ["", "male", "female", "non_binary", "other", "prefer_not_to_say"] as const;
+type Status = "loading" | "idle" | "error";
 
 export default function PatientListPage() {
+  const { session } = useAuthSession();
+  const [patients, setPatients] = useState<PatientSummary[]>([]);
+  const [status, setStatus] = useState<Status>(session ? "loading" : "idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
-  const [gender, setGender] = useState("");
-  const [results, setResults] = useState<PatientDemographics[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  async function handleSearch() {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page: "1", pageSize: "20" });
-      if (search) params.set("search", search);
-      if (gender) params.set("gender", gender);
-      const res = await fetch(`/api/v1/patients?${params}`);
-      const body: PatientListResponse = await res.json();
-      setResults(body.patients);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    fetchPatients(session.accessToken)
+      .then((result) => {
+        if (cancelled) return;
+        setPatients(result.patients);
+        setStatus("idle");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setErrorMessage(
+          err instanceof Error ? err.message : "Failed to load patients",
+        );
+        setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return patients;
+    return patients.filter(
+      (p) =>
+        p.firstName.toLowerCase().includes(q) ||
+        p.lastName.toLowerCase().includes(q) ||
+        p.gender.toLowerCase().includes(q),
+    );
+  }, [patients, search]);
+
+  if (!session) {
+    return <p className="authLead">Sign in to view patients.</p>;
   }
 
   return (
     <main className="authPage">
-      <h1>Patients</h1>
+      <section className="authCard">
+        <div className="authCardContent">
+          <p className="eyebrow">Patients</p>
+          <h1>Patient Directory</h1>
+          <p className="authLead">
+            View and manage patient demographics for your clinic.
+          </p>
+        </div>
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-        <input
-          type="text"
-          placeholder="Search by name…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select value={gender} onChange={(e) => setGender(e.target.value)}>
-          {GENDER_OPTIONS.map((g) => (
-            <option key={g} value={g}>
-              {g || "All genders"}
-            </option>
-          ))}
-        </select>
-        <button onClick={handleSearch} disabled={loading}>
-          Search
-        </button>
-      </div>
+        <div className="staffDirectory">
+          <div className="auditFilters">
+            <label>
+              Search
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Name or gender..."
+              />
+            </label>
+          </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>DOB</th>
-            <th>Gender</th>
-            <th>MRN</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((p) => (
-            <tr key={p.patientId}>
-              <td>
-                {p.firstName} {p.lastName}
-              </td>
-              <td>{p.dateOfBirth}</td>
-              <td>{p.gender}</td>
-              <td>{p.medicalRecordNumber}</td>
-              <td>
-                <a href={`/patients/${p.patientId}`}>View</a>
-              </td>
-            </tr>
-          ))}
-          {results.length === 0 && !loading && (
-            <tr>
-              <td colSpan={5}>No patients found.</td>
-            </tr>
+          {status === "loading" && (
+            <p className="authLead">Loading patients...</p>
           )}
-        </tbody>
-      </table>
+
+          {status === "error" && (
+            <div className="authStatus">
+              <p>{errorMessage}</p>
+            </div>
+          )}
+
+          {status === "idle" && filtered.length === 0 && (
+            <p className="authLead">
+              No patients found. Create your first patient record to get started.
+            </p>
+          )}
+
+          {status === "idle" && filtered.length > 0 && (
+            <table className="staffTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Date of Birth</th>
+                  <th>Gender</th>
+                  <th>Last Visit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((patient) => (
+                  <tr key={patient.patientId}>
+                    <td>
+                      <Link href={`/patients/${patient.patientId}`}>
+                        {patient.firstName} {patient.lastName}
+                      </Link>
+                    </td>
+                    <td>{patient.dateOfBirth}</td>
+                    <td>{patient.gender}</td>
+                    <td>
+                      {patient.lastVisitAt
+                        ? new Date(patient.lastVisitAt).toLocaleDateString()
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <p className="muted">{filtered.length} patients</p>
+        </div>
+      </section>
     </main>
   );
 }

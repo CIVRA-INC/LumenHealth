@@ -1,39 +1,79 @@
+import { randomUUID } from "crypto";
 import {
-  createPatientRequestSchema,
-  updatePatientDemographicsRequestSchema,
-  type PatientDemographicRecord,
-  type CreatePatientRequestInput,
-  type UpdatePatientDemographicsRequestInput,
+  patientDemographicRecordSchema,
+  type PatientDemographicRecordInput,
 } from "@qyou/shared";
-import { patientStore, type PatientRecord } from "../repositories/in-memory-patient.repository.js";
+import { patientStore } from "../repositories/in-memory-patient.repository.js";
+import type {
+  PatientRecord,
+  CreatePatientInput,
+  UpdateDemographicsInput,
+} from "../types/patient-demographics.types.js";
 
-export class PatientDemographicsService {
-  public getDemographics(patientId: string): PatientRecord | undefined {
-    return patientStore.findById(patientId);
-  }
+export function createPatient(
+  clinicId: string,
+  input: CreatePatientInput,
+): PatientRecord {
+  const record: PatientDemographicRecordInput = {
+    patientId: randomUUID(),
+    firstName: input.firstName,
+    lastName: input.lastName,
+    dateOfBirth: input.dateOfBirth,
+    gender: input.gender as PatientDemographicRecordInput["gender"],
+    bloodType: input.bloodType,
+    emergencyContact: input.emergencyContact,
+  };
 
-  public listPatients(clinicId: string): PatientRecord[] {
-    return patientStore.findByClinic(clinicId);
-  }
+  patientDemographicRecordSchema.parse(record);
 
-  public createPatient(
-    clinicId: string,
-    input: CreatePatientRequestInput,
-  ): PatientRecord {
-    const parsed = createPatientRequestSchema.parse(input);
-    return patientStore.create(clinicId, parsed);
-  }
+  const now = new Date().toISOString();
+  const patient: PatientRecord = {
+    ...record,
+    clinicId,
+    createdAt: now,
+    updatedAt: now,
+  };
 
-  public updateDemographics(
-    patientId: string,
-    clinicId: string,
-    input: UpdatePatientDemographicsRequestInput,
-  ): PatientRecord | undefined {
-    const parsed = updatePatientDemographicsRequestSchema.parse(input);
-    const existing = patientStore.findById(patientId);
-    if (!existing || existing.clinicId !== clinicId) return undefined;
-    return patientStore.update(patientId, parsed);
-  }
+  return patientStore.save(patient);
 }
 
-export const patientDemographicsService = new PatientDemographicsService();
+export function getPatient(
+  patientId: string,
+  clinicId: string,
+): PatientRecord | null {
+  const patient = patientStore.findById(patientId);
+  if (!patient || patient.clinicId !== clinicId) {
+    return null;
+  }
+  return patient;
+}
+
+export function updateDemographics(
+  patientId: string,
+  clinicId: string,
+  input: UpdateDemographicsInput,
+): PatientRecord | null {
+  const existing = patientStore.findById(patientId);
+  if (!existing || existing.clinicId !== clinicId) {
+    return null;
+  }
+
+  const updated: PatientRecord = {
+    ...existing,
+    firstName: input.firstName ?? existing.firstName,
+    lastName: input.lastName ?? existing.lastName,
+    dateOfBirth: input.dateOfBirth ?? existing.dateOfBirth,
+    gender: input.gender ?? existing.gender,
+    bloodType: input.bloodType ?? existing.bloodType,
+    emergencyContact: input.emergencyContact
+      ? { ...existing.emergencyContact, ...input.emergencyContact }
+      : existing.emergencyContact,
+    updatedAt: new Date().toISOString(),
+  };
+
+  return patientStore.save(updated);
+}
+
+export function listPatients(clinicId: string): PatientRecord[] {
+  return patientStore.listByClinic(clinicId);
+}

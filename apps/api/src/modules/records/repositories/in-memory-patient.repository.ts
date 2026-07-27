@@ -1,67 +1,28 @@
-import { randomUUID } from "node:crypto";
-import type { PatientDemographicRecord } from "@qyou/shared";
+import type { PatientRecord } from "../types/patient-demographics.types.js";
 
-export type PatientRecord = PatientDemographicRecord & {
-  clinicId: string;
-  createdAt: string;
-  updatedAt: string;
-};
+const store = new Map<string, PatientRecord>();
 
-class InMemoryPatientRepository {
-  private readonly store = new Map<string, PatientRecord>();
-
-  public findById(patientId: string): PatientRecord | undefined {
-    return this.store.get(patientId);
-  }
-
-  public findByClinic(clinicId: string): PatientRecord[] {
-    const results: PatientRecord[] = [];
-    for (const record of this.store.values()) {
-      if (record.clinicId === clinicId) {
-        results.push(record);
-      }
-    }
-    return results;
-  }
-
-  public create(
-    clinicId: string,
-    data: Omit<PatientDemographicRecord, "patientId">,
-  ): PatientRecord {
-    const patientId = randomUUID();
-    const now = new Date().toISOString();
-    const record: PatientRecord = {
-      ...data,
-      patientId,
-      clinicId,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.store.set(patientId, record);
-    return record;
-  }
-
-  public update(
-    patientId: string,
-    patch: Partial<PatientDemographicRecord>,
-  ): PatientRecord | undefined {
-    const existing = this.store.get(patientId);
-    if (!existing) return undefined;
-    const updated: PatientRecord = {
-      ...existing,
-      ...patch,
-      patientId: existing.patientId,
-      clinicId: existing.clinicId,
-      createdAt: existing.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    this.store.set(patientId, updated);
-    return updated;
-  }
-
-  public _reset(): void {
-    this.store.clear();
-  }
+function save(patient: PatientRecord): PatientRecord {
+  store.set(patient.patientId, patient);
+  return patient;
 }
 
-export const patientStore = new InMemoryPatientRepository();
+function findById(patientId: string): PatientRecord | undefined {
+  return store.get(patientId);
+}
+
+function listByClinic(clinicId: string): PatientRecord[] {
+  const results: PatientRecord[] = [];
+  for (const p of store.values()) {
+    if (p.clinicId === clinicId) {
+      results.push(p);
+    }
+  }
+  return results;
+}
+
+function _reset(): void {
+  store.clear();
+}
+
+export const patientStore = { save, findById, listByClinic, _reset };
