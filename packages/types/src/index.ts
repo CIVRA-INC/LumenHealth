@@ -4,6 +4,7 @@ export * from "./staff.js";
 export * from "./audit.js";
 export * from "./hashing.js";
 export * from "./merkle.js";
+export * from "./patient.js";
 
 export type PaymentIntent = {
   id: string;
