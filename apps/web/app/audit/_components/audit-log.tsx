@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AuditAction, AuditEntry, AuditVerifyResponse } from "@lumen/types";
 import { useAuthSession } from "../../auth/session-provider";
 import { exportAuditLog, fetchAuditLog, verifyAuditEntry } from "../api";
@@ -27,6 +27,11 @@ const STELLAR_TESTNET_EXPLORER = "https://stellar.expert/explorer/testnet/tx";
 
 function isResolvedVerify(state: VerifyState | undefined): state is AuditVerifyResponse {
   return typeof state === "object" && state !== null;
+}
+
+/** Date inputs have no time component; use the final millisecond to include the selected day. */
+function endOfDay(value: string): string | undefined {
+  return value ? `${value}T23:59:59.999Z` : undefined;
 }
 
 function VerificationBadge({ state }: { state: VerifyState | undefined }) {
@@ -61,11 +66,13 @@ export function AuditLog() {
 
   const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
   const [exportMessage, setExportMessage] = useState("");
+  const latestLoadId = useRef(0);
 
   const canView = session?.role === "owner" || session?.role === "admin";
 
   const loadEntries = useCallback(() => {
     if (!session || !canView) return;
+    const loadId = ++latestLoadId.current;
     setStatus("loading");
     setErrorMessage("");
     setVerifyResults({});
@@ -76,16 +83,18 @@ export function AuditLog() {
         action: actionFilter || undefined,
         actorId: actorFilter || undefined,
         from: fromFilter || undefined,
-        to: toFilter || undefined,
+        to: endOfDay(toFilter),
       },
       session.accessToken,
     )
       .then((result) => {
+        if (loadId !== latestLoadId.current) return;
         setEntries(result.entries);
         setTotal(result.total);
         setStatus("idle");
       })
       .catch((err) => {
+        if (loadId !== latestLoadId.current) return;
         setErrorMessage(err instanceof Error ? err.message : "Failed to load audit log");
         setStatus("error");
       });
@@ -127,7 +136,7 @@ export function AuditLog() {
 
     try {
       const bundle = await exportAuditLog(
-        { from: fromFilter || undefined, to: toFilter || undefined },
+        { from: fromFilter || undefined, to: endOfDay(toFilter) },
         session.accessToken,
       );
 
@@ -142,7 +151,9 @@ export function AuditLog() {
       URL.revokeObjectURL(url);
 
       setExportStatus("success");
-      setExportMessage(`Downloaded ${bundle.manifest.entryCount} entries, signed and ready for independent verification.`);
+      setExportMessage(
+        `Downloaded ${bundle.manifest.entryCount} entries, signed and ready for independent verification.`,
+      );
     } catch (err) {
       setExportMessage(err instanceof Error ? err.message : "Failed to export audit log");
       setExportStatus("error");
@@ -244,11 +255,20 @@ export function AuditLog() {
               {entries.map((entry) => {
                 const verifyState = verifyResults[entry.auditId];
                 const isTampered = isResolvedVerify(verifyState) && verifyState.status === "tampered";
+
                 return (
                   <tr
                     key={entry.auditId}
                     className={isTampered ? "auditRow auditRow--tampered" : "auditRow"}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedAuditId(entry.auditId)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedAuditId(entry.auditId);
+                      }
+                    }}
                   >
                     <td>{new Date(entry.createdAt).toLocaleString()}</td>
                     <td>{entry.action}</td>
@@ -301,6 +321,10 @@ export function AuditLog() {
               {selectedVerify.status === "unanchored" ? (
                 <p className="authLead">
                   This entry hasn&apos;t been included in a Stellar anchor batch yet.
+                </p>
+              ) : selectedVerify.status === "tampered" ? (
+                <p className="authLead">
+                  Chain-of-custody details are withheld because this record failed verification.
                 </p>
               ) : (
                 <>
