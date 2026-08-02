@@ -14,16 +14,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Run linter
-        run: npm run lint
+        run: pnpm run lint
 
   typecheck:
     name: Type Check
@@ -33,19 +39,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Build shared packages
-        run: npm run build -w packages/config && npm run build -w packages/types
+        run: pnpm run build --filter @lumenhealth/shared --filter @lumenhealth/ui --filter @lumenhealth/rules-engine
 
       - name: Run type check
-        run: npm run typecheck
+        run: pnpm run typecheck
 
   test:
     name: Test
@@ -55,13 +67,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Run tests
-        run: npm test
+        run: pnpm test

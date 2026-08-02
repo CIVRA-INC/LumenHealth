@@ -1,26 +1,17 @@
 {
-  "name": "lumenhealth",
+  "name": "lumenhealth-monorepo",
+  "version": "1.0.0",
   "private": true,
-  "packageManager": "npm@10.9.2",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.0.0",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "check:boundaries": "node packages/config/check-workspace-boundaries.cjs",
-    "check:architecture": "node packages/config/architecture-check.cjs",
-    "issues:preview": "node scripts/issues/render-batch.mjs",
-    "issues:publish": "node scripts/issues/publish-batch.mjs"
+    "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "turbo": "^2.6.1",
-    "typescript": "^5.9.3",
-    "zod": "^4.4.3"
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
   }
 }
