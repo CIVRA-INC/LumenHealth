@@ -1,0 +1,15 @@
+{
+  "name": "@lumenhealth/ui",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {},
+  "peerDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0"
+  }
+}

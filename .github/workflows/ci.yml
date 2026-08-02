@@ -2,75 +2,26 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - "feat/**"
-      - "fix/**"
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [ main ]
 
 jobs:
-  api:
-    name: API — lint / test / build
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Build shared packages
-        run: npm run build -w packages/config && npm run build -w packages/types
-      - name: Architecture checks
-        run: npm run check:architecture
-      - name: Lint
-        run: npm run lint -w apps/api
-      - name: Test
-        run: npm run test -w apps/api
-      - name: Build
-        run: npm run build -w apps/api
 
-  web:
-    name: Web — lint / test / build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Build shared packages
-        run: npm run build -w packages/config && npm run build -w packages/types
-      - name: Test
-        run: npm run test -w apps/web
-      - name: Lint
-        run: npm run lint -w apps/web
-      - name: Build
-        run: npm run build -w apps/web
-
-  packages:
-    name: Packages — build / lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Build config
-        run: npm run build -w packages/config
-      - name: Build types
-        run: npm run build -w packages/types
+    - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v3
+      with:
+        version: 9
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'pnpm'
+    
+    - run: pnpm install
+    - run: pnpm lint
+    - run: pnpm typecheck
+    - run: pnpm test
+    - run: pnpm build

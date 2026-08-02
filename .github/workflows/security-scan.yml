@@ -19,24 +19,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Audit npm dependencies
         run: |
           for attempt in 1 2 3; do
-            if npm audit --audit-level=critical; then
+            if pnpm audit --audit-level=critical; then
               exit 0
             fi
-            echo "npm audit attempt $attempt failed, retrying in 15s..." >&2
+            echo "pnpm audit attempt $attempt failed, retrying in 15s..." >&2
             sleep 15
           done
-          echo "npm audit failed after 3 attempts (likely a registry outage), failing the build" >&2
+          echo "pnpm audit failed after 3 attempts (likely a registry outage), failing the build" >&2
           exit 1
 
       - name: Scan for hardcoded secrets
