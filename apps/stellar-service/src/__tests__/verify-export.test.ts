@@ -9,6 +9,7 @@ import {
   type AuditEntry,
   type AuditExportBundle,
   type HashableAuditEntry,
+  type SigningKeyRecord,
 } from "@lumen/types";
 import { signPayload } from "../signing.js";
 import { verifyExportBundle } from "../verify-export.js";
@@ -190,5 +191,63 @@ describe("verifyExportBundle", () => {
 
     const report = await verifyExportBundle(cleanBundle, async () => tree.root);
     expect(report.ok).toBe(true);
+  });
+});
+
+describe("verifyExportBundle — signing key authorization registry", () => {
+  it("leaves signingKeyAuthorized undefined and doesn't affect ok when no registry is supplied", async () => {
+    const { bundle, tree } = buildGenuineBundle();
+    const report = await verifyExportBundle(bundle, async () => tree.root);
+
+    expect(report.signingKeyAuthorized).toBeUndefined();
+  });
+
+  it("reports signingKeyAuthorized: true for a key the registry authorizes at the manifest's generatedAt", async () => {
+    const { bundle, tree, signingKeypair } = buildGenuineBundle();
+    const registry: SigningKeyRecord[] = [
+      {
+        publicKey: signingKeypair.publicKey(),
+        role: "export-signing",
+        validFrom: "2020-01-01T00:00:00.000Z",
+      },
+    ];
+
+    const report = await verifyExportBundle(bundle, async () => tree.root, registry);
+
+    // buildGenuineBundle()'s fixture includes a deliberately-tampered entry
+    // (see the top-level describe block), so `ok` is false regardless —
+    // this test only cares about the signing-key check itself.
+    expect(report.signingKeyAuthorized).toBe(true);
+  });
+
+  it("reports signingKeyAuthorized: false and fails 'ok' for a key not in the registry, even though the signature itself is cryptographically valid", async () => {
+    const { bundle, tree } = buildGenuineBundle();
+    const registry: SigningKeyRecord[] = [
+      { publicKey: Keypair.random().publicKey(), role: "export-signing", validFrom: "2020-01-01T00:00:00.000Z" },
+    ];
+
+    const report = await verifyExportBundle(bundle, async () => tree.root, registry);
+
+    expect(report.signatureValid).toBe(true);
+    expect(report.signingKeyAuthorized).toBe(false);
+    expect(report.ok).toBe(false);
+  });
+
+  it("reports signingKeyAuthorized: false for a key that was rotated out before this manifest's generatedAt", async () => {
+    const { bundle, tree, signingKeypair } = buildGenuineBundle();
+    // bundle.manifest.generatedAt is "2026-01-03T00:00:00.000Z" — this record expired before then.
+    const registry: SigningKeyRecord[] = [
+      {
+        publicKey: signingKeypair.publicKey(),
+        role: "export-signing",
+        validFrom: "2020-01-01T00:00:00.000Z",
+        validTo: "2025-01-01T00:00:00.000Z",
+      },
+    ];
+
+    const report = await verifyExportBundle(bundle, async () => tree.root, registry);
+
+    expect(report.signingKeyAuthorized).toBe(false);
+    expect(report.ok).toBe(false);
   });
 });

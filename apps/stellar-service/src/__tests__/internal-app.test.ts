@@ -246,4 +246,40 @@ describe("POST /internal/verify-export", () => {
     expect(status).toBe(200);
     expect(body).toMatchObject({ ok: false, tamperedCount: 1 });
   });
+
+  it("threads the server-configured signing key registry through to the report", async () => {
+    const { bundle, onChainRoot } = makeGenuineBundle();
+    const getMerkleRootForTx = vi.fn(async () => onChainRoot);
+    const registry = [
+      { publicKey: bundle.signingPublicKey, role: "export-signing" as const, validFrom: "2020-01-01T00:00:00.000Z" },
+    ];
+    const app = createInternalApp(getMerkleRootForTx, fakeSignPayload, registry);
+
+    const { status, body } = await req(app, "/internal/verify-export", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { bundle },
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ signingKeyAuthorized: true });
+  });
+
+  it("flags signingKeyAuthorized: false for a key the configured registry doesn't recognize", async () => {
+    const { bundle, onChainRoot } = makeGenuineBundle();
+    const getMerkleRootForTx = vi.fn(async () => onChainRoot);
+    const registry = [
+      { publicKey: "GSOMEOTHERKEY", role: "export-signing" as const, validFrom: "2020-01-01T00:00:00.000Z" },
+    ];
+    const app = createInternalApp(getMerkleRootForTx, fakeSignPayload, registry);
+
+    const { status, body } = await req(app, "/internal/verify-export", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { bundle },
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ signingKeyAuthorized: false, ok: false });
+  });
 });

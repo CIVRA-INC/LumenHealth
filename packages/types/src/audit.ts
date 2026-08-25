@@ -159,6 +159,17 @@ export type AuditExportVerifyReport = {
   verifiedCount: number;
   unanchoredCount: number;
   tamperedCount: number;
-  /** True only if the signature, digest, and every entry all check out. */
+  /**
+   * Whether `signingPublicKey` was an authorized export-signing key at the
+   * time the manifest was generated, per a `SigningKeyRecord[]` registry —
+   * `undefined` when the caller didn't supply one (a cryptographically
+   * valid signature was checked, but against no notion of "was this key
+   * ever actually authorized"). A cryptographically valid signature from a
+   * key that was never authorized, or was authorized only outside this
+   * window (e.g. after rotation), still reports `false` here even though
+   * `signatureValid` is `true`.
+   */
+  signingKeyAuthorized?: boolean;
+  /** True only if the signature, digest, every entry, and (when checked) the signing key authorization all check out. */
   ok: boolean;
 };
