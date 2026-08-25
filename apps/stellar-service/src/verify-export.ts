@@ -23,31 +23,19 @@ import {
   verifyMerkleProof,
   type AuditEntry,
   type AuditExportBundle,
-  type AuditVerifyStatus,
+  type AuditExportVerifyEntryResult,
+  type AuditExportVerifyReport,
 } from "@lumen/types";
 import { MERKLE_ROOT_DATA_NAME } from "./anchoring.js";
 import { verifyPayloadSignature } from "./signing.js";
 
 export type GetOnChainMerkleRoot = (txHash: string) => Promise<string | null>;
 
-export type ExportEntryResult = {
-  auditId: string;
-  action: string;
-  status: AuditVerifyStatus;
-  reason?: string;
-};
+/** @deprecated use `AuditExportVerifyEntryResult` from `@lumen/types` */
+export type ExportEntryResult = AuditExportVerifyEntryResult;
 
-export type ExportVerificationReport = {
-  clinicId: string;
-  signatureValid: boolean;
-  entriesDigestValid: boolean;
-  results: ExportEntryResult[];
-  verifiedCount: number;
-  unanchoredCount: number;
-  tamperedCount: number;
-  /** True only if the signature, digest, and every entry all check out. */
-  ok: boolean;
-};
+/** @deprecated use `AuditExportVerifyReport` from `@lumen/types` */
+export type ExportVerificationReport = AuditExportVerifyReport;
 
 function recomputeEntryHash(entry: AuditEntry): string {
   const { sha256Hash: _sha256Hash, stellarTxHash: _tx, merkleRoot: _root, anchoredAt: _at, merkleProof: _proof, ...hashable } = entry;

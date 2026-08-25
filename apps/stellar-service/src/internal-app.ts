@@ -1,9 +1,31 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { serverConfig } from "@lumen/config";
+import type { AuditExportBundle } from "@lumen/types";
 import type { SignedPayload } from "./signing.js";
+import { verifyExportBundle } from "./verify-export.js";
 
 export type GetMerkleRootForTx = (txHash: string) => Promise<string | null>;
 export type SignPayload = (payload: string) => SignedPayload;
+
+/**
+ * Minimal shape check for an uploaded export bundle — enough to reject
+ * garbage before it reaches `verifyExportBundle`, not a full schema
+ * validation. `verifyExportBundle` itself is what actually determines
+ * whether the *contents* are trustworthy.
+ */
+function isPlausibleExportBundle(value: unknown): value is AuditExportBundle {
+  if (!value || typeof value !== "object") return false;
+  const b = value as Partial<AuditExportBundle>;
+  return (
+    typeof b.signature === "string" &&
+    typeof b.signingPublicKey === "string" &&
+    Array.isArray(b.entries) &&
+    !!b.manifest &&
+    typeof b.manifest === "object" &&
+    typeof b.manifest.clinicId === "string" &&
+    typeof b.manifest.entriesDigest === "string"
+  );
+}
 
 function requireInternalServiceToken(req: Request, res: Response, next: NextFunction): void {
   const token = req.header("x-internal-service-token");
@@ -40,6 +62,27 @@ export function createInternalApp(
       res.status(502).json({
         error: "HORIZON_ERROR",
         message: error instanceof Error ? error.message : "failed to reach Horizon",
+      });
+    }
+  });
+
+  app.post("/internal/verify-export", async (req: Request, res: Response) => {
+    const { bundle } = req.body as { bundle?: unknown };
+    if (!isPlausibleExportBundle(bundle)) {
+      res.status(400).json({
+        error: "INVALID_BODY",
+        message: "bundle must be a well-formed AuditExportBundle (manifest, signature, signingPublicKey, entries)",
+      });
+      return;
+    }
+
+    try {
+      const report = await verifyExportBundle(bundle, getMerkleRootForTx);
+      res.json(report);
+    } catch (error) {
+      res.status(502).json({
+        error: "HORIZON_ERROR",
+        message: error instanceof Error ? error.message : "failed to verify export against Stellar",
       });
     }
   });

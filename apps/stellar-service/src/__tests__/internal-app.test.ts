@@ -3,6 +3,18 @@ import { serverConfig } from "@lumen/config";
 import { createInternalApp } from "../internal-app.js";
 import type { SignPayload } from "../internal-app.js";
 import type { Express } from "express";
+import { Keypair } from "@stellar/stellar-sdk";
+import {
+  buildMerkleTree,
+  canonicalize,
+  getMerkleProof,
+  hashAuditEntry,
+  sha256Hash,
+  type AuditEntry,
+  type AuditExportBundle,
+  type HashableAuditEntry,
+} from "@lumen/types";
+import { signPayload } from "../signing.js";
 
 const fakeSignPayload: SignPayload = (payload) => ({
   signature: `sig-for-${payload}`,
@@ -130,5 +142,108 @@ describe("POST /internal/sign", () => {
 
     expect(status).toBe(500);
     expect(body).toMatchObject({ error: "SIGNING_ERROR" });
+  });
+});
+
+function makeGenuineBundle(): { bundle: AuditExportBundle; onChainRoot: string } {
+  const signingKeypair = Keypair.random();
+
+  const hashable: HashableAuditEntry = {
+    auditId: "a-genuine",
+    clinicId: "c-1",
+    action: "staff.role_changed",
+    actorId: "actor-1",
+    actorRole: "owner",
+    targetId: "staff-1",
+    targetType: "staff",
+    before: { role: "clinician" },
+    after: { role: "admin" },
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+  const entryHash = hashAuditEntry(hashable);
+  const tree = buildMerkleTree([entryHash]);
+
+  const entry: AuditEntry = {
+    ...hashable,
+    sha256Hash: entryHash,
+    stellarTxHash: "tx-batch-1",
+    merkleRoot: tree.root,
+    anchoredAt: "2026-01-02T00:00:00.000Z",
+    merkleProof: getMerkleProof(tree, 0),
+  };
+
+  const entriesDigest = sha256Hash([{ auditId: entry.auditId, sha256Hash: entry.sha256Hash }]);
+  const manifest = {
+    clinicId: "c-1",
+    generatedAt: "2026-01-03T00:00:00.000Z",
+    range: {},
+    entryCount: 1,
+    entriesDigest,
+  };
+
+  const { signature, publicKey } = signPayload(signingKeypair, canonicalize(manifest));
+
+  const bundle: AuditExportBundle = {
+    manifest,
+    signature,
+    signingPublicKey: publicKey,
+    entries: [entry],
+  };
+
+  return { bundle, onChainRoot: tree.root };
+}
+
+describe("POST /internal/verify-export", () => {
+  it("rejects requests without a valid internal service token", async () => {
+    const app = createInternalApp(async () => null, fakeSignPayload);
+    const { bundle } = makeGenuineBundle();
+    const { status } = await req(app, "/internal/verify-export", { method: "POST", body: { bundle } });
+    expect(status).toBe(401);
+  });
+
+  it("rejects a malformed body that isn't a plausible export bundle", async () => {
+    const app = createInternalApp(async () => null, fakeSignPayload);
+    const { status, body } = await req(app, "/internal/verify-export", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { bundle: { not: "a bundle" } },
+    });
+
+    expect(status).toBe(400);
+    expect(body).toMatchObject({ error: "INVALID_BODY" });
+  });
+
+  it("returns a verification report for a well-formed bundle, using the injected chain lookup", async () => {
+    const { bundle, onChainRoot } = makeGenuineBundle();
+    const getMerkleRootForTx = vi.fn(async () => onChainRoot);
+    const app = createInternalApp(getMerkleRootForTx, fakeSignPayload);
+
+    const { status, body } = await req(app, "/internal/verify-export", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { bundle },
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ ok: true, signatureValid: true, verifiedCount: 1 });
+    expect(getMerkleRootForTx).toHaveBeenCalledWith("tx-batch-1");
+  });
+
+  it("reports a per-entry chain-lookup failure as 'tampered' rather than failing the whole request", async () => {
+    // verifyExportBundle treats a chain-lookup error the same as "no matching
+    // root" for that entry — the overall HTTP call still succeeds with a report.
+    const { bundle } = makeGenuineBundle();
+    const app = createInternalApp(async () => {
+      throw new Error("horizon down");
+    }, fakeSignPayload);
+
+    const { status, body } = await req(app, "/internal/verify-export", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { bundle },
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ ok: false, tamperedCount: 1 });
   });
 });

@@ -135,3 +135,30 @@ export type AuditExportBundle = {
   signingPublicKey: string;
   entries: AuditEntry[];
 };
+
+/** Per-entry outcome of independently re-verifying an `AuditExportBundle`. */
+export type AuditExportVerifyEntryResult = {
+  auditId: string;
+  action: string;
+  status: AuditVerifyStatus;
+  reason?: string;
+};
+
+/**
+ * Result of independently re-verifying a whole `AuditExportBundle`: the
+ * manifest signature, the entries digest, and every entry's hash + Merkle
+ * proof re-checked against on-chain state. Shared between the standalone
+ * CLI verifier, the internal stellar-service HTTP endpoint, and the public
+ * web verification portal so all three agree on exactly one report shape.
+ */
+export type AuditExportVerifyReport = {
+  clinicId: string;
+  signatureValid: boolean;
+  entriesDigestValid: boolean;
+  results: AuditExportVerifyEntryResult[];
+  verifiedCount: number;
+  unanchoredCount: number;
+  tamperedCount: number;
+  /** True only if the signature, digest, and every entry all check out. */
+  ok: boolean;
+};

@@ -1,4 +1,5 @@
 import { serverConfig } from "@lumen/config";
+import type { AuditExportBundle, AuditExportVerifyReport } from "@lumen/types";
 
 /**
  * Fetches the Merkle root actually written on-chain for `txHash` from
@@ -52,3 +53,34 @@ export async function signExportManifest(payload: string): Promise<SignedPayload
 
   return (await res.json()) as SignedPayload;
 }
+
+/**
+ * Asks apps/stellar-service to independently re-verify a compliance export
+ * bundle: recompute every entry's hash, walk its Merkle proof, and cross-
+ * check against live Stellar state — the same logic the standalone CLI
+ * verifier and the public web verification portal both rely on, so all
+ * three agree on the same verdict for the same bundle.
+ */
+export async function verifyExportBundleRemote(bundle: AuditExportBundle): Promise<AuditExportVerifyReport> {
+  const res = await fetch(`${serverConfig.stellarServiceUrl}/internal/verify-export`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-internal-service-token": serverConfig.internalServiceToken,
+    },
+    body: JSON.stringify({ bundle }),
+  });
+
+  if (res.status === 400) {
+    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new InvalidExportBundleError(body.message ?? "malformed export bundle");
+  }
+  if (!res.ok) {
+    throw new Error(`[audit] failed to verify export bundle: ${res.status}`);
+  }
+
+  return (await res.json()) as AuditExportVerifyReport;
+}
+
+/** Distinguishes "the bundle itself is malformed" (400) from stellar-service being unreachable (502). */
+export class InvalidExportBundleError extends Error {}

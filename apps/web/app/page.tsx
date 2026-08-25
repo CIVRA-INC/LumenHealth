@@ -24,6 +24,9 @@ export default function HomePage() {
           <Link href="/auth/register" className="secondary">
             Create account
           </Link>
+          <Link href="/verify" className="secondary">
+            Verify a compliance export
+          </Link>
           <a href="https://stellar.org" className="secondary">
             Stellar track
           </a>

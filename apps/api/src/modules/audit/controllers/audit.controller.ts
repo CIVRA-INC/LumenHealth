@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
-import type { AuditAction } from "@lumen/types";
+import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { buildAuditExport, queryAuditLog, verifyAuditEntry } from "../services/audit.service.js";
+import { InvalidExportBundleError, verifyExportBundleRemote } from "../services/stellar-verifier.client.js";
 
 export function list(req: Request, res: Response): void {
   const role = req.auth!.role;
@@ -44,6 +45,52 @@ export async function exportAuditLog(req: Request, res: Response): Promise<void>
     );
     res.json(bundle);
   } catch (error) {
+    res.status(502).json({
+      error: "STELLAR_SERVICE_UNAVAILABLE",
+      message: error instanceof Error ? error.message : "failed to reach stellar-service",
+    });
+  }
+}
+
+function isPlausibleExportBundle(value: unknown): value is AuditExportBundle {
+  if (!value || typeof value !== "object") return false;
+  const b = value as Partial<AuditExportBundle>;
+  return (
+    typeof b.signature === "string" &&
+    typeof b.signingPublicKey === "string" &&
+    Array.isArray(b.entries) &&
+    !!b.manifest &&
+    typeof b.manifest === "object" &&
+    typeof b.manifest.clinicId === "string" &&
+    typeof b.manifest.entriesDigest === "string"
+  );
+}
+
+/**
+ * Public, unauthenticated: independently re-verifies a compliance export
+ * bundle (see `exportAuditLog`) against live Stellar state. Deliberately
+ * requires no LumenHealth account — a regulator, auditor, or partner
+ * clinic holding an export file is exactly who this is for.
+ */
+export async function verifyExport(req: Request, res: Response): Promise<void> {
+  const { bundle } = req.body as { bundle?: unknown };
+
+  if (!isPlausibleExportBundle(bundle)) {
+    res.status(400).json({
+      error: "INVALID_BODY",
+      message: "bundle must be a well-formed AuditExportBundle (manifest, signature, signingPublicKey, entries)",
+    });
+    return;
+  }
+
+  try {
+    const report = await verifyExportBundleRemote(bundle);
+    res.json(report);
+  } catch (error) {
+    if (error instanceof InvalidExportBundleError) {
+      res.status(400).json({ error: "INVALID_BODY", message: error.message });
+      return;
+    }
     res.status(502).json({
       error: "STELLAR_SERVICE_UNAVAILABLE",
       message: error instanceof Error ? error.message : "failed to reach stellar-service",
