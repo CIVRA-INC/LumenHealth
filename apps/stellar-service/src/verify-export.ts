@@ -9,22 +9,29 @@
  * verifies the manifest's ed25519 signature against the stated signing key.
  *
  * Usage (from apps/stellar-service):
- *   npm run verify-export -- path/to/export.json
+ *   npm run verify-export -- path/to/export.json [path/to/signing-key-registry.json]
  *
- * Exit code is 0 only if the signature, the entries digest, and every
- * entry's status are all clean; otherwise 1.
+ * The optional second argument is a `SigningKeyRecord[]` JSON file (see
+ * `docs/key-rotation.md`) — when given, the bundle's signing key is also
+ * checked against it, not just its cryptographic signature.
+ *
+ * Exit code is 0 only if the signature, the entries digest, every entry's
+ * status, and (when checked) the signing key authorization are all clean;
+ * otherwise 1.
  */
 import { readFileSync } from "node:fs";
 import { Horizon } from "@stellar/stellar-sdk";
 import {
   canonicalize,
   hashAuditEntry,
+  isAuthorizedSigningKey,
   sha256Hash,
   verifyMerkleProof,
   type AuditEntry,
   type AuditExportBundle,
   type AuditExportVerifyEntryResult,
   type AuditExportVerifyReport,
+  type SigningKeyRecord,
 } from "@lumen/types";
 import { MERKLE_ROOT_DATA_NAME } from "./anchoring.js";
 import { verifyPayloadSignature } from "./signing.js";
@@ -53,16 +60,33 @@ function recomputeEntriesDigest(entries: AuditEntry[]): string {
  * Pure verification core, independent of how the on-chain root is fetched —
  * `getOnChainMerkleRoot` is injected so this can be unit-tested without a
  * live Horizon connection, and reused by the real CLI against testnet.
+ *
+ * `signingKeyRegistry` is optional and additive: when supplied, the
+ * bundle's `signingPublicKey` is also checked against it for the
+ * `export-signing` role at `manifest.generatedAt`, catching a signature
+ * that's cryptographically valid but from a key that was never actually
+ * authorized (or was authorized only outside this time window, e.g. after
+ * rotation). Omitting it preserves the older signature-only behavior.
  */
 export async function verifyExportBundle(
   bundle: AuditExportBundle,
   getOnChainMerkleRoot: GetOnChainMerkleRoot,
+  signingKeyRegistry?: SigningKeyRecord[],
 ): Promise<ExportVerificationReport> {
   const signatureValid = verifyPayloadSignature(
     bundle.signingPublicKey,
     canonicalize(bundle.manifest),
     bundle.signature,
   );
+
+  const signingKeyAuthorized = signingKeyRegistry
+    ? isAuthorizedSigningKey(
+        signingKeyRegistry,
+        "export-signing",
+        bundle.signingPublicKey,
+        bundle.manifest.generatedAt,
+      )
+    : undefined;
 
   const entriesDigestValid = recomputeEntriesDigest(bundle.entries) === bundle.manifest.entriesDigest;
 
@@ -132,19 +156,25 @@ export async function verifyExportBundle(
     verifiedCount,
     unanchoredCount,
     tamperedCount,
-    ok: signatureValid && entriesDigestValid && tamperedCount === 0,
+    signingKeyAuthorized,
+    // signingKeyAuthorized !== false: passes when unchecked (undefined) or explicitly authorized (true).
+    ok: signatureValid && entriesDigestValid && tamperedCount === 0 && signingKeyAuthorized !== false,
   };
 }
 
 async function runCli() {
   const filePath = process.argv[2];
   if (!filePath) {
-    console.error("Usage: verify-export <bundle.json>");
+    console.error("Usage: verify-export <bundle.json> [signing-key-registry.json]");
     process.exitCode = 1;
     return;
   }
 
   const bundle = JSON.parse(readFileSync(filePath, "utf8")) as AuditExportBundle;
+  const registryPath = process.argv[3];
+  const signingKeyRegistry = registryPath
+    ? (JSON.parse(readFileSync(registryPath, "utf8")) as SigningKeyRecord[])
+    : undefined;
   const server = new Horizon.Server("https://horizon-testnet.stellar.org");
 
   const getOnChainMerkleRoot: GetOnChainMerkleRoot = async (txHash) => {
@@ -157,10 +187,13 @@ async function runCli() {
     return null;
   };
 
-  const report = await verifyExportBundle(bundle, getOnChainMerkleRoot);
+  const report = await verifyExportBundle(bundle, getOnChainMerkleRoot, signingKeyRegistry);
 
   console.log(`Clinic: ${report.clinicId}`);
   console.log(`Manifest signature: ${report.signatureValid ? "VALID" : "INVALID"}`);
+  if (report.signingKeyAuthorized !== undefined) {
+    console.log(`Signing key authorized: ${report.signingKeyAuthorized ? "YES" : "NO"}`);
+  }
   console.log(`Entries digest: ${report.entriesDigestValid ? "MATCH" : "MISMATCH"}`);
   console.log("");
 

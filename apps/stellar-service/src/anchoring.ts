@@ -1,9 +1,10 @@
 import { Operation, TransactionBuilder, BASE_FEE } from "@stellar/stellar-sdk";
-import type { Keypair, Horizon } from "@stellar/stellar-sdk";
+import type { Horizon } from "@stellar/stellar-sdk";
 import type { BatchAnchorResult } from "@lumen/types";
 import type { StellarClient } from "./client.js";
 import { buildMerkleTree, getMerkleProof } from "./merkle.js";
 import { withRetry, type RetryOptions } from "./retry.js";
+import { collectSignatures, InsufficientSignaturesError, type Cosigner } from "./multisig.js";
 
 export type UnanchoredEntry = {
   auditId: string;
@@ -39,12 +40,22 @@ export class AnchoringService {
 
   constructor(
     private readonly client: StellarClient,
-    private readonly keypair: Keypair,
+    /** The shared multisig account anchor transactions are submitted from — not any one cosigner's own account. */
+    private readonly anchorAccountPublicKey: string,
+    private readonly cosigners: Cosigner[],
+    /** Combined cosigner weight required to submit — matches the account's on-chain threshold. */
+    private readonly requiredWeight: number,
     private readonly fetchUnanchoredEntries: FetchUnanchoredEntries,
     private readonly persistAnchorResult: PersistAnchorResult,
     options: AnchoringServiceOptions = {},
   ) {
-    this.submitRetry = options.submitRetry ?? {};
+    // A short-of-threshold signature set will never be fixed by retrying
+    // against the same cosigners, so it's excluded from retry by default —
+    // unlike a Horizon network blip, retrying it would only waste attempts.
+    this.submitRetry = {
+      isRetryable: (error) => !(error instanceof InsufficientSignaturesError),
+      ...options.submitRetry,
+    };
     this.persistRetry = options.persistRetry ?? {};
   }
 
@@ -121,7 +132,7 @@ export class AnchoringService {
   private async submitMerkleRoot(
     merkleRoot: string,
   ): Promise<Horizon.HorizonApi.SubmitTransactionResponse> {
-    const account = await this.client.loadAccount(this.keypair.publicKey());
+    const account = await this.client.loadAccount(this.anchorAccountPublicKey);
 
     const transaction = new TransactionBuilder(account, {
       fee: BASE_FEE,
@@ -136,7 +147,9 @@ export class AnchoringService {
       .setTimeout(30)
       .build();
 
-    transaction.sign(this.keypair);
+    // Fails fast, before ever touching Horizon, if the cosigners we have on
+    // hand don't add up to the account's required signing weight.
+    await collectSignatures(transaction, this.cosigners, this.requiredWeight);
 
     return this.client.raw().submitTransaction(transaction);
   }
