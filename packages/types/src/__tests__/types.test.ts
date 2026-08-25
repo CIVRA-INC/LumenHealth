@@ -75,6 +75,7 @@ describe("@lumen/types — compile-time shape checks", () => {
       before: { role: "clinician" },
       after: { role: "admin" },
       createdAt: new Date().toISOString(),
+      sha256Hash: "a".repeat(64),
     } satisfies AuditEntry;
 
     void _entry;

@@ -28,7 +28,16 @@ jobs:
         run: npm ci
 
       - name: Audit npm dependencies
-        run: npm audit --audit-level=critical
+        run: |
+          for attempt in 1 2 3; do
+            if npm audit --audit-level=critical; then
+              exit 0
+            fi
+            echo "npm audit attempt $attempt failed, retrying in 15s..." >&2
+            sleep 15
+          done
+          echo "npm audit failed after 3 attempts (likely a registry outage), failing the build" >&2
+          exit 1
 
       - name: Scan for hardcoded secrets
         uses: gitleaks/gitleaks-action@v1

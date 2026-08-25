@@ -1,23 +1,65 @@
-import { Horizon, Networks } from "@stellar/stellar-sdk";
-import { serverConfig } from "@lumen/config";
+import { loadNetworkConfig, loadAnchorKeypair } from "./config.js";
+import { StellarClient } from "./client.js";
+import { AnchoringService } from "./anchoring.js";
+import { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
 
-const networkPassphrase =
-  serverConfig.stellarNetwork === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+export { loadNetworkConfig, loadAnchorKeypair } from "./config.js";
+export type { StellarNetworkConfig } from "./config.js";
+export { StellarClient } from "./client.js";
+export { canonicalize, sha256Hash, hashAuditEntry } from "./hashing.js";
+export { buildMerkleTree, getMerkleProof, verifyMerkleProof } from "./merkle.js";
+export type { MerkleTree } from "./merkle.js";
+export { AnchoringService, MERKLE_ROOT_DATA_NAME } from "./anchoring.js";
+export type { UnanchoredEntry, FetchUnanchoredEntries, PersistAnchorResult } from "./anchoring.js";
+export { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
+export { createInternalApp } from "./internal-app.js";
+export type { GetMerkleRootForTx, SignPayload } from "./internal-app.js";
+export { signPayload, verifyPayloadSignature } from "./signing.js";
+export type { SignedPayload } from "./signing.js";
+export { verifyExportBundle } from "./verify-export.js";
+export type { ExportVerificationReport, ExportEntryResult } from "./verify-export.js";
 
-const server = new Horizon.Server(serverConfig.stellarHorizonUrl);
+async function runDiagnostics() {
+  const network = loadNetworkConfig();
+  const client = new StellarClient(network);
 
-async function main() {
   console.log("LumenHealth Stellar service starter");
-  console.log(`Network: ${serverConfig.stellarNetwork}`);
-  console.log(`Passphrase: ${networkPassphrase}`);
+  console.log(`Network: ${network.network}`);
+  console.log(`Passphrase: ${network.networkPassphrase}`);
 
-  try {
-    await server.feeStats();
+  const healthy = await client.isHealthy();
+  if (healthy) {
     console.log("Horizon diagnostics reachable");
-  } catch (error) {
+  } else {
     console.error("Unable to reach Horizon diagnostics");
-    console.error(error);
   }
 }
 
-void main();
+/** On-demand batch anchor run, invoked via `npm run dev -- anchor`. */
+async function runAnchorBatch() {
+  const network = loadNetworkConfig();
+  const client = new StellarClient(network);
+  const keypair = loadAnchorKeypair();
+  const service = new AnchoringService(client, keypair, fetchUnanchoredEntries, persistAnchorResult);
+
+  const result = await service.runBatch();
+  if (!result) {
+    console.log("No unanchored audit entries to batch.");
+    return;
+  }
+
+  console.log(`Anchored ${result.entries.length} entries in tx ${result.stellarTxHash}`);
+  console.log(`Merkle root: ${result.merkleRoot}`);
+}
+
+async function main() {
+  if (process.argv.includes("anchor")) {
+    await runAnchorBatch();
+  } else {
+    await runDiagnostics();
+  }
+}
+
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  void main();
+}
