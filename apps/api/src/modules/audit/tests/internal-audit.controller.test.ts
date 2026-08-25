@@ -63,7 +63,7 @@ describe("internal audit routes", () => {
     expect(status).toBe(401);
   });
 
-  it("lists unanchored entries as {auditId, sha256Hash}", async () => {
+  it("lists unanchored entries as {auditId, sha256Hash, createdAt}", async () => {
     const a = recordAudit({
       clinicId: "c-1",
       action: "staff.invited",
@@ -76,8 +76,10 @@ describe("internal audit routes", () => {
     });
 
     expect(status).toBe(200);
-    const result = body as { entries: { auditId: string; sha256Hash: string }[] };
-    expect(result.entries).toEqual([{ auditId: a.auditId, sha256Hash: a.sha256Hash }]);
+    const result = body as { entries: { auditId: string; sha256Hash: string; createdAt: string }[] };
+    expect(result.entries).toEqual([
+      { auditId: a.auditId, sha256Hash: a.sha256Hash, createdAt: a.createdAt },
+    ]);
   });
 
   it("excludes already-anchored entries from the unanchored list", async () => {
