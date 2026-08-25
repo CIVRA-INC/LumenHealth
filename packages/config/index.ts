@@ -33,6 +33,12 @@ export const serverConfig = {
   // (e.g. to fetch the on-chain Merkle root for an anchored batch).
   stellarServiceUrl: read("STELLAR_SERVICE_URL", "http://localhost:4100"),
   stellarServicePort: Number(read("STELLAR_SERVICE_PORT", "4100")),
+  // How often the persistent anchoring job runs a batch, in ms. Default: 1 minute.
+  anchorIntervalMs: Number(read("ANCHOR_INTERVAL_MS", "60000")),
+  // Reconciliation treats the unanchored queue as stuck once its oldest
+  // entry has been waiting this long, and forces an extra out-of-cycle
+  // batch attempt. Default: 15 minutes.
+  anchorReconcileStaleThresholdMs: Number(read("ANCHOR_RECONCILE_STALE_THRESHOLD_MS", "900000")),
   public: getPublicRuntimeConfig(),
 };
 

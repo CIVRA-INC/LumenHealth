@@ -56,9 +56,9 @@ describe("AnchoringService.runBatch", () => {
     const keypair = Keypair.random();
 
     const entries = [
-      { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }) },
-      { auditId: "a-2", sha256Hash: sha256Hash({ auditId: "a-2" }) },
-      { auditId: "a-3", sha256Hash: sha256Hash({ auditId: "a-3" }) },
+      { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" },
+      { auditId: "a-2", sha256Hash: sha256Hash({ auditId: "a-2" }), createdAt: "2026-01-01T00:00:01.000Z" },
+      { auditId: "a-3", sha256Hash: sha256Hash({ auditId: "a-3" }), createdAt: "2026-01-01T00:00:02.000Z" },
     ];
     const fetchUnanchored = vi.fn(async () => entries);
     const persist = vi.fn(async () => {});
@@ -90,18 +90,139 @@ describe("AnchoringService.runBatch", () => {
     expect(persist).toHaveBeenCalledWith(result);
   });
 
-  it("propagates a submission failure without persisting a result", async () => {
+  it("propagates a submission failure without persisting a result, once retries are exhausted", async () => {
     const submitTransaction = vi.fn(async () => {
       throw new Error("horizon rejected the transaction");
     });
     const { client } = makeFakeClient(submitTransaction);
     const keypair = Keypair.random();
-    const fetchUnanchored = vi.fn(async () => [{ auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }) }]);
+    const fetchUnanchored = vi.fn(async () => [
+      { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" },
+    ]);
     const persist = vi.fn(async () => {});
 
-    const service = new AnchoringService(client, keypair, fetchUnanchored, persist);
+    // maxAttempts: 1 isolates "submission fails" from retry behavior (covered separately below) and keeps this test fast.
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist, {
+      submitRetry: { maxAttempts: 1 },
+    });
 
     await expect(service.runBatch()).rejects.toThrow("horizon rejected the transaction");
     expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("retries a transient Horizon submission failure and succeeds once it recovers", async () => {
+    let attempts = 0;
+    const submitTransaction = vi.fn(async () => {
+      attempts += 1;
+      if (attempts < 3) throw new Error("ECONNRESET");
+      return { hash: "fake-tx-hash-after-retry" };
+    });
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+    const fetchUnanchored = vi.fn(async () => [
+      { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" },
+    ]);
+    const persist = vi.fn(async () => {});
+    const sleep = vi.fn(async () => {});
+
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist, {
+      submitRetry: { maxAttempts: 5, sleep },
+    });
+
+    const result = await service.runBatch();
+
+    expect(result?.stellarTxHash).toBe("fake-tx-hash-after-retry");
+    expect(submitTransaction).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it("queues a successfully-anchored result instead of losing it when persisting keeps failing", async () => {
+    const submitTransaction = vi.fn(async () => ({ hash: "fake-tx-hash-123" }));
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+    const fetchUnanchored = vi.fn(async () => [
+      { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" },
+    ]);
+    const persist = vi.fn(async () => {
+      throw new Error("apps/api unreachable");
+    });
+    const sleep = vi.fn(async () => {});
+
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist, {
+      persistRetry: { maxAttempts: 2, sleep },
+    });
+
+    const result = await service.runBatch();
+
+    // The on-chain anchor still succeeded and is still returned to the caller...
+    expect(result?.stellarTxHash).toBe("fake-tx-hash-123");
+    // ...even though every persist attempt failed.
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(service.pendingPersistCount).toBe(1);
+  });
+
+  it("flushes a queued pending persist at the start of the next runBatch before fetching new entries", async () => {
+    const submitTransaction = vi.fn(async () => ({ hash: "fake-tx-hash-123" }));
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+    const fetchUnanchored = vi
+      .fn()
+      .mockResolvedValueOnce([
+        { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" },
+      ])
+      .mockResolvedValueOnce([]);
+
+    let persistShouldFail = true;
+    const persist = vi.fn(async () => {
+      if (persistShouldFail) throw new Error("apps/api unreachable");
+    });
+    const sleep = vi.fn(async () => {});
+
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist, {
+      persistRetry: { maxAttempts: 1, sleep },
+    });
+
+    const first = await service.runBatch();
+    expect(first?.stellarTxHash).toBe("fake-tx-hash-123");
+    expect(service.pendingPersistCount).toBe(1);
+
+    // apps/api recovers before the next scheduled tick.
+    persistShouldFail = false;
+    const second = await service.runBatch();
+
+    // No new entries were unanchored, so this call anchors nothing new...
+    expect(second).toBeNull();
+    // ...but the previously-stuck result got persisted, and the same
+    // entries were never fetched/anchored a second time.
+    expect(service.pendingPersistCount).toBe(0);
+    expect(submitTransaction).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(2);
+  });
+
+  it("flushPendingPersists can be called on its own (e.g. from a reconciliation pass)", async () => {
+    const submitTransaction = vi.fn(async () => ({ hash: "fake-tx-hash-123" }));
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+    const fetchUnanchored = vi.fn(async () => [
+      { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" },
+    ]);
+
+    let persistShouldFail = true;
+    const persist = vi.fn(async () => {
+      if (persistShouldFail) throw new Error("apps/api unreachable");
+    });
+
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist, {
+      persistRetry: { maxAttempts: 1, sleep: vi.fn(async () => {}) },
+    });
+
+    await service.runBatch();
+    expect(service.pendingPersistCount).toBe(1);
+
+    persistShouldFail = false;
+    await service.flushPendingPersists();
+
+    expect(service.pendingPersistCount).toBe(0);
   });
 });

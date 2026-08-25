@@ -10,7 +10,16 @@ export { canonicalize, sha256Hash, hashAuditEntry } from "./hashing.js";
 export { buildMerkleTree, getMerkleProof, verifyMerkleProof } from "./merkle.js";
 export type { MerkleTree } from "./merkle.js";
 export { AnchoringService, MERKLE_ROOT_DATA_NAME } from "./anchoring.js";
-export type { UnanchoredEntry, FetchUnanchoredEntries, PersistAnchorResult } from "./anchoring.js";
+export type {
+  UnanchoredEntry,
+  FetchUnanchoredEntries,
+  PersistAnchorResult,
+  AnchoringServiceOptions,
+} from "./anchoring.js";
+export { AnchoringScheduler } from "./scheduler.js";
+export type { AnchoringSchedulerOptions, StaleUnanchoredInfo } from "./scheduler.js";
+export { withRetry } from "./retry.js";
+export type { RetryOptions } from "./retry.js";
 export { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
 export { createInternalApp } from "./internal-app.js";
 export type { GetMerkleRootForTx, SignPayload } from "./internal-app.js";
@@ -35,7 +44,12 @@ async function runDiagnostics() {
   }
 }
 
-/** On-demand batch anchor run, invoked via `npm run dev -- anchor`. */
+/**
+ * On-demand, one-shot batch anchor run, invoked via `npm run dev -- anchor`.
+ * For continuous operation, use `npm run dev:scheduler` instead (see
+ * `scheduler-main.ts`), which runs this same `AnchoringService` on an
+ * interval with reconciliation rather than requiring a human to re-invoke it.
+ */
 async function runAnchorBatch() {
   const network = loadNetworkConfig();
   const client = new StellarClient(network);

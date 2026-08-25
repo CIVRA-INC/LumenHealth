@@ -57,11 +57,16 @@ export function queryAuditLog(q: AuditQuery): { entries: AuditEntry[]; total: nu
   return auditStore.query(q);
 }
 
-/** Minimal shape the anchoring job needs: just enough to build a Merkle tree. */
-export function getUnanchoredEntries(): { auditId: string; sha256Hash: string }[] {
+/**
+ * Minimal shape the anchoring job needs: enough to build a Merkle tree, plus
+ * `createdAt` so a reconciliation pass can tell a freshly-recorded entry
+ * apart from one that's been stuck unanchored for an unusually long time.
+ */
+export function getUnanchoredEntries(): { auditId: string; sha256Hash: string; createdAt: string }[] {
   return auditStore.findUnanchored().map((entry) => ({
     auditId: entry.auditId,
     sha256Hash: entry.sha256Hash,
+    createdAt: entry.createdAt,
   }));
 }
 
