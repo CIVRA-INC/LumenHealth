@@ -48,6 +48,32 @@ export class AnchoringService {
     this.persistRetry = options.persistRetry ?? {};
   }
 
+  /**
+   * Chains every submission-affecting call (runBatch, flushPendingPersists)
+   * onto a single promise queue, so two overlapping invocations — e.g. a
+   * scheduled tick that's still running when the next interval fires
+   * because Horizon was slow — never build and submit transactions
+   * concurrently. Concurrent submissions against the same account race on
+   * its sequence number (`tx_bad_seq`) and, worse, can each independently
+   * fetch the same "unanchored" entries before either has persisted a
+   * result, anchoring them twice under two different transactions. Once
+   * everything that submits to this account shares one `AnchoringService`
+   * instance (true after this process also serves any immediate-anchor
+   * path — see the anchoring-scheduler/internal-API process consolidation),
+   * this queue is what actually guarantees "one submission at a time" for
+   * the whole account, not just within a single call.
+   */
+  private serialQueue: Promise<unknown> = Promise.resolve();
+
+  private async serialize<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.serialQueue.then(fn, fn);
+    this.serialQueue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
   /** Anchored batches still waiting to be persisted back to apps/api. */
   get pendingPersistCount(): number {
     return this.pendingPersists.length;
@@ -60,12 +86,19 @@ export class AnchoringService {
    * the resulting tx hash + each entry's inclusion proof. Returns `null` if
    * there was nothing to anchor.
    *
-   * Always drains any previously-stuck persist-backs first, so a batch
-   * that anchored successfully but failed to persist doesn't get re-fetched
-   * and re-anchored a second time by this same call.
+   * Queued behind any other in-flight `runBatch`/`flushPendingPersists`
+   * call on this instance (see `serialize`), and always drains any
+   * previously-stuck persist-backs first — so a batch that anchored
+   * successfully but failed to persist doesn't get re-fetched and
+   * re-anchored a second time, whether by an overlapping call or by this
+   * same call's own retry.
    */
   async runBatch(): Promise<BatchAnchorResult | null> {
-    await this.flushPendingPersists();
+    return this.serialize(() => this.runBatchLocked());
+  }
+
+  private async runBatchLocked(): Promise<BatchAnchorResult | null> {
+    await this.flushPendingPersistsLocked();
 
     const unanchored = await this.fetchUnanchoredEntries();
     if (unanchored.length === 0) {
@@ -94,9 +127,14 @@ export class AnchoringService {
    * Retries persisting every currently-queued pending result. Results that
    * still fail stay queued for the next call. Safe to call on its own (e.g.
    * from a reconciliation pass) as well as automatically at the start of
-   * every `runBatch()`.
+   * every `runBatch()` — queued the same way, so it never runs concurrently
+   * with an in-flight batch.
    */
   async flushPendingPersists(): Promise<void> {
+    return this.serialize(() => this.flushPendingPersistsLocked());
+  }
+
+  private async flushPendingPersistsLocked(): Promise<void> {
     if (this.pendingPersists.length === 0) return;
 
     const stillPending: BatchAnchorResult[] = [];
