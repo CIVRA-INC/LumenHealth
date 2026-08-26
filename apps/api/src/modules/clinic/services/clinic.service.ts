@@ -2,9 +2,11 @@ import type {
   Clinic,
   CreateClinicRequest,
   UpdateClinicRequest,
+  UserRole,
 } from '@lumen/types';
 import { clinicStore } from '../repositories/clinic.repository.js';
 import { generateSlug } from '../validators/clinic.validator.js';
+import { recordAudit } from '../../audit/services/audit.service.js';
 
 function uniqueSlug(base: string): string {
   let slug = base;
@@ -74,6 +76,8 @@ export function updateClinic(
 export function archiveClinic(
   clinicId: string,
   callerClinicId: string,
+  callerActorId: string,
+  callerRole: UserRole,
 ): Clinic | null {
   const clinic = getClinic(clinicId, callerClinicId);
   if (!clinic) return null;
@@ -84,5 +88,21 @@ export function archiveClinic(
     updatedAt: new Date().toISOString(),
   };
 
-  return clinicStore.save(archived);
+  const saved = clinicStore.save(archived);
+
+  // Governance-critical — see CRITICAL_AUDIT_ACTIONS in @lumen/types. Fires
+  // an immediate, individual Stellar anchor rather than waiting for the
+  // routine batch.
+  recordAudit({
+    clinicId: callerClinicId,
+    action: 'clinic.archived',
+    actorId: callerActorId,
+    actorRole: callerRole,
+    targetId: clinicId,
+    targetType: 'clinic',
+    before: { status: clinic.status },
+    after: { status: saved.status },
+  });
+
+  return saved;
 }

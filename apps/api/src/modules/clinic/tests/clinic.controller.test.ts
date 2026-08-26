@@ -8,6 +8,7 @@ import { sessionStore } from "../../auth/repositories/session.repository.js";
 import { _resetAuthStateForTests } from "../../auth/controllers/auth.controller.js";
 import { buildTwoClinicFixture } from "../../auth/tests/fixtures.js";
 import { accessTokenSigner } from "../../auth/services/token.service.js";
+import { auditStore } from "../../audit/repositories/audit.repository.js";
 import type { UserRole } from "@lumen/types";
 
 // Build a token for a given role scoped to the same clinicId as fixture A.
@@ -195,6 +196,7 @@ describe("DELETE /api/v1/clinics/:clinicId — archive", () => {
     identityStore._reset();
     sessionStore._reset();
     clinicStore._reset();
+    auditStore._reset();
   });
 
   it("returns 200 and the clinic status becomes archived", async () => {
@@ -208,6 +210,21 @@ describe("DELETE /api/v1/clinics/:clinicId — archive", () => {
 
     const stored = clinicStore.findById(clinicId);
     expect(stored?.status).toBe("archived");
+  });
+
+  it("records a clinic.archived audit entry with before/after status", async () => {
+    const { a } = buildTwoClinicFixture();
+    const { body: created } = await req(app, "POST", "/api/v1/clinics", VALID_BODY, a.token);
+    const clinicId = (created as { clinic: { clinicId: string } }).clinic.clinicId;
+
+    await req(app, "DELETE", `/api/v1/clinics/${clinicId}`, undefined, a.token);
+
+    const events = auditStore.query({ clinicId: a.clinicId, action: "clinic.archived" });
+    expect(events.total).toBe(1);
+    const event = events.entries[0]!;
+    expect(event.targetId).toBe(clinicId);
+    expect(event.before).toEqual({ status: "active" });
+    expect(event.after).toEqual({ status: "archived" });
   });
 
   it("returns 403 when an admin tries to archive the clinic — only owner may", async () => {

@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import {
   canonicalize,
   hashAuditEntry,
+  isCriticalAuditAction,
   sha256Hash,
   verifyMerkleProof,
   type AuditAction,
@@ -14,7 +15,12 @@ import {
   type UserRole,
 } from "@lumen/types";
 import { auditStore } from "../repositories/audit.repository.js";
-import { fetchAnchoredMerkleRoot, signExportManifest } from "./stellar-verifier.client.js";
+import {
+  anchorEntriesImmediately,
+  fetchAnchoredMerkleRoot,
+  signExportManifest,
+  type ImmediateAnchorEntry,
+} from "./stellar-verifier.client.js";
 import type { SignedPayload } from "./stellar-verifier.client.js";
 
 export type RecordAuditParams = {
@@ -50,7 +56,37 @@ export function recordAudit(params: RecordAuditParams): AuditEntry {
     sha256Hash: hashAuditEntry(unhashed),
   };
 
-  return auditStore.save(entry);
+  const saved = auditStore.save(entry);
+
+  if (isCriticalAuditAction(saved.action)) {
+    // Fire-and-forget: recordAudit stays synchronous for its ~15 other call
+    // sites, none of which are network-bound today. Errors are logged, not
+    // thrown — a failed immediate anchor still leaves the entry anchorable
+    // by the next routine batch, so it isn't a fatal error for the caller.
+    void anchorImmediately(saved).catch((error) => {
+      console.error(`[audit] immediate anchor failed for ${saved.auditId} (${saved.action}):`, error);
+    });
+  }
+
+  return saved;
+}
+
+/**
+ * Anchors a single audit entry immediately, bypassing the routine batch
+ * queue — see `isCriticalAuditAction`. Exported separately from
+ * `recordAudit`'s fire-and-forget dispatch so tests (and any future caller
+ * that wants to await completion, e.g. a retry job) can call it directly
+ * instead of racing an unawaited promise.
+ *
+ * `anchor` is injectable for tests; defaults to the real stellar-service call.
+ */
+export async function anchorImmediately(
+  entry: Pick<AuditEntry, "auditId" | "sha256Hash" | "createdAt">,
+  anchor: (entries: ImmediateAnchorEntry[]) => Promise<BatchAnchorResult> = anchorEntriesImmediately,
+): Promise<AuditEntry | null> {
+  const result = await anchor([{ auditId: entry.auditId, sha256Hash: entry.sha256Hash, createdAt: entry.createdAt }]);
+  const [updated] = auditStore.applyAnchorResult(result);
+  return updated ?? null;
 }
 
 export function queryAuditLog(q: AuditQuery): { entries: AuditEntry[]; total: number } {
@@ -117,7 +153,8 @@ export async function verifyAuditEntry(
     return null;
   }
 
-  const { sha256Hash: storedHash, stellarTxHash, merkleRoot, anchoredAt, merkleProof, ...hashable } = entry;
+  const { sha256Hash: storedHash, stellarTxHash, merkleRoot, anchoredAt, merkleProof, anchorMode, ...hashable } =
+    entry;
   void anchoredAt;
   const recomputedHash = hashAuditEntry(hashable);
   const checkedAt = new Date().toISOString();
@@ -167,7 +204,16 @@ export async function verifyAuditEntry(
     };
   }
 
-  return { auditId, status: "verified", recomputedHash, storedHash, merkleRoot, stellarTxHash, checkedAt };
+  return {
+    auditId,
+    status: "verified",
+    recomputedHash,
+    storedHash,
+    merkleRoot,
+    stellarTxHash,
+    anchorMode,
+    checkedAt,
+  };
 }
 
 function computeEntriesDigest(entries: AuditEntry[]): string {

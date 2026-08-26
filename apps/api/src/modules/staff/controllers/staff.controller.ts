@@ -20,7 +20,7 @@ export function updateRole(req: Request, res: Response): void {
     return;
   }
 
-  const result = updateStaffRole(String(req.params.staffId), body, req.auth!.clinicId, req.auth!.userId);
+  const result = updateStaffRole(String(req.params.staffId), body, req.auth!.clinicId, req.auth!.userId, role);
 
   if ("error" in result) {
     const status = result.error === "STAFF_NOT_FOUND" ? 404 : 403;

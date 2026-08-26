@@ -10,6 +10,7 @@ import { _resetAuthStateForTests } from "../../auth/controllers/auth.controller.
 import { buildTwoClinicFixture } from "../../auth/tests/fixtures.js";
 import { accessTokenSigner } from "../../auth/services/token.service.js";
 import { createStaffFromInvitation } from "../services/staff.service.js";
+import { auditStore } from "../../audit/repositories/audit.repository.js";
 import type { UserRole } from "@lumen/types";
 
 function buildApp(): Express {
@@ -106,6 +107,7 @@ describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
     sessionStore._reset();
     invitationStore._reset();
     staffStore._reset();
+    auditStore._reset();
   });
 
   it("returns 200 with updated staff on valid role change", async () => {
@@ -121,6 +123,20 @@ describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
     );
     expect(status).toBe(200);
     expect((body as { staff: { role: string } }).staff.role).toBe("admin");
+  });
+
+  it("records a staff.role_changed audit entry with before/after role", async () => {
+    const { a } = buildTwoClinicFixture();
+    const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
+
+    await req(app, "PATCH", `/api/v1/staff/${member.staffId}/role`, { role: "admin" }, a.token);
+
+    const events = auditStore.query({ clinicId: a.clinicId, action: "staff.role_changed" });
+    expect(events.total).toBe(1);
+    const event = events.entries[0]!;
+    expect(event.targetId).toBe(member.staffId);
+    expect(event.before).toEqual({ role: "clinician" });
+    expect(event.after).toEqual({ role: "admin" });
   });
 
   it("returns 400 when role is 'owner'", async () => {

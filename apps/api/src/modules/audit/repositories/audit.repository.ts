@@ -16,10 +16,11 @@ function findUnanchored(): AuditEntry[] {
 }
 
 /**
- * Applies a completed batch anchor result: stamps `stellarTxHash`,
- * `merkleRoot`, `anchoredAt`, and the per-entry `merkleProof` onto each
- * entry named in the result. Entries not found in the store are skipped —
- * the caller decides whether that's an error.
+ * Applies a completed batch (or immediate) anchor result: stamps
+ * `stellarTxHash`, `merkleRoot`, `anchoredAt`, `anchorMode`, and the
+ * per-entry `merkleProof` onto each entry named in the result. Entries not
+ * found in the store are skipped — the caller decides whether that's an
+ * error.
  */
 function applyAnchorResult(result: BatchAnchorResult): AuditEntry[] {
   const updated: AuditEntry[] = [];
@@ -33,6 +34,7 @@ function applyAnchorResult(result: BatchAnchorResult): AuditEntry[] {
       stellarTxHash: result.stellarTxHash,
       merkleRoot: result.merkleRoot,
       anchoredAt: result.anchoredAt,
+      anchorMode: result.mode,
       merkleProof,
     };
     store.set(auditId, anchored);

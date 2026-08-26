@@ -199,6 +199,30 @@ describe("AuditLog", () => {
     expect(link).toHaveAttribute("href", expect.stringContaining("tx-1"));
   });
 
+  it("shows an 'Immediately' badge for a critical action anchored via the immediate path", async () => {
+    mockSessionValue = ownerSession;
+    mockFetchAuditLog.mockResolvedValue({ entries: [genuineEntry], total: 1 });
+    mockVerifyAuditEntry.mockResolvedValue({ ...verifiedResponse(genuineEntry.auditId), anchorMode: "immediate" });
+
+    render(<AuditLog />);
+    await screen.findByText(/anchored & verified/i);
+    fireEvent.click(screen.getByRole("cell", { name: "staff.role_changed" }));
+
+    expect(await screen.findByText(/immediately \(critical action\)/i)).toBeInTheDocument();
+  });
+
+  it("shows a 'Routine batch' badge for an entry anchored via the scheduled batch", async () => {
+    mockSessionValue = ownerSession;
+    mockFetchAuditLog.mockResolvedValue({ entries: [genuineEntry], total: 1 });
+    mockVerifyAuditEntry.mockResolvedValue({ ...verifiedResponse(genuineEntry.auditId), anchorMode: "batched" });
+
+    render(<AuditLog />);
+    await screen.findByText(/anchored & verified/i);
+    fireEvent.click(screen.getByRole("cell", { name: "staff.role_changed" }));
+
+    expect(await screen.findByText(/routine batch/i)).toBeInTheDocument();
+  });
+
   it("shows a reason and no chain data for a tampered entry's detail panel", async () => {
     mockSessionValue = ownerSession;
     mockFetchAuditLog.mockResolvedValue({ entries: [tamperedEntry], total: 1 });
