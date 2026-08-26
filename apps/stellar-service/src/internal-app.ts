@@ -1,11 +1,12 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { serverConfig } from "@lumen/config";
-import type { AuditExportBundle } from "@lumen/types";
+import type { AnchoringHealthReport, AuditExportBundle } from "@lumen/types";
 import type { SignedPayload } from "./signing.js";
 import { verifyExportBundle } from "./verify-export.js";
 
 export type GetMerkleRootForTx = (txHash: string) => Promise<string | null>;
 export type SignPayload = (payload: string) => SignedPayload;
+export type GetAnchoringHealth = () => Promise<AnchoringHealthReport>;
 
 /**
  * Minimal shape check for an uploaded export bundle — enough to reject
@@ -45,10 +46,32 @@ function requireInternalServiceToken(req: Request, res: Response, next: NextFunc
 export function createInternalApp(
   getMerkleRootForTx: GetMerkleRootForTx,
   signPayload: SignPayload,
+  /** Optional — omitted in contexts (e.g. some tests) that don't run the anchoring scheduler in-process. */
+  getAnchoringHealth?: GetAnchoringHealth,
 ): Express {
   const app = express();
   app.use(express.json());
   app.use(requireInternalServiceToken);
+
+  app.get("/internal/anchoring/health", async (_req: Request, res: Response) => {
+    if (!getAnchoringHealth) {
+      res.status(501).json({
+        error: "NOT_CONFIGURED",
+        message: "this process doesn't run the anchoring scheduler",
+      });
+      return;
+    }
+
+    try {
+      const health = await getAnchoringHealth();
+      res.json(health);
+    } catch (error) {
+      res.status(502).json({
+        error: "HEALTH_CHECK_FAILED",
+        message: error instanceof Error ? error.message : "failed to compute anchoring health",
+      });
+    }
+  });
 
   app.get("/internal/tx/:txHash/merkle-root", async (req: Request, res: Response) => {
     try {

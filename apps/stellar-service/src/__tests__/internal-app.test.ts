@@ -247,3 +247,57 @@ describe("POST /internal/verify-export", () => {
     expect(body).toMatchObject({ ok: false, tamperedCount: 1 });
   });
 });
+
+describe("GET /internal/anchoring/health", () => {
+  it("rejects requests without a valid internal service token", async () => {
+    const app = createInternalApp(async () => null, fakeSignPayload);
+    const { status } = await req(app, "/internal/anchoring/health");
+    expect(status).toBe(401);
+  });
+
+  it("returns 501 when this process doesn't run the anchoring scheduler", async () => {
+    const app = createInternalApp(async () => null, fakeSignPayload);
+    const { status, body } = await req(app, "/internal/anchoring/health", {
+      token: serverConfig.internalServiceToken,
+    });
+
+    expect(status).toBe(501);
+    expect(body).toMatchObject({ error: "NOT_CONFIGURED" });
+  });
+
+  it("returns the health report from the injected getAnchoringHealth callback", async () => {
+    const health = {
+      lastSuccessfulTickAt: "2026-01-01T00:05:00.000Z",
+      lastAnchorAt: "2026-01-01T00:05:00.000Z",
+      consecutiveFailureCount: 0,
+      unanchoredCount: 2,
+      oldestUnanchoredAgeMs: 60_000,
+      pendingPersistCount: 0,
+      checkedAt: "2026-01-01T00:06:00.000Z",
+    };
+    const getAnchoringHealth = vi.fn(async () => health);
+    const app = createInternalApp(async () => null, fakeSignPayload, getAnchoringHealth);
+
+    const { status, body } = await req(app, "/internal/anchoring/health", {
+      token: serverConfig.internalServiceToken,
+    });
+
+    expect(status).toBe(200);
+    expect(body).toEqual(health);
+    expect(getAnchoringHealth).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 502 when computing health throws", async () => {
+    const getAnchoringHealth = vi.fn(async () => {
+      throw new Error("scheduler state unavailable");
+    });
+    const app = createInternalApp(async () => null, fakeSignPayload, getAnchoringHealth);
+
+    const { status, body } = await req(app, "/internal/anchoring/health", {
+      token: serverConfig.internalServiceToken,
+    });
+
+    expect(status).toBe(502);
+    expect(body).toMatchObject({ error: "HEALTH_CHECK_FAILED" });
+  });
+});

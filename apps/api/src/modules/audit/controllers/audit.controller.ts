@@ -1,7 +1,12 @@
 import type { Request, Response } from "express";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { buildAuditExport, queryAuditLog, verifyAuditEntry } from "../services/audit.service.js";
-import { InvalidExportBundleError, verifyExportBundleRemote } from "../services/stellar-verifier.client.js";
+import {
+  AnchoringNotConfiguredError,
+  InvalidExportBundleError,
+  fetchAnchoringHealth,
+  verifyExportBundleRemote,
+} from "../services/stellar-verifier.client.js";
 
 export function list(req: Request, res: Response): void {
   const role = req.auth!.role;
@@ -89,6 +94,33 @@ export async function verifyExport(req: Request, res: Response): Promise<void> {
   } catch (error) {
     if (error instanceof InvalidExportBundleError) {
       res.status(400).json({ error: "INVALID_BODY", message: error.message });
+      return;
+    }
+    res.status(502).json({
+      error: "STELLAR_SERVICE_UNAVAILABLE",
+      message: error instanceof Error ? error.message : "failed to reach stellar-service",
+    });
+  }
+}
+
+/**
+ * Owner/admin only: the anchoring *pipeline's* operational health — is the
+ * scheduled batch job actually keeping up — as opposed to `verify`, which
+ * reports on one specific audit entry.
+ */
+export async function anchoringHealth(req: Request, res: Response): Promise<void> {
+  const role = req.auth!.role;
+  if (role !== "owner" && role !== "admin") {
+    res.status(403).json({ error: "AUTH_FORBIDDEN", message: "only owner or admin can view anchoring health" });
+    return;
+  }
+
+  try {
+    const health = await fetchAnchoringHealth();
+    res.json(health);
+  } catch (error) {
+    if (error instanceof AnchoringNotConfiguredError) {
+      res.status(501).json({ error: "NOT_CONFIGURED", message: error.message });
       return;
     }
     res.status(502).json({

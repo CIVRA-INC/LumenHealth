@@ -1,3 +1,4 @@
+import type { AnchoringHealthReport } from "@lumen/types";
 import type { AnchoringService, FetchUnanchoredEntries } from "./anchoring.js";
 
 export type StaleUnanchoredInfo = {
@@ -15,10 +16,18 @@ export type AnchoringSchedulerOptions = {
    * minutes.
    */
   reconcileStaleThresholdMs?: number;
+  /**
+   * Consecutive batch-attempt failures (across both scheduled ticks and
+   * reconciliation's forced retry) before `onConsecutiveFailures` fires.
+   * Defaults to 3.
+   */
+  maxConsecutiveFailures?: number;
   /** Called whenever a scheduled or reconciliation batch attempt throws. Never throws itself. */
   onBatchError?: (error: unknown) => void;
   /** Called when reconciliation finds the queue stuck past the staleness threshold. */
   onReconcileStale?: (info: StaleUnanchoredInfo) => void;
+  /** Called once the consecutive-failure count reaches `maxConsecutiveFailures`, and again on every failure after that. */
+  onConsecutiveFailures?: (count: number) => void;
   now?: () => number;
   setIntervalFn?: (handler: () => void, ms: number) => ReturnType<typeof setInterval>;
   clearIntervalFn?: (handle: ReturnType<typeof setInterval>) => void;
@@ -26,6 +35,7 @@ export type AnchoringSchedulerOptions = {
 
 const DEFAULT_INTERVAL_MS = 60_000;
 const DEFAULT_STALE_THRESHOLD_MS = 15 * 60_000;
+const DEFAULT_MAX_CONSECUTIVE_FAILURES = 3;
 
 /**
  * Turns `AnchoringService.runBatch()` from a manual, one-shot CLI action
@@ -36,6 +46,9 @@ const DEFAULT_STALE_THRESHOLD_MS = 15 * 60_000;
  */
 export class AnchoringScheduler {
   private timer: ReturnType<typeof setInterval> | null = null;
+  private lastSuccessfulTickAt: string | null = null;
+  private lastAnchorAt: string | null = null;
+  private consecutiveFailureCount = 0;
 
   constructor(
     private readonly anchoringService: AnchoringService,
@@ -103,11 +116,61 @@ export class AnchoringScheduler {
     }
   }
 
-  private async runBatchSafely(): Promise<void> {
+  /**
+   * Point-in-time snapshot of the anchoring pipeline's operational health —
+   * distinct from any single entry's verification status. Combines this
+   * scheduler's in-memory tick history with a live queue-lag check, so it
+   * always reflects current reality rather than only what's been observed
+   * since the process started.
+   */
+  async getHealth(): Promise<AnchoringHealthReport> {
+    const now = this.options.now ?? Date.now;
+    let unanchoredCount = 0;
+    let oldestUnanchoredAgeMs: number | null = null;
+
     try {
-      await this.anchoringService.runBatch();
+      const unanchored = await this.fetchUnanchoredEntries();
+      unanchoredCount = unanchored.length;
+      if (unanchored.length > 0) {
+        const oldestCreatedAtMs = unanchored.reduce(
+          (min, entry) => Math.min(min, Date.parse(entry.createdAt)),
+          Infinity,
+        );
+        oldestUnanchoredAgeMs = now() - oldestCreatedAtMs;
+      }
+    } catch {
+      // Live queue-lag check unavailable (e.g. apps/api unreachable) — report
+      // what we do know (tick history) rather than failing the whole report.
+    }
+
+    return {
+      lastSuccessfulTickAt: this.lastSuccessfulTickAt,
+      lastAnchorAt: this.lastAnchorAt,
+      consecutiveFailureCount: this.consecutiveFailureCount,
+      unanchoredCount,
+      oldestUnanchoredAgeMs,
+      pendingPersistCount: this.anchoringService.pendingPersistCount,
+      checkedAt: new Date(now()).toISOString(),
+    };
+  }
+
+  private async runBatchSafely(): Promise<void> {
+    const now = this.options.now ?? Date.now;
+    try {
+      const result = await this.anchoringService.runBatch();
+      this.lastSuccessfulTickAt = new Date(now()).toISOString();
+      if (result) {
+        this.lastAnchorAt = this.lastSuccessfulTickAt;
+      }
+      this.consecutiveFailureCount = 0;
     } catch (error) {
+      this.consecutiveFailureCount += 1;
       this.options.onBatchError?.(error);
+
+      const maxConsecutiveFailures = this.options.maxConsecutiveFailures ?? DEFAULT_MAX_CONSECUTIVE_FAILURES;
+      if (this.consecutiveFailureCount >= maxConsecutiveFailures) {
+        this.options.onConsecutiveFailures?.(this.consecutiveFailureCount);
+      }
     }
   }
 }
