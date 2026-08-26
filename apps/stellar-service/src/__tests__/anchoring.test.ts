@@ -356,3 +356,108 @@ describe("AnchoringService.runBatch", () => {
     expect(service.pendingPersistCount).toBe(0);
   });
 });
+
+describe("AnchoringService — concurrent call serialization", () => {
+  it("never lets two overlapping runBatch() calls submit at the same time", async () => {
+    // Simulates two scheduler ticks overlapping because the first is slow
+    // (e.g. Horizon latency) and the interval fires again before it
+    // finishes. Without serialization, both would call loadAccount/build/
+    // submit concurrently and race on the account's sequence number.
+    const callOrder: string[] = [];
+    let resolveFirstSubmit!: () => void;
+    const firstSubmitGate = new Promise<void>((resolve) => {
+      resolveFirstSubmit = resolve;
+    });
+
+    let submitCount = 0;
+    const submitTransaction = vi.fn(async (_tx: unknown) => {
+      submitCount += 1;
+      const label = `submit-${submitCount}`;
+      callOrder.push(`${label}-start`);
+      if (submitCount === 1) {
+        await firstSubmitGate; // held open until the test explicitly releases it
+      }
+      callOrder.push(`${label}-end`);
+      return { hash: `tx-hash-${submitCount}` };
+    });
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+
+    // Each call sees a fresh, disjoint entry so a real double-anchor (same
+    // entry anchored twice) isn't the only thing this test would catch —
+    // interleaved submission itself is the thing being verified.
+    let fetchCount = 0;
+    const fetchUnanchored = vi.fn(async () => {
+      fetchCount += 1;
+      return [
+        { auditId: `a-${fetchCount}`, sha256Hash: sha256Hash({ auditId: `a-${fetchCount}` }), createdAt: "2026-01-01T00:00:00.000Z" },
+      ];
+    });
+    const persist = vi.fn(async () => {});
+
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist);
+
+    const first = service.runBatch();
+    // Give the first call a tick to reach (and block inside) submitTransaction.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(callOrder).toEqual(["submit-1-start"]);
+
+    const second = service.runBatch();
+    // The second call must NOT reach submitTransaction while the first is
+    // still mid-flight — it should be queued, not interleaved.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(callOrder).toEqual(["submit-1-start"]);
+
+    resolveFirstSubmit();
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+
+    expect(callOrder).toEqual(["submit-1-start", "submit-1-end", "submit-2-start", "submit-2-end"]);
+    expect(firstResult?.stellarTxHash).toBe("tx-hash-1");
+    expect(secondResult?.stellarTxHash).toBe("tx-hash-2");
+  });
+
+  it("a second overlapping call re-fetches after the first persists, so it never re-anchors the same entry", async () => {
+    // A minimal stateful fake standing in for apps/api's audit store: an
+    // entry disappears from "unanchored" once persistAnchorResult marks it.
+    const unanchoredIds = new Set(["a-1"]);
+    const fetchUnanchored = vi.fn(async () =>
+      [...unanchoredIds].map((auditId) => ({
+        auditId,
+        sha256Hash: sha256Hash({ auditId }),
+        createdAt: "2026-01-01T00:00:00.000Z",
+      })),
+    );
+    const persist = vi.fn(async (result: { entries: { auditId: string }[] }) => {
+      for (const { auditId } of result.entries) unanchoredIds.delete(auditId);
+    });
+
+    let resolveFirstSubmit!: () => void;
+    const firstSubmitGate = new Promise<void>((resolve) => {
+      resolveFirstSubmit = resolve;
+    });
+    let submitCount = 0;
+    const submitTransaction = vi.fn(async (_tx: unknown) => {
+      submitCount += 1;
+      if (submitCount === 1) await firstSubmitGate;
+      return { hash: `tx-hash-${submitCount}` };
+    });
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist);
+
+    const first = service.runBatch();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const second = service.runBatch(); // queued behind `first`
+
+    resolveFirstSubmit();
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+
+    expect(firstResult?.entries.map((e) => e.auditId)).toEqual(["a-1"]);
+    // By the time the second call's fetch runs, a-1 has already been
+    // persisted as anchored — so the second call finds nothing to anchor,
+    // rather than re-anchoring a-1 under a second transaction.
+    expect(secondResult).toBeNull();
+    expect(submitTransaction).toHaveBeenCalledTimes(1);
+  });
+});
