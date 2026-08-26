@@ -1,5 +1,5 @@
 import { serverConfig } from "@lumen/config";
-import { loadNetworkConfig, loadAnchorKeypair } from "./config.js";
+import { loadNetworkConfig, loadAnchorMultisigSetup } from "./config.js";
 import { StellarClient } from "./client.js";
 import { AnchoringService } from "./anchoring.js";
 import { AnchoringScheduler } from "./scheduler.js";
@@ -15,9 +15,16 @@ import { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
 function main() {
   const network = loadNetworkConfig();
   const client = new StellarClient(network);
-  const keypair = loadAnchorKeypair();
+  const { anchorAccountPublicKey, cosigners, requiredWeight } = loadAnchorMultisigSetup();
 
-  const anchoringService = new AnchoringService(client, keypair, fetchUnanchoredEntries, persistAnchorResult);
+  const anchoringService = new AnchoringService(
+    client,
+    anchorAccountPublicKey,
+    cosigners,
+    requiredWeight,
+    fetchUnanchoredEntries,
+    persistAnchorResult,
+  );
 
   const scheduler = new AnchoringScheduler(anchoringService, fetchUnanchoredEntries, {
     intervalMs: serverConfig.anchorIntervalMs,

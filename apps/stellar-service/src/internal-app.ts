@@ -1,6 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { serverConfig } from "@lumen/config";
-import type { AuditExportBundle } from "@lumen/types";
+import type { AuditExportBundle, SigningKeyRecord } from "@lumen/types";
 import type { SignedPayload } from "./signing.js";
 import { verifyExportBundle } from "./verify-export.js";
 
@@ -45,6 +45,8 @@ function requireInternalServiceToken(req: Request, res: Response, next: NextFunc
 export function createInternalApp(
   getMerkleRootForTx: GetMerkleRootForTx,
   signPayload: SignPayload,
+  /** Server-controlled, not client-supplied — a caller-provided registry could just claim any key is authorized. */
+  signingKeyRegistry?: SigningKeyRecord[],
 ): Express {
   const app = express();
   app.use(express.json());
@@ -77,7 +79,7 @@ export function createInternalApp(
     }
 
     try {
-      const report = await verifyExportBundle(bundle, getMerkleRootForTx);
+      const report = await verifyExportBundle(bundle, getMerkleRootForTx, signingKeyRegistry);
       res.json(report);
     } catch (error) {
       res.status(502).json({
