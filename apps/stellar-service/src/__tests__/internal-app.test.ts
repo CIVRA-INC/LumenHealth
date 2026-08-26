@@ -246,6 +246,117 @@ describe("POST /internal/verify-export", () => {
     expect(status).toBe(200);
     expect(body).toMatchObject({ ok: false, tamperedCount: 1 });
   });
+
+  it("threads the server-configured signing key registry through to the report", async () => {
+    const { bundle, onChainRoot } = makeGenuineBundle();
+    const getMerkleRootForTx = vi.fn(async () => onChainRoot);
+    const registry = [
+      { publicKey: bundle.signingPublicKey, role: "export-signing" as const, validFrom: "2020-01-01T00:00:00.000Z" },
+    ];
+    const app = createInternalApp(getMerkleRootForTx, fakeSignPayload, undefined, undefined, registry);
+
+    const { status, body } = await req(app, "/internal/verify-export", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { bundle },
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ signingKeyAuthorized: true });
+  });
+
+  it("flags signingKeyAuthorized: false for a key the configured registry doesn't recognize", async () => {
+    const { bundle, onChainRoot } = makeGenuineBundle();
+    const getMerkleRootForTx = vi.fn(async () => onChainRoot);
+    const registry = [
+      { publicKey: "GSOMEOTHERKEY", role: "export-signing" as const, validFrom: "2020-01-01T00:00:00.000Z" },
+    ];
+    const app = createInternalApp(getMerkleRootForTx, fakeSignPayload, undefined, undefined, registry);
+
+    const { status, body } = await req(app, "/internal/verify-export", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { bundle },
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ signingKeyAuthorized: false, ok: false });
+  });
+});
+
+describe("POST /internal/anchor-immediate", () => {
+  const entries = [{ auditId: "a-1", sha256Hash: "h1", createdAt: "2026-01-01T00:00:00.000Z" }];
+
+  it("rejects requests without a valid internal service token", async () => {
+    const app = createInternalApp(async () => null, fakeSignPayload, vi.fn());
+    const { status } = await req(app, "/internal/anchor-immediate", { method: "POST", body: { entries } });
+    expect(status).toBe(401);
+  });
+
+  it("returns 501 when this process doesn't run the anchoring service", async () => {
+    const app = createInternalApp(async () => null, fakeSignPayload);
+    const { status, body } = await req(app, "/internal/anchor-immediate", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { entries },
+    });
+
+    expect(status).toBe(501);
+    expect(body).toMatchObject({ error: "NOT_CONFIGURED" });
+  });
+
+  it("rejects an empty or malformed entries array", async () => {
+    const anchorImmediate = vi.fn();
+    const app = createInternalApp(async () => null, fakeSignPayload, anchorImmediate);
+
+    const { status, body } = await req(app, "/internal/anchor-immediate", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { entries: [] },
+    });
+
+    expect(status).toBe(400);
+    expect(body).toMatchObject({ error: "INVALID_BODY" });
+    expect(anchorImmediate).not.toHaveBeenCalled();
+  });
+
+  it("returns the anchor result from the injected anchorImmediate callback", async () => {
+    const result = {
+      merkleRoot: "root",
+      stellarTxHash: "tx-immediate",
+      anchoredAt: "2026-01-01T00:00:01.000Z",
+      mode: "immediate" as const,
+      entries: [{ auditId: "a-1", merkleProof: [] }],
+    };
+    const anchorImmediate = vi.fn(async () => result);
+    const app = createInternalApp(async () => null, fakeSignPayload, anchorImmediate);
+
+    const { status, body } = await req(app, "/internal/anchor-immediate", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { entries },
+    });
+
+    expect(status).toBe(200);
+    expect(body).toEqual(result);
+    expect(anchorImmediate).toHaveBeenCalledWith(entries);
+  });
+
+  it("returns 502 when anchoring throws", async () => {
+    const anchorImmediate = vi.fn(async () => {
+      throw new Error("horizon rejected the transaction");
+    });
+    const app = createInternalApp(async () => null, fakeSignPayload, anchorImmediate);
+
+    const { status, body } = await req(app, "/internal/anchor-immediate", {
+      method: "POST",
+      token: serverConfig.internalServiceToken,
+      body: { entries },
+    });
+
+    expect(status).toBe(502);
+    expect(body).toMatchObject({ error: "HORIZON_ERROR" });
+  });
 });
 
 describe("GET /internal/anchoring/health", () => {
@@ -276,7 +387,7 @@ describe("GET /internal/anchoring/health", () => {
       checkedAt: "2026-01-01T00:06:00.000Z",
     };
     const getAnchoringHealth = vi.fn(async () => health);
-    const app = createInternalApp(async () => null, fakeSignPayload, getAnchoringHealth);
+    const app = createInternalApp(async () => null, fakeSignPayload, undefined, getAnchoringHealth);
 
     const { status, body } = await req(app, "/internal/anchoring/health", {
       token: serverConfig.internalServiceToken,
@@ -291,7 +402,7 @@ describe("GET /internal/anchoring/health", () => {
     const getAnchoringHealth = vi.fn(async () => {
       throw new Error("scheduler state unavailable");
     });
-    const app = createInternalApp(async () => null, fakeSignPayload, getAnchoringHealth);
+    const app = createInternalApp(async () => null, fakeSignPayload, undefined, getAnchoringHealth);
 
     const { status, body } = await req(app, "/internal/anchoring/health", {
       token: serverConfig.internalServiceToken,

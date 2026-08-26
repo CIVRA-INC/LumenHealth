@@ -49,6 +49,7 @@ export class AnchoringScheduler {
   private lastSuccessfulTickAt: string | null = null;
   private lastAnchorAt: string | null = null;
   private consecutiveFailureCount = 0;
+  private ticking = false;
 
   constructor(
     private readonly anchoringService: AnchoringService,
@@ -76,10 +77,27 @@ export class AnchoringScheduler {
     return this.timer !== null;
   }
 
-  /** One scheduled cycle: a batch attempt, then a reconciliation check. Never throws. */
+  /** Whether a tick is currently in progress. */
+  get isTicking(): boolean {
+    return this.ticking;
+  }
+
+  /**
+   * One scheduled cycle: a batch attempt, then a reconciliation check.
+   * Never throws. Skips entirely if a previous tick is still running (e.g.
+   * a slow Horizon call outlasted the interval) — `AnchoringService` itself
+   * already serializes overlapping submissions safely, but skipping here
+   * avoids piling up redundant fetch/build work behind that queue.
+   */
   async tick(): Promise<void> {
-    await this.runBatchSafely();
-    await this.reconcile();
+    if (this.ticking) return;
+    this.ticking = true;
+    try {
+      await this.runBatchSafely();
+      await this.reconcile();
+    } finally {
+      this.ticking = false;
+    }
   }
 
   /**

@@ -82,6 +82,45 @@ describe("AnchoringScheduler.tick", () => {
 
     expect(fetchUnanchored).toHaveBeenCalled();
   });
+
+  it("skips a tick entirely if the previous one is still running", async () => {
+    // Simulates the interval firing again before a slow tick (e.g. Horizon
+    // latency) has finished — AnchoringService's own queue would still
+    // keep submissions safe, but the scheduler shouldn't pile up redundant
+    // fetch/build work behind it.
+    let resolveFirstRunBatch!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      resolveFirstRunBatch = resolve;
+    });
+    const runBatch = vi.fn(async () => {
+      await gate;
+      return null;
+    });
+    const fetchUnanchored = vi.fn(async () => []);
+    const scheduler = new AnchoringScheduler(makeFakeAnchoringService(runBatch), fetchUnanchored);
+
+    const firstTick = scheduler.tick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(scheduler.isTicking).toBe(true);
+
+    const secondTick = scheduler.tick(); // should be a no-op, not queued work
+
+    resolveFirstRunBatch();
+    await Promise.all([firstTick, secondTick]);
+
+    expect(runBatch).toHaveBeenCalledTimes(1);
+    expect(scheduler.isTicking).toBe(false);
+  });
+
+  it("allows a new tick once the previous one has finished", async () => {
+    const runBatch = vi.fn(async () => null);
+    const scheduler = new AnchoringScheduler(makeFakeAnchoringService(runBatch), vi.fn(async () => []));
+
+    await scheduler.tick();
+    await scheduler.tick();
+
+    expect(runBatch).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("AnchoringScheduler.reconcile", () => {

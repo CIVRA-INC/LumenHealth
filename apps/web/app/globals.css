@@ -335,6 +335,26 @@ a {
   animation: auditTamperedPulse 1.6s ease-in-out infinite;
 }
 
+.anchorModeBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.anchorModeBadge--immediate {
+  background: rgba(0, 109, 119, 0.16);
+  color: var(--accent);
+}
+
+.anchorModeBadge--batched {
+  background: rgba(93, 106, 115, 0.12);
+  color: var(--muted);
+}
+
 .auditRow--tampered {
   background: rgba(179, 38, 30, 0.1);
   outline: 2px solid #b3261e;

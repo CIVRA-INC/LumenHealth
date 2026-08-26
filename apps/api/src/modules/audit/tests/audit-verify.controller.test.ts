@@ -62,6 +62,7 @@ function anchorSingleEntry(auditId: string, sha256Hash: string, merkleRoot = sha
     merkleRoot,
     stellarTxHash: `tx-${auditId}`,
     anchoredAt: "2026-01-01T00:00:00.000Z",
+    mode: "batched",
     entries: [{ auditId, merkleProof: [] }],
   };
   applyBatchAnchorResult(result);

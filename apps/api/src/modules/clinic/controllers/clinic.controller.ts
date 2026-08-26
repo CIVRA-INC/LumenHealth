@@ -65,7 +65,7 @@ export function archive(req: Request, res: Response): void {
     return;
   }
 
-  const clinic = archiveClinic(String(req.params.clinicId), req.auth!.clinicId);
+  const clinic = archiveClinic(String(req.params.clinicId), req.auth!.clinicId, req.auth!.userId, req.auth!.role);
   if (!clinic) {
     res.status(404).json({ error: "CLINIC_NOT_FOUND", message: "clinic not found" });
     return;

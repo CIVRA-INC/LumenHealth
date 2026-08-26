@@ -5,6 +5,7 @@ export * from "./audit.js";
 export * from "./hashing.js";
 export * from "./merkle.js";
 export * from "./anchoring-health.js";
+export * from "./signing-keys.js";
 
 export type PaymentIntent = {
   id: string;

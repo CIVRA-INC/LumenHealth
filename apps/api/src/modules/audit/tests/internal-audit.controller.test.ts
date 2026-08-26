@@ -100,6 +100,7 @@ describe("internal audit routes", () => {
       merkleRoot: "root-hash",
       stellarTxHash: "tx-hash",
       anchoredAt: new Date().toISOString(),
+      mode: "batched",
       entries: [{ auditId: a.auditId, merkleProof: [] }],
     };
 
@@ -132,6 +133,7 @@ describe("internal audit routes", () => {
       merkleRoot: "root-hash",
       stellarTxHash: "tx-hash",
       anchoredAt: "2026-01-01T00:00:00.000Z",
+      mode: "batched",
       entries: [{ auditId: a.auditId, merkleProof: proof }],
     };
 

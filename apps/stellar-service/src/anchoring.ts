@@ -1,9 +1,10 @@
 import { Operation, TransactionBuilder, BASE_FEE } from "@stellar/stellar-sdk";
 import type { Keypair, Horizon } from "@stellar/stellar-sdk";
-import type { BatchAnchorResult } from "@lumen/types";
+import type { AnchorMode, BatchAnchorResult } from "@lumen/types";
 import type { StellarClient } from "./client.js";
 import { buildMerkleTree, getMerkleProof } from "./merkle.js";
 import { withRetry, type RetryOptions } from "./retry.js";
+import { collectSignatures, InsufficientSignaturesError, type Cosigner } from "./multisig.js";
 
 export type UnanchoredEntry = {
   auditId: string;
@@ -39,13 +40,49 @@ export class AnchoringService {
 
   constructor(
     private readonly client: StellarClient,
-    private readonly keypair: Keypair,
+    /** The shared multisig account anchor transactions are submitted from — not any one cosigner's own account. */
+    private readonly anchorAccountPublicKey: string,
+    private readonly cosigners: Cosigner[],
+    /** Combined cosigner weight required to submit — matches the account's on-chain threshold. */
+    private readonly requiredWeight: number,
     private readonly fetchUnanchoredEntries: FetchUnanchoredEntries,
     private readonly persistAnchorResult: PersistAnchorResult,
     options: AnchoringServiceOptions = {},
   ) {
-    this.submitRetry = options.submitRetry ?? {};
+    // A short-of-threshold signature set will never be fixed by retrying
+    // against the same cosigners, so it's excluded from retry by default —
+    // unlike a Horizon network blip, retrying it would only waste attempts.
+    this.submitRetry = {
+      isRetryable: (error) => !(error instanceof InsufficientSignaturesError),
+      ...options.submitRetry,
+    };
     this.persistRetry = options.persistRetry ?? {};
+  }
+
+  /**
+   * Chains every submission-affecting call (runBatch, flushPendingPersists)
+   * onto a single promise queue, so two overlapping invocations — e.g. a
+   * scheduled tick that's still running when the next interval fires
+   * because Horizon was slow — never build and submit transactions
+   * concurrently. Concurrent submissions against the same account race on
+   * its sequence number (`tx_bad_seq`) and, worse, can each independently
+   * fetch the same "unanchored" entries before either has persisted a
+   * result, anchoring them twice under two different transactions. Once
+   * everything that submits to this account shares one `AnchoringService`
+   * instance (true after this process also serves any immediate-anchor
+   * path — see the anchoring-scheduler/internal-API process consolidation),
+   * this queue is what actually guarantees "one submission at a time" for
+   * the whole account, not just within a single call.
+   */
+  private serialQueue: Promise<unknown> = Promise.resolve();
+
+  private async serialize<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.serialQueue.then(fn, fn);
+    this.serialQueue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
   }
 
   /** Anchored batches still waiting to be persisted back to apps/api. */
@@ -54,25 +91,54 @@ export class AnchoringService {
   }
 
   /**
-   * Pulls all currently unanchored audit entry hashes, builds a Merkle tree
-   * over them, writes the root to Stellar via a single `manageData`
-   * operation (retried with backoff on transient failure), and persists
-   * the resulting tx hash + each entry's inclusion proof. Returns `null` if
-   * there was nothing to anchor.
+   * Pulls all currently unanchored audit entry hashes and anchors them as
+   * one routine batch. Returns `null` if there was nothing to anchor.
    *
-   * Always drains any previously-stuck persist-backs first, so a batch
-   * that anchored successfully but failed to persist doesn't get re-fetched
-   * and re-anchored a second time by this same call.
+   * Queued behind any other in-flight `runBatch`/`flushPendingPersists`
+   * call on this instance (see `serialize`), and always drains any
+   * previously-stuck persist-backs first — so a batch that anchored
+   * successfully but failed to persist doesn't get re-fetched and
+   * re-anchored a second time, whether by an overlapping call or by this
+   * same call's own retry.
    */
   async runBatch(): Promise<BatchAnchorResult | null> {
-    await this.flushPendingPersists();
+    return this.serialize(() => this.runBatchLocked());
+  }
+
+  private async runBatchLocked(): Promise<BatchAnchorResult | null> {
+    await this.flushPendingPersistsLocked();
 
     const unanchored = await this.fetchUnanchoredEntries();
     if (unanchored.length === 0) {
       return null;
     }
 
-    const tree = buildMerkleTree(unanchored.map((entry) => entry.sha256Hash));
+    return this.anchorEntries(unanchored, "batched");
+  }
+
+  /**
+   * Anchors exactly the given entries immediately, as a single-entry (or
+   * few-entry) transaction of their own — bypassing the routine batch
+   * queue entirely. Used for governance-critical actions that shouldn't
+   * sit in an un-anchored window until the next scheduled tick. `entries`
+   * must be non-empty.
+   */
+  async anchorImmediate(entries: UnanchoredEntry[]): Promise<BatchAnchorResult> {
+    if (entries.length === 0) {
+      throw new Error("anchorImmediate requires at least one entry");
+    }
+    return this.anchorEntries(entries, "immediate");
+  }
+
+  /**
+   * Builds a Merkle tree over `entries`, writes the root to Stellar via a
+   * single `manageData` operation (retried with backoff on transient
+   * failure), and persists the resulting tx hash + each entry's inclusion
+   * proof, tagged with `mode` so a verifier can tell an immediately-anchored
+   * critical action apart from one that waited for the routine batch.
+   */
+  private async anchorEntries(entries: UnanchoredEntry[], mode: AnchorMode): Promise<BatchAnchorResult> {
+    const tree = buildMerkleTree(entries.map((entry) => entry.sha256Hash));
     const response = await withRetry(() => this.submitMerkleRoot(tree.root), this.submitRetry);
     const anchoredAt = new Date().toISOString();
 
@@ -80,7 +146,8 @@ export class AnchoringService {
       merkleRoot: tree.root,
       stellarTxHash: response.hash,
       anchoredAt,
-      entries: unanchored.map((entry, index) => ({
+      mode,
+      entries: entries.map((entry, index) => ({
         auditId: entry.auditId,
         merkleProof: getMerkleProof(tree, index),
       })),
@@ -94,9 +161,14 @@ export class AnchoringService {
    * Retries persisting every currently-queued pending result. Results that
    * still fail stay queued for the next call. Safe to call on its own (e.g.
    * from a reconciliation pass) as well as automatically at the start of
-   * every `runBatch()`.
+   * every `runBatch()` — queued the same way, so it never runs concurrently
+   * with an in-flight batch.
    */
   async flushPendingPersists(): Promise<void> {
+    return this.serialize(() => this.flushPendingPersistsLocked());
+  }
+
+  private async flushPendingPersistsLocked(): Promise<void> {
     if (this.pendingPersists.length === 0) return;
 
     const stillPending: BatchAnchorResult[] = [];
@@ -121,7 +193,7 @@ export class AnchoringService {
   private async submitMerkleRoot(
     merkleRoot: string,
   ): Promise<Horizon.HorizonApi.SubmitTransactionResponse> {
-    const account = await this.client.loadAccount(this.keypair.publicKey());
+    const account = await this.client.loadAccount(this.anchorAccountPublicKey);
 
     const transaction = new TransactionBuilder(account, {
       fee: BASE_FEE,
@@ -136,7 +208,9 @@ export class AnchoringService {
       .setTimeout(30)
       .build();
 
-    transaction.sign(this.keypair);
+    // Fails fast, before ever touching Horizon, if the cosigners we have on
+    // hand don't add up to the account's required signing weight.
+    await collectSignatures(transaction, this.cosigners, this.requiredWeight);
 
     return this.client.raw().submitTransaction(transaction);
   }

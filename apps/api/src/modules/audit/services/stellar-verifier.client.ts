@@ -1,5 +1,10 @@
 import { serverConfig } from "@lumen/config";
-import type { AnchoringHealthReport, AuditExportBundle, AuditExportVerifyReport } from "@lumen/types";
+import type {
+  AnchoringHealthReport,
+  AuditExportBundle,
+  AuditExportVerifyReport,
+  BatchAnchorResult,
+} from "@lumen/types";
 
 /**
  * Fetches the Merkle root actually written on-chain for `txHash` from
@@ -110,4 +115,29 @@ export class AnchoringNotConfiguredError extends Error {
   constructor() {
     super("the running stellar-service process doesn't run the anchoring scheduler");
   }
+}
+
+export type ImmediateAnchorEntry = { auditId: string; sha256Hash: string; createdAt: string };
+
+/**
+ * Asks apps/stellar-service to anchor `entries` right now, as their own
+ * transaction, bypassing the routine batch queue — used for governance-
+ * critical actions (see `isCriticalAuditAction`) that shouldn't sit
+ * un-anchored until the next scheduled tick.
+ */
+export async function anchorEntriesImmediately(entries: ImmediateAnchorEntry[]): Promise<BatchAnchorResult> {
+  const res = await fetch(`${serverConfig.stellarServiceUrl}/internal/anchor-immediate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-internal-service-token": serverConfig.internalServiceToken,
+    },
+    body: JSON.stringify({ entries }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`[audit] failed to anchor entries immediately: ${res.status}`);
+  }
+
+  return (await res.json()) as BatchAnchorResult;
 }

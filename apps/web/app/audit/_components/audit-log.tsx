@@ -305,6 +305,16 @@ export function AuditLog() {
               ) : (
                 <>
                   <p>
+                    <strong>Anchored:</strong>{" "}
+                    {selectedVerify.anchorMode === "immediate" ? (
+                      <span className="anchorModeBadge anchorModeBadge--immediate">
+                        Immediately (critical action)
+                      </span>
+                    ) : (
+                      <span className="anchorModeBadge anchorModeBadge--batched">Routine batch</span>
+                    )}
+                  </p>
+                  <p>
                     <strong>Stellar transaction:</strong>{" "}
                     {selectedVerify.stellarTxHash ? (
                       <a
