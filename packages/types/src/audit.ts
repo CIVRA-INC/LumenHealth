@@ -13,6 +13,26 @@ export type AuditAction =
   | "auth.password_reset_completed"
   | "batch.anchored";
 
+/**
+ * Governance-critical actions that get anchored individually and
+ * immediately, rather than waiting for the next scheduled batch — a
+ * staff-role change or clinic archival should never sit in a window where
+ * it's provably un-anchored just because the batch interval hasn't elapsed.
+ */
+export const CRITICAL_AUDIT_ACTIONS: readonly AuditAction[] = ["staff.role_changed", "clinic.archived"];
+
+export function isCriticalAuditAction(action: AuditAction): boolean {
+  return CRITICAL_AUDIT_ACTIONS.includes(action);
+}
+
+/**
+ * `immediate`: anchored individually, right after the action occurred, via
+ * its own single-entry Stellar transaction — see `CRITICAL_AUDIT_ACTIONS`.
+ * `batched`: anchored as part of the routine scheduled batch, alongside
+ * whatever else was unanchored at the time.
+ */
+export type AnchorMode = "immediate" | "batched";
+
 /** One step of a Merkle inclusion proof: the sibling hash and which side it sits on. */
 export type MerkleProofStep = {
   hash: string;
@@ -50,12 +70,14 @@ export type AuditEntry = {
    * `merkleRoot`, without needing to re-anchor or re-fetch the whole batch.
    */
   merkleProof?: MerkleProofStep[];
+  /** How this entry was anchored — see `AnchorMode`. Absent until anchored. */
+  anchorMode?: AnchorMode;
 };
 
 /** Fields hashed to derive `AuditEntry.sha256Hash`. */
 export type HashableAuditEntry = Omit<
   AuditEntry,
-  "sha256Hash" | "stellarTxHash" | "merkleRoot" | "anchoredAt" | "merkleProof"
+  "sha256Hash" | "stellarTxHash" | "merkleRoot" | "anchoredAt" | "merkleProof" | "anchorMode"
 >;
 
 export type AuditQuery = {
@@ -76,6 +98,8 @@ export type BatchAnchorResult = {
   merkleRoot: string;
   stellarTxHash: string;
   anchoredAt: string;
+  /** "immediate" for a single-entry batch triggered by a critical action; "batched" for the routine scheduled run. */
+  mode: AnchorMode;
   entries: {
     auditId: string;
     merkleProof: MerkleProofStep[];
@@ -100,6 +124,8 @@ export type AuditVerifyResponse = {
   storedHash: string;
   merkleRoot?: string;
   stellarTxHash?: string;
+  /** How this entry was anchored — see `AnchorMode`. Absent when `status` is `unanchored`. */
+  anchorMode?: AnchorMode;
   checkedAt: string;
   reason?: string;
 };

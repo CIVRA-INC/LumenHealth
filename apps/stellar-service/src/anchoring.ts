@@ -1,6 +1,6 @@
 import { Operation, TransactionBuilder, BASE_FEE } from "@stellar/stellar-sdk";
 import type { Keypair, Horizon } from "@stellar/stellar-sdk";
-import type { BatchAnchorResult } from "@lumen/types";
+import type { AnchorMode, BatchAnchorResult } from "@lumen/types";
 import type { StellarClient } from "./client.js";
 import { buildMerkleTree, getMerkleProof } from "./merkle.js";
 import { withRetry, type RetryOptions } from "./retry.js";
@@ -54,11 +54,8 @@ export class AnchoringService {
   }
 
   /**
-   * Pulls all currently unanchored audit entry hashes, builds a Merkle tree
-   * over them, writes the root to Stellar via a single `manageData`
-   * operation (retried with backoff on transient failure), and persists
-   * the resulting tx hash + each entry's inclusion proof. Returns `null` if
-   * there was nothing to anchor.
+   * Pulls all currently unanchored audit entry hashes and anchors them as
+   * one routine batch. Returns `null` if there was nothing to anchor.
    *
    * Always drains any previously-stuck persist-backs first, so a batch
    * that anchored successfully but failed to persist doesn't get re-fetched
@@ -72,7 +69,32 @@ export class AnchoringService {
       return null;
     }
 
-    const tree = buildMerkleTree(unanchored.map((entry) => entry.sha256Hash));
+    return this.anchorEntries(unanchored, "batched");
+  }
+
+  /**
+   * Anchors exactly the given entries immediately, as a single-entry (or
+   * few-entry) transaction of their own — bypassing the routine batch
+   * queue entirely. Used for governance-critical actions that shouldn't
+   * sit in an un-anchored window until the next scheduled tick. `entries`
+   * must be non-empty.
+   */
+  async anchorImmediate(entries: UnanchoredEntry[]): Promise<BatchAnchorResult> {
+    if (entries.length === 0) {
+      throw new Error("anchorImmediate requires at least one entry");
+    }
+    return this.anchorEntries(entries, "immediate");
+  }
+
+  /**
+   * Builds a Merkle tree over `entries`, writes the root to Stellar via a
+   * single `manageData` operation (retried with backoff on transient
+   * failure), and persists the resulting tx hash + each entry's inclusion
+   * proof, tagged with `mode` so a verifier can tell an immediately-anchored
+   * critical action apart from one that waited for the routine batch.
+   */
+  private async anchorEntries(entries: UnanchoredEntry[], mode: AnchorMode): Promise<BatchAnchorResult> {
+    const tree = buildMerkleTree(entries.map((entry) => entry.sha256Hash));
     const response = await withRetry(() => this.submitMerkleRoot(tree.root), this.submitRetry);
     const anchoredAt = new Date().toISOString();
 
@@ -80,7 +102,8 @@ export class AnchoringService {
       merkleRoot: tree.root,
       stellarTxHash: response.hash,
       anchoredAt,
-      entries: unanchored.map((entry, index) => ({
+      mode,
+      entries: entries.map((entry, index) => ({
         auditId: entry.auditId,
         merkleProof: getMerkleProof(tree, index),
       })),

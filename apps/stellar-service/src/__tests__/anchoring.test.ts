@@ -226,3 +226,70 @@ describe("AnchoringService.runBatch", () => {
     expect(service.pendingPersistCount).toBe(0);
   });
 });
+
+describe("AnchoringService.anchorImmediate", () => {
+  it("tags the result mode as 'immediate' and never calls fetchUnanchoredEntries", async () => {
+    const submitTransaction = vi.fn(async (_tx: unknown) => ({ hash: "fake-tx-hash-immediate" }));
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+    const fetchUnanchored = vi.fn(async () => []);
+    const persist = vi.fn(async () => {});
+
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist);
+    const entry = { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" };
+
+    const result = await service.anchorImmediate([entry]);
+
+    expect(result.mode).toBe("immediate");
+    expect(result.stellarTxHash).toBe("fake-tx-hash-immediate");
+    expect(result.entries).toHaveLength(1);
+    expect(fetchUnanchored).not.toHaveBeenCalled();
+    expect(persist).toHaveBeenCalledWith(result);
+  });
+
+  it("throws without touching Stellar when given no entries", async () => {
+    const submitTransaction = vi.fn();
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+    const service = new AnchoringService(client, keypair, vi.fn(async () => []), vi.fn(async () => {}));
+
+    await expect(service.anchorImmediate([])).rejects.toThrow(/at least one entry/);
+    expect(submitTransaction).not.toHaveBeenCalled();
+  });
+
+  it("queues a failed persist the same way a batch anchor would", async () => {
+    const submitTransaction = vi.fn(async () => ({ hash: "fake-tx-hash-immediate" }));
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+    const persist = vi.fn(async () => {
+      throw new Error("apps/api unreachable");
+    });
+
+    const service = new AnchoringService(client, keypair, vi.fn(async () => []), persist, {
+      persistRetry: { maxAttempts: 1, sleep: vi.fn(async () => {}) },
+    });
+
+    const entry = { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" };
+    const result = await service.anchorImmediate([entry]);
+
+    expect(result.mode).toBe("immediate");
+    expect(service.pendingPersistCount).toBe(1);
+  });
+});
+
+describe("AnchoringService.runBatch — mode tagging", () => {
+  it("tags a routine batch result as 'batched'", async () => {
+    const submitTransaction = vi.fn(async (_tx: unknown) => ({ hash: "fake-tx-hash-batched" }));
+    const { client } = makeFakeClient(submitTransaction);
+    const keypair = Keypair.random();
+    const fetchUnanchored = vi.fn(async () => [
+      { auditId: "a-1", sha256Hash: sha256Hash({ auditId: "a-1" }), createdAt: "2026-01-01T00:00:00.000Z" },
+    ]);
+    const persist = vi.fn(async () => {});
+
+    const service = new AnchoringService(client, keypair, fetchUnanchored, persist);
+    const result = await service.runBatch();
+
+    expect(result?.mode).toBe("batched");
+  });
+});

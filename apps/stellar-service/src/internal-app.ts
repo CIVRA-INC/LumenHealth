@@ -1,11 +1,28 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { serverConfig } from "@lumen/config";
-import type { AuditExportBundle } from "@lumen/types";
+import type { AuditExportBundle, BatchAnchorResult } from "@lumen/types";
 import type { SignedPayload } from "./signing.js";
 import { verifyExportBundle } from "./verify-export.js";
+import type { UnanchoredEntry } from "./anchoring.js";
 
 export type GetMerkleRootForTx = (txHash: string) => Promise<string | null>;
 export type SignPayload = (payload: string) => SignedPayload;
+export type AnchorImmediate = (entries: UnanchoredEntry[]) => Promise<BatchAnchorResult>;
+
+function isPlausibleUnanchoredEntries(value: unknown): value is UnanchoredEntry[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (e) =>
+        e &&
+        typeof e === "object" &&
+        typeof (e as Partial<UnanchoredEntry>).auditId === "string" &&
+        typeof (e as Partial<UnanchoredEntry>).sha256Hash === "string" &&
+        typeof (e as Partial<UnanchoredEntry>).createdAt === "string",
+    )
+  );
+}
 
 /**
  * Minimal shape check for an uploaded export bundle — enough to reject
@@ -45,10 +62,41 @@ function requireInternalServiceToken(req: Request, res: Response, next: NextFunc
 export function createInternalApp(
   getMerkleRootForTx: GetMerkleRootForTx,
   signPayload: SignPayload,
+  /** Optional — omitted in contexts that don't run the anchoring service in-process. */
+  anchorImmediate?: AnchorImmediate,
 ): Express {
   const app = express();
   app.use(express.json());
   app.use(requireInternalServiceToken);
+
+  app.post("/internal/anchor-immediate", async (req: Request, res: Response) => {
+    if (!anchorImmediate) {
+      res.status(501).json({
+        error: "NOT_CONFIGURED",
+        message: "this process doesn't run the anchoring service",
+      });
+      return;
+    }
+
+    const { entries } = req.body as { entries?: unknown };
+    if (!isPlausibleUnanchoredEntries(entries)) {
+      res.status(400).json({
+        error: "INVALID_BODY",
+        message: "entries must be a non-empty array of {auditId, sha256Hash, createdAt}",
+      });
+      return;
+    }
+
+    try {
+      const result = await anchorImmediate(entries);
+      res.json(result);
+    } catch (error) {
+      res.status(502).json({
+        error: "HORIZON_ERROR",
+        message: error instanceof Error ? error.message : "failed to anchor entries immediately",
+      });
+    }
+  });
 
   app.get("/internal/tx/:txHash/merkle-root", async (req: Request, res: Response) => {
     try {
