@@ -1,5 +1,10 @@
 import { serverConfig } from "@lumen/config";
-import type { AuditExportBundle, AuditExportVerifyReport, BatchAnchorResult } from "@lumen/types";
+import type {
+  AnchoringHealthReport,
+  AuditExportBundle,
+  AuditExportVerifyReport,
+  BatchAnchorResult,
+} from "@lumen/types";
 
 /**
  * Fetches the Merkle root actually written on-chain for `txHash` from
@@ -84,6 +89,33 @@ export async function verifyExportBundleRemote(bundle: AuditExportBundle): Promi
 
 /** Distinguishes "the bundle itself is malformed" (400) from stellar-service being unreachable (502). */
 export class InvalidExportBundleError extends Error {}
+
+/**
+ * Fetches the anchoring pipeline's operational health from apps/stellar-service
+ * — whether the scheduled batch job is actually keeping up, not whether any
+ * particular audit entry is anchored. Throws `AnchoringNotConfiguredError`
+ * if the running stellar-service process doesn't run the scheduler.
+ */
+export async function fetchAnchoringHealth(): Promise<AnchoringHealthReport> {
+  const res = await fetch(`${serverConfig.stellarServiceUrl}/internal/anchoring/health`, {
+    headers: { "x-internal-service-token": serverConfig.internalServiceToken },
+  });
+
+  if (res.status === 501) {
+    throw new AnchoringNotConfiguredError();
+  }
+  if (!res.ok) {
+    throw new Error(`[audit] failed to fetch anchoring health: ${res.status}`);
+  }
+
+  return (await res.json()) as AnchoringHealthReport;
+}
+
+export class AnchoringNotConfiguredError extends Error {
+  constructor() {
+    super("the running stellar-service process doesn't run the anchoring scheduler");
+  }
+}
 
 export type ImmediateAnchorEntry = { auditId: string; sha256Hash: string; createdAt: string };
 

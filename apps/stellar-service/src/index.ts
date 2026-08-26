@@ -56,9 +56,9 @@ async function runDiagnostics() {
 
 /**
  * On-demand, one-shot batch anchor run, invoked via `npm run dev -- anchor`.
- * For continuous operation, use `npm run dev:scheduler` instead (see
- * `scheduler-main.ts`), which runs this same `AnchoringService` on an
- * interval with reconciliation rather than requiring a human to re-invoke it.
+ * For continuous operation, use `npm run dev:server` instead (see
+ * `server.ts`), which runs this same `AnchoringService` on an interval with
+ * reconciliation rather than requiring a human to re-invoke it.
  */
 async function runAnchorBatch() {
   const network = loadNetworkConfig();

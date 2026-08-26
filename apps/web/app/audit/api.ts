@@ -1,5 +1,5 @@
 import { getPublicRuntimeConfig } from "@lumen/config/public";
-import type { AuditAction, AuditEntry, AuditExportBundle, AuditVerifyResponse } from "@lumen/types";
+import type { AnchoringHealthReport, AuditAction, AuditEntry, AuditExportBundle, AuditVerifyResponse } from "@lumen/types";
 
 function headers(token: string): HeadersInit {
   return {
@@ -105,4 +105,25 @@ export async function exportAuditLog(
   }
 
   return (await res.json()) as AuditExportBundle;
+}
+
+/**
+ * Fetches the anchoring pipeline's operational health — whether the
+ * scheduled batch job is actually keeping up — as opposed to any single
+ * entry's verification status.
+ */
+export async function fetchAnchoringHealth(token: string): Promise<AnchoringHealthReport> {
+  const { apiBaseUrl } = getPublicRuntimeConfig();
+  const res = await fetch(`${apiBaseUrl}/api/v1/audit/anchoring-health`, {
+    headers: headers(token),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(
+      (body as { message?: string }).message ?? `Failed to fetch anchoring health (${res.status})`,
+    );
+  }
+
+  return (await res.json()) as AnchoringHealthReport;
 }

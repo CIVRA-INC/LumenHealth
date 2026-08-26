@@ -1,6 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { serverConfig } from "@lumen/config";
-import type { AuditExportBundle, BatchAnchorResult } from "@lumen/types";
+import type { AnchoringHealthReport, AuditExportBundle, BatchAnchorResult, SigningKeyRecord } from "@lumen/types";
 import type { SignedPayload } from "./signing.js";
 import { verifyExportBundle } from "./verify-export.js";
 import type { UnanchoredEntry } from "./anchoring.js";
@@ -8,6 +8,7 @@ import type { UnanchoredEntry } from "./anchoring.js";
 export type GetMerkleRootForTx = (txHash: string) => Promise<string | null>;
 export type SignPayload = (payload: string) => SignedPayload;
 export type AnchorImmediate = (entries: UnanchoredEntry[]) => Promise<BatchAnchorResult>;
+export type GetAnchoringHealth = () => Promise<AnchoringHealthReport>;
 
 function isPlausibleUnanchoredEntries(value: unknown): value is UnanchoredEntry[] {
   return (
@@ -62,8 +63,12 @@ function requireInternalServiceToken(req: Request, res: Response, next: NextFunc
 export function createInternalApp(
   getMerkleRootForTx: GetMerkleRootForTx,
   signPayload: SignPayload,
-  /** Optional — omitted in contexts that don't run the anchoring service in-process. */
+  /** Optional — omitted in contexts (e.g. some tests) that don't run the anchoring service in-process. */
   anchorImmediate?: AnchorImmediate,
+  /** Optional — omitted in contexts that don't run the anchoring scheduler in-process. */
+  getAnchoringHealth?: GetAnchoringHealth,
+  /** Server-controlled, not client-supplied — a caller-provided registry could just claim any key is authorized. */
+  signingKeyRegistry?: SigningKeyRecord[],
 ): Express {
   const app = express();
   app.use(express.json());
@@ -94,6 +99,26 @@ export function createInternalApp(
       res.status(502).json({
         error: "HORIZON_ERROR",
         message: error instanceof Error ? error.message : "failed to anchor entries immediately",
+      });
+    }
+  });
+
+  app.get("/internal/anchoring/health", async (_req: Request, res: Response) => {
+    if (!getAnchoringHealth) {
+      res.status(501).json({
+        error: "NOT_CONFIGURED",
+        message: "this process doesn't run the anchoring scheduler",
+      });
+      return;
+    }
+
+    try {
+      const health = await getAnchoringHealth();
+      res.json(health);
+    } catch (error) {
+      res.status(502).json({
+        error: "HEALTH_CHECK_FAILED",
+        message: error instanceof Error ? error.message : "failed to compute anchoring health",
       });
     }
   });

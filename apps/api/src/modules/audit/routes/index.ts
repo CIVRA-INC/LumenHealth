@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { resolveAuthContext } from "../../../shared/middleware/auth-context.js";
-import { exportAuditLog, list, verify, verifyExport } from "../controllers/audit.controller.js";
+import { anchoringHealth, exportAuditLog, list, verify, verifyExport } from "../controllers/audit.controller.js";
 
 const router = Router();
 
 router.get("/", resolveAuthContext, list);
 router.get("/export", resolveAuthContext, exportAuditLog);
+router.get("/anchoring-health", resolveAuthContext, anchoringHealth);
 router.get("/:auditId/verify", resolveAuthContext, verify);
 
 // Public, unauthenticated: re-verifying an export bundle needs no LumenHealth

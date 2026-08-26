@@ -516,6 +516,89 @@ a {
   font-weight: 600;
 }
 
+.healthPanel {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  margin-top: 16px;
+}
+
+.healthPanel h2 {
+  margin: 0;
+}
+
+.healthPanel--healthy {
+  border-color: var(--accent);
+}
+
+.healthPanel--degraded {
+  border-color: #b3261e;
+  border-width: 2px;
+  background: rgba(179, 38, 30, 0.06);
+}
+
+.healthPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.healthStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.healthStatusBadge--healthy {
+  background: rgba(0, 109, 119, 0.12);
+  color: var(--accent);
+}
+
+.healthStatusBadge--degraded {
+  background: #b3261e;
+  color: white;
+}
+
+.healthSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.healthSummary dt {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.healthSummary dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+.healthPanel button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
+  justify-self: start;
+}
+
 @media (max-width: 720px) {
   .hero,
   .panel,
