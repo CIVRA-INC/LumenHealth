@@ -1,10 +1,18 @@
-import { loadNetworkConfig, loadAnchorKeypair } from "./config.js";
+import { loadNetworkConfig, loadAnchorMultisigSetup } from "./config.js";
 import { StellarClient } from "./client.js";
 import { AnchoringService } from "./anchoring.js";
 import { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
 
-export { loadNetworkConfig, loadAnchorKeypair } from "./config.js";
-export type { StellarNetworkConfig } from "./config.js";
+export {
+  loadNetworkConfig,
+  loadAnchorAccountPublicKey,
+  loadAnchorCosignerKeypairs,
+  loadAnchorRequiredWeight,
+  loadAnchorMultisigSetup,
+  loadExportSigningKeypair,
+  loadSigningKeyRegistry,
+} from "./config.js";
+export type { StellarNetworkConfig, AnchorMultisigSetup } from "./config.js";
 export { StellarClient } from "./client.js";
 export { canonicalize, sha256Hash, hashAuditEntry } from "./hashing.js";
 export { buildMerkleTree, getMerkleProof, verifyMerkleProof } from "./merkle.js";
@@ -20,6 +28,8 @@ export { AnchoringScheduler } from "./scheduler.js";
 export type { AnchoringSchedulerOptions, StaleUnanchoredInfo } from "./scheduler.js";
 export { withRetry } from "./retry.js";
 export type { RetryOptions } from "./retry.js";
+export { collectSignatures, localCosigner, buildMultisigSetupOperations, InsufficientSignaturesError } from "./multisig.js";
+export type { Cosigner } from "./multisig.js";
 export { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
 export { createInternalApp } from "./internal-app.js";
 export type { GetMerkleRootForTx, SignPayload } from "./internal-app.js";
@@ -53,8 +63,15 @@ async function runDiagnostics() {
 async function runAnchorBatch() {
   const network = loadNetworkConfig();
   const client = new StellarClient(network);
-  const keypair = loadAnchorKeypair();
-  const service = new AnchoringService(client, keypair, fetchUnanchoredEntries, persistAnchorResult);
+  const { anchorAccountPublicKey, cosigners, requiredWeight } = loadAnchorMultisigSetup();
+  const service = new AnchoringService(
+    client,
+    anchorAccountPublicKey,
+    cosigners,
+    requiredWeight,
+    fetchUnanchoredEntries,
+    persistAnchorResult,
+  );
 
   const result = await service.runBatch();
   if (!result) {

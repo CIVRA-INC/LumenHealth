@@ -125,7 +125,7 @@ export function createInternalApp(
     }
 
     try {
-      const report = await verifyExportBundle(bundle, getMerkleRootForTx);
+      const report = await verifyExportBundle(bundle, getMerkleRootForTx, signingKeyRegistry);
       res.json(report);
     } catch (error) {
       res.status(502).json({

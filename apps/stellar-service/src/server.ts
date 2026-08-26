@@ -1,5 +1,5 @@
 import { serverConfig } from "@lumen/config";
-import { loadNetworkConfig, loadAnchorKeypair } from "./config.js";
+import { loadNetworkConfig, loadExportSigningKeypair, loadSigningKeyRegistry } from "./config.js";
 import { StellarClient } from "./client.js";
 import { AnchoringService, MERKLE_ROOT_DATA_NAME } from "./anchoring.js";
 import { fetchUnanchoredEntries, persistAnchorResult } from "./api-client.js";
@@ -8,7 +8,9 @@ import { signPayload } from "./signing.js";
 
 const network = loadNetworkConfig();
 const client = new StellarClient(network);
-const anchorKeypair = loadAnchorKeypair();
+// Deliberately not an anchor cosigner key — see loadExportSigningKeypair.
+const exportSigningKeypair = loadExportSigningKeypair();
+const signingKeyRegistry = loadSigningKeyRegistry();
 
 // Used only for anchorImmediate() here — the routine batch loop runs in its
 // own process (see scheduler-main.ts) with its own AnchoringService
