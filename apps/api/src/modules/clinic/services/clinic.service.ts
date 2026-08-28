@@ -57,6 +57,8 @@ export function updateClinic(
   clinicId: string,
   callerClinicId: string,
   patch: UpdateClinicRequest,
+  actorId: string,
+  actorRole: UserRole,
 ): Clinic | null {
   const clinic = getClinic(clinicId, callerClinicId);
   if (!clinic) return null;
@@ -70,7 +72,20 @@ export function updateClinic(
     updatedAt: new Date().toISOString(),
   };
 
-  return clinicStore.save(updated);
+  const saved = clinicStore.save(updated);
+
+  recordAudit({
+    clinicId: callerClinicId,
+    action: 'clinic.updated',
+    actorId,
+    actorRole,
+    targetId: clinicId,
+    targetType: 'clinic',
+    before: { name: clinic.name, address: clinic.address, phone: clinic.phone, email: clinic.email },
+    after: { name: saved.name, address: saved.address, phone: saved.phone, email: saved.email },
+  });
+
+  return saved;
 }
 
 export function archiveClinic(

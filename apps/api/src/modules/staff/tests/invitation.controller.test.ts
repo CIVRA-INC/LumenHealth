@@ -8,6 +8,7 @@ import { sessionStore } from "../../auth/repositories/session.repository.js";
 import { _resetAuthStateForTests } from "../../auth/controllers/auth.controller.js";
 import { buildTwoClinicFixture } from "../../auth/tests/fixtures.js";
 import { accessTokenSigner } from "../../auth/services/token.service.js";
+import { auditStore } from "../../audit/repositories/audit.repository.js";
 import type { UserRole } from "@lumen/types";
 
 function buildApp(): Express {
@@ -71,6 +72,16 @@ describe("POST /api/v1/staff/invitations — send", () => {
     expect(inv.status).toBe("pending");
     expect(inv.email).toBe(VALID_INVITE.email);
     expect(inv.token).toHaveLength(64); // 32 bytes hex
+  });
+
+  it("records a staff.invited audit entry (issue #1011)", async () => {
+    auditStore._reset();
+    const { a } = buildTwoClinicFixture();
+    await req(app, "POST", "/api/v1/staff/invitations", VALID_INVITE, a.token);
+
+    const events = auditStore.query({ clinicId: a.clinicId, action: "staff.invited" });
+    expect(events.total).toBe(1);
+    expect(events.entries[0]!.after).toMatchObject({ email: VALID_INVITE.email, role: VALID_INVITE.role });
   });
 
   it("returns 400 when email is invalid", async () => {

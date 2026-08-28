@@ -11,6 +11,7 @@ import { identityStore } from "../repositories/identity.repository.js";
 import { validatePassword, passwordResemblesIdentifier } from "../validators/password.validator.js";
 import { accountStatusError } from "../services/account-status.service.js";
 import { incrementMetric, getAuthMetricsSnapshot } from "../services/metrics.service.js";
+import { recordAudit } from "../../audit/services/audit.service.js";
 
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 const seenRefreshTokens = new Set<string>();
@@ -190,6 +191,16 @@ export function passwordResetRequest(req: Request, res: Response): void {
   const identity = identityStore.findByEmail(email);
   if (identity) {
     resetTokens.set(token, { userId: identity.userId, expiresAt: Date.now() + 15 * 60_000 });
+    // Only recorded when the email maps to a real account — recording for
+    // unknown emails too would let the audit log confirm which addresses exist.
+    recordAudit({
+      clinicId: identity.clinicId,
+      action: "auth.password_reset_requested",
+      actorId: identity.userId,
+      actorRole: identity.role,
+      targetId: identity.userId,
+      targetType: "staff",
+    });
   }
   authLogger.info("auth.recovery.requested", { meta: { tokenPreview: token.slice(0, 8) } });
   res.json({ ok: true });
@@ -213,6 +224,17 @@ export function passwordResetConfirm(req: Request, res: Response): void {
     return;
   }
   resetTokens.delete(token);
+  const identity = identityStore.findById(reset.userId);
+  if (identity) {
+    recordAudit({
+      clinicId: identity.clinicId,
+      action: "auth.password_reset_completed",
+      actorId: identity.userId,
+      actorRole: identity.role,
+      targetId: identity.userId,
+      targetType: "staff",
+    });
+  }
   authLogger.info("auth.recovery.completed", { userId: reset.userId });
   res.json({ ok: true });
 }
@@ -258,5 +280,12 @@ export function errorHandler(
   _next: import("express").NextFunction
 ): void {
   const normalized = normalizeAuthError(err);
-  res.status(authErrorStatus(normalized.error)).json(normalized);
+  if (normalized) {
+    res.status(authErrorStatus(normalized.error)).json(normalized);
+    return;
+  }
+  // Unexpected/unknown error: log the real error server-side only, and return a
+  // generic 500 so we don't leak internal exception text to the client (#1014).
+  console.error("[auth] unhandled error:", err);
+  res.status(500).json({ error: "INTERNAL_ERROR", message: "internal server error" });
 }

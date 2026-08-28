@@ -18,7 +18,7 @@ export function send(req: Request, res: Response): void {
   }
 
   const body = req.body as SendInvitationRequest;
-  const result = sendInvitation(body, req.auth!.clinicId, req.auth!.userId);
+  const result = sendInvitation(body, req.auth!.clinicId, req.auth!.userId, req.auth!.role);
 
   if ("error" in result) {
     const status = result.error === "INVITATION_ALREADY_PENDING" || result.error === "STAFF_ALREADY_EXISTS" ? 409 : 400;
@@ -70,7 +70,7 @@ export function revoke(req: Request, res: Response): void {
     return;
   }
 
-  const result = revokeInvitation(String(req.params.invitationId), req.auth!.clinicId);
+  const result = revokeInvitation(String(req.params.invitationId), req.auth!.clinicId, req.auth!.userId, req.auth!.role);
 
   if ("error" in result) {
     const status = result.error === "INVITATION_NOT_FOUND" ? 404 : 400;

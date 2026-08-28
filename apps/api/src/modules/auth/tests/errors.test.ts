@@ -14,10 +14,10 @@ describe("auth error normalization", () => {
     expect(normalizeAuthError(error)).toEqual(error);
   });
 
-  it("normalizes unknown errors into a safe auth error payload", () => {
-    expect(normalizeAuthError(new Error("boom"))).toEqual({
-      error: "AUTH_TOKEN_INVALID",
-      message: "boom",
-    });
+  it("returns null for unknown (non-auth) errors instead of leaking err.message", () => {
+    // The handler turns null into a generic 500 — see errorHandler in
+    // auth.controller.ts. Crucially, the raw "boom" message is never surfaced
+    // and the error is not mislabeled AUTH_TOKEN_INVALID (issue #1014).
+    expect(normalizeAuthError(new Error("boom"))).toBeNull();
   });
 });
