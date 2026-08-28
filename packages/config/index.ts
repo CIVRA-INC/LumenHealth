@@ -33,6 +33,15 @@ export const serverConfig = {
   // (e.g. to fetch the on-chain Merkle root for an anchored batch).
   stellarServiceUrl: read("STELLAR_SERVICE_URL", "http://localhost:4100"),
   stellarServicePort: Number(read("STELLAR_SERVICE_PORT", "4100")),
+  // Explicit CORS allowlist for the api (comma-separated). Defaults to the
+  // local web dev origin; set CORS_ALLOWED_ORIGINS in every real environment.
+  corsAllowedOrigins: read("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  // App-wide rate limiting (per client IP) applied to all routers.
+  rateLimitWindowMs: Number(read("RATE_LIMIT_WINDOW_MS", "60000")),
+  rateLimitMax: Number(read("RATE_LIMIT_MAX", "600")),
   // How often the persistent anchoring job runs a batch, in ms. Default: 1 minute.
   anchorIntervalMs: Number(read("ANCHOR_INTERVAL_MS", "60000")),
   // Reconciliation treats the unanchored queue as stuck once its oldest
