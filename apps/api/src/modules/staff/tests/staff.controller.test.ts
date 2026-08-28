@@ -96,6 +96,13 @@ describe("GET /api/v1/staff — list", () => {
     const { status } = await req(app, "GET", "/api/v1/staff", undefined, clinicianToken);
     expect(status).toBe(200);
   });
+
+  it("rejects a token claiming the reserved 'system' role with 401 (issue #1029)", async () => {
+    const { a } = buildTwoClinicFixture();
+    const systemToken = tokenWithRole(a.clinicId, "system");
+    const { status } = await req(app, "GET", "/api/v1/staff", undefined, systemToken);
+    expect(status).toBe(401);
+  });
 });
 
 describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
