@@ -5,9 +5,13 @@ const tokenIndex = new Map<string, string>(); // token → invitationId
 
 export const invitationStore = {
   save(inv: Invitation): Invitation {
-    store.set(inv.invitationId, inv);
-    tokenIndex.set(inv.token, inv.invitationId);
-    return inv;
+    // Normalize email case to match identityStore (which lowercases), so the
+    // duplicate-invite check in sendInvitation can't be bypassed by inviting
+    // User@X.com after user@x.com already has a pending invite (issue #1022).
+    const normalized: Invitation = { ...inv, email: inv.email.toLowerCase() };
+    store.set(normalized.invitationId, normalized);
+    tokenIndex.set(normalized.token, normalized.invitationId);
+    return normalized;
   },
 
   findById(invitationId: string): Invitation | undefined {
@@ -20,8 +24,9 @@ export const invitationStore = {
   },
 
   findByEmail(clinicId: string, email: string): Invitation | undefined {
+    const normalizedEmail = email.toLowerCase();
     return Array.from(store.values()).find(
-      (inv) => inv.clinicId === clinicId && inv.email === email
+      (inv) => inv.clinicId === clinicId && inv.email === normalizedEmail
     );
   },
 

@@ -168,6 +168,38 @@ describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
     expect((body as { field: string }).field).toBe("role");
   });
 
+  it("returns 403 when an admin tries to promote someone to admin (owner-only) (issue #1021)", async () => {
+    const { a } = buildTwoClinicFixture();
+    const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
+    const adminToken = tokenWithRole(a.clinicId, "admin");
+
+    const { status, body } = await req(
+      app,
+      "PATCH",
+      `/api/v1/staff/${member.staffId}/role`,
+      { role: "admin" },
+      adminToken,
+    );
+    expect(status).toBe(403);
+    expect((body as { error: string }).error).toBe("STAFF_ADMIN_CHANGE_OWNER_ONLY");
+  });
+
+  it("still lets an admin change a non-admin between non-admin roles (issue #1021)", async () => {
+    const { a } = buildTwoClinicFixture();
+    const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
+    const adminToken = tokenWithRole(a.clinicId, "admin");
+
+    const { status, body } = await req(
+      app,
+      "PATCH",
+      `/api/v1/staff/${member.staffId}/role`,
+      { role: "cashier" },
+      adminToken,
+    );
+    expect(status).toBe(200);
+    expect((body as { staff: { role: string } }).staff.role).toBe("cashier");
+  });
+
   it("returns 403 when a clinician tries to update a role", async () => {
     const { a } = buildTwoClinicFixture();
     const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
