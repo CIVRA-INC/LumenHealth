@@ -216,6 +216,26 @@ export async function verifyAuditEntry(
   };
 }
 
+/**
+ * Hard cap on how many entries a single compliance export may contain. A
+ * clinic with years of history could otherwise produce an unbounded JSON
+ * response (each entry carries full before/after payloads plus a Merkle
+ * proof). Callers that hit this should narrow their `from`/`to` range — see
+ * `AuditExportTooLargeError` and issue #1034.
+ */
+export const MAX_AUDIT_EXPORT_ENTRIES = 10_000;
+
+/** Thrown by `buildAuditExport` when a requested range exceeds `MAX_AUDIT_EXPORT_ENTRIES`. */
+export class AuditExportTooLargeError extends Error {
+  constructor(
+    readonly count: number,
+    readonly max: number,
+  ) {
+    super(`audit export range contains ${count} entries, exceeding the ${max}-entry limit; narrow the from/to range`);
+    this.name = "AuditExportTooLargeError";
+  }
+}
+
 function computeEntriesDigest(entries: AuditEntry[]): string {
   const sorted = entries
     .map((entry) => ({ auditId: entry.auditId, sha256Hash: entry.sha256Hash }))
@@ -238,8 +258,13 @@ export async function buildAuditExport(
   from?: string,
   to?: string,
   sign: (payload: string) => Promise<SignedPayload> = signExportManifest,
+  maxEntries: number = MAX_AUDIT_EXPORT_ENTRIES,
 ): Promise<AuditExportBundle> {
   const entries = auditStore.findAllInRange(clinicId, from, to);
+
+  if (entries.length > maxEntries) {
+    throw new AuditExportTooLargeError(entries.length, maxEntries);
+  }
 
   const manifest: AuditExportManifest = {
     clinicId,

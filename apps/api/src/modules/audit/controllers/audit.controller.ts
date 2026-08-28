@@ -1,6 +1,15 @@
 import type { Request, Response } from "express";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
-import { buildAuditExport, queryAuditLog, verifyAuditEntry } from "../services/audit.service.js";
+import { isAuditAction } from "@lumen/types";
+import { AuditExportTooLargeError, buildAuditExport, queryAuditLog, verifyAuditEntry } from "../services/audit.service.js";
+
+/** Returns the name of the first query param that arrived as a non-string (e.g. a repeated key parsed as an array), or undefined if all are single strings. */
+function firstNonStringParam(params: Record<string, unknown>): string | undefined {
+  for (const [name, value] of Object.entries(params)) {
+    if (value !== undefined && typeof value !== "string") return name;
+  }
+  return undefined;
+}
 import {
   AnchoringNotConfiguredError,
   InvalidExportBundleError,
@@ -17,6 +26,21 @@ export function list(req: Request, res: Response): void {
 
   const clinicId = req.auth!.clinicId;
   const { action, actorId, targetId, from, to, page, limit } = req.query;
+
+  // Query params arrive untyped from Express; a repeated key (?actorId=a&actorId=b)
+  // even arrives as an array. Validate before casting so a malformed request gets
+  // a clear 400 instead of silently matching nothing (or, for `action`, matching
+  // no stored entry and returning a confusing empty page).
+  const badParam = firstNonStringParam({ action, actorId, targetId, from, to });
+  if (badParam) {
+    res.status(400).json({ error: "INVALID_QUERY", message: `${badParam} must be a single string value` });
+    return;
+  }
+
+  if (action !== undefined && !isAuditAction(action)) {
+    res.status(400).json({ error: "INVALID_QUERY", message: "action is not a recognized audit action" });
+    return;
+  }
 
   const result = queryAuditLog({
     clinicId,
@@ -50,6 +74,10 @@ export async function exportAuditLog(req: Request, res: Response): Promise<void>
     );
     res.json(bundle);
   } catch (error) {
+    if (error instanceof AuditExportTooLargeError) {
+      res.status(413).json({ error: "EXPORT_TOO_LARGE", message: error.message });
+      return;
+    }
     res.status(502).json({
       error: "STELLAR_SERVICE_UNAVAILABLE",
       message: error instanceof Error ? error.message : "failed to reach stellar-service",

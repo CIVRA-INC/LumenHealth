@@ -10,7 +10,7 @@ import { sessionStore } from "../../auth/repositories/session.repository.js";
 import { _resetAuthStateForTests } from "../../auth/controllers/auth.controller.js";
 import { buildTwoClinicFixture } from "../../auth/tests/fixtures.js";
 import { accessTokenSigner } from "../../auth/services/token.service.js";
-import { recordAudit } from "../services/audit.service.js";
+import { recordAudit, buildAuditExport, AuditExportTooLargeError } from "../services/audit.service.js";
 
 vi.mock("../services/stellar-verifier.client.js", () => ({
   fetchAnchoredMerkleRoot: vi.fn(),
@@ -159,6 +159,17 @@ describe("GET /api/v1/audit/export", () => {
     const clinicianToken = tokenWithRole(a.clinicId, "clinician");
     const { status } = await req(app, "/api/v1/audit/export", clinicianToken);
     expect(status).toBe(403);
+  });
+
+  it("throws AuditExportTooLargeError when the range exceeds the entry cap", async () => {
+    const { a } = buildTwoClinicFixture();
+    recordAudit({ clinicId: a.clinicId, action: "staff.invited", actorId: "actor-1", actorRole: "owner" });
+    recordAudit({ clinicId: a.clinicId, action: "staff.invited", actorId: "actor-2", actorRole: "owner" });
+    recordAudit({ clinicId: a.clinicId, action: "staff.invited", actorId: "actor-3", actorRole: "owner" });
+
+    await expect(
+      buildAuditExport(a.clinicId, undefined, undefined, signExportManifest, 2),
+    ).rejects.toBeInstanceOf(AuditExportTooLargeError);
   });
 
   it("returns 401 with no token", async () => {
