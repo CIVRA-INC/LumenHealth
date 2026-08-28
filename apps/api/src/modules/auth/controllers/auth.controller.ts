@@ -200,6 +200,8 @@ export function passwordResetRequest(req: Request, res: Response): void {
       actorRole: identity.role,
       targetId: identity.userId,
       targetType: "staff",
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent"),
     });
   }
   authLogger.info("auth.recovery.requested", { meta: { tokenPreview: token.slice(0, 8) } });
@@ -233,6 +235,8 @@ export function passwordResetConfirm(req: Request, res: Response): void {
       actorRole: identity.role,
       targetId: identity.userId,
       targetType: "staff",
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent"),
     });
   }
   authLogger.info("auth.recovery.completed", { userId: reset.userId });
