@@ -1,3 +1,4 @@
+import { _reset as resetClinicSwitcher } from "./clinic-switcher";
 import type { AuthSession } from "@lumen/types";
 
 type Listener = () => void;
@@ -20,6 +21,7 @@ export function setSession(session: AuthSession): void {
 
 export function clearSession(): void {
   currentSession = null;
+  resetClinicSwitcher();
   notify();
 }
 
