@@ -32,6 +32,12 @@ export function isAuditAction(value: unknown): value is AuditAction {
  * immediately, rather than waiting for the next scheduled batch — a
  * staff-role change or clinic archival should never sit in a window where
  * it's provably un-anchored just because the batch interval hasn't elapsed.
+ *
+ * `batch.anchored` is intentionally excluded (issue #1025): treating the
+ * "a batch was anchored" meta-entry as critical would fire an extra immediate
+ * anchor per clinic on every batch. It instead rides along in the next routine
+ * batch, so it's provably immutable one cycle later — see the note on
+ * `applyBatchAnchorResult` in apps/api's audit.service.ts.
  */
 export const CRITICAL_AUDIT_ACTIONS: readonly AuditAction[] = ["staff.role_changed", "clinic.archived"];
 

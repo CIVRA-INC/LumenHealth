@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import type { StaffMember, UpdateStaffRoleRequest, UserRole } from "@lumen/types";
 import { staffStore } from "../repositories/staff.repository.js";
 import { recordAudit } from "../../audit/services/audit.service.js";
+import type { RequestAuditMeta } from "../../../shared/http/audit-meta.js";
 
 /** Roles a staff member may be assigned via updateStaffRole (owner/system are not reassignable here). */
 const ASSIGNABLE_STAFF_ROLES: readonly UserRole[] = ["admin", "clinician", "cashier"];
@@ -20,6 +21,7 @@ export function updateStaffRole(
   callerClinicId: string,
   callerUserId: string,
   callerRole: UserRole,
+  meta: RequestAuditMeta = {},
 ): StaffMember | { error: string; message: string } {
   // Defense-in-depth: the controller validates body.role, but any other caller
   // of this service must not be able to write an arbitrary string into the role
@@ -59,6 +61,8 @@ export function updateStaffRole(
     targetType: "staff",
     before: { role: previousRole },
     after: { role: saved.role },
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
   });
 
   return saved;

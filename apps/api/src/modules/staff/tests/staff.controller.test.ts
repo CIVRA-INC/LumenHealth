@@ -9,7 +9,7 @@ import { sessionStore } from "../../auth/repositories/session.repository.js";
 import { _resetAuthStateForTests } from "../../auth/controllers/auth.controller.js";
 import { buildTwoClinicFixture } from "../../auth/tests/fixtures.js";
 import { accessTokenSigner } from "../../auth/services/token.service.js";
-import { createStaffFromInvitation } from "../services/staff.service.js";
+import { createStaffFromInvitation, updateStaffRole } from "../services/staff.service.js";
 import { auditStore } from "../../audit/repositories/audit.repository.js";
 import type { UserRole } from "@lumen/types";
 
@@ -137,6 +137,20 @@ describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
     expect(event.targetId).toBe(member.staffId);
     expect(event.before).toEqual({ role: "clinician" });
     expect(event.after).toEqual({ role: "admin" });
+  });
+
+  it("populates ipAddress/userAgent on the audit entry from request meta (issue #1026)", () => {
+    const { a } = buildTwoClinicFixture();
+    const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
+
+    updateStaffRole(member.staffId, { role: "admin" }, a.clinicId, a.userId, "owner", {
+      ipAddress: "203.0.113.7",
+      userAgent: "vitest-agent/1.0",
+    });
+
+    const events = auditStore.query({ clinicId: a.clinicId, action: "staff.role_changed" });
+    expect(events.entries[0]!.ipAddress).toBe("203.0.113.7");
+    expect(events.entries[0]!.userAgent).toBe("vitest-agent/1.0");
   });
 
   it("returns 400 when role is 'owner'", async () => {
