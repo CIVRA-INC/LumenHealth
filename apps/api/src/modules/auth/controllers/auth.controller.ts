@@ -8,7 +8,7 @@ import { unauthorized } from "../../../shared/middleware/response-helpers.js";
 import { accessTokenSigner } from "../services/token.service.js";
 import { makeSession, sessionStore } from "../repositories/session.repository.js";
 import { identityStore } from "../repositories/identity.repository.js";
-import { validatePassword } from "../validators/password.validator.js";
+import { validatePassword, passwordResemblesIdentifier } from "../validators/password.validator.js";
 import { accountStatusError } from "../services/account-status.service.js";
 import { incrementMetric, getAuthMetricsSnapshot } from "../services/metrics.service.js";
 
@@ -44,6 +44,10 @@ export async function register(req: Request, res: Response): Promise<void> {
   const pwdErr = validatePassword(body.password);
   if (pwdErr) {
     res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: pwdErr });
+    return;
+  }
+  if (passwordResemblesIdentifier(body.password, [body.email.split("@")[0], body.clinicName])) {
+    res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: "password must not be derived from your email or clinic name" });
     return;
   }
   if (identityStore.findByEmail(body.email)) {

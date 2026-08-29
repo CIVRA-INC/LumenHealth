@@ -1,17 +1,31 @@
 import type { UserRole } from "./auth.js";
 
-export type AuditAction =
-  | "staff.invited"
-  | "staff.invitation_accepted"
-  | "staff.invitation_revoked"
-  | "staff.role_changed"
-  | "staff.deactivated"
-  | "staff.reactivated"
-  | "clinic.updated"
-  | "clinic.archived"
-  | "auth.password_reset_requested"
-  | "auth.password_reset_completed"
-  | "batch.anchored";
+/**
+ * Every valid audit action, as a runtime-inspectable tuple. `AuditAction` is
+ * derived from this so the type and the runtime list can never drift apart —
+ * callers validating untrusted input (e.g. an `?action=` query param) can use
+ * `isAuditAction` instead of an unchecked `as AuditAction` cast.
+ */
+export const AUDIT_ACTIONS = [
+  "staff.invited",
+  "staff.invitation_accepted",
+  "staff.invitation_revoked",
+  "staff.role_changed",
+  "staff.deactivated",
+  "staff.reactivated",
+  "clinic.updated",
+  "clinic.archived",
+  "auth.password_reset_requested",
+  "auth.password_reset_completed",
+  "batch.anchored",
+] as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+/** Runtime type guard: is `value` one of the known `AuditAction`s? */
+export function isAuditAction(value: unknown): value is AuditAction {
+  return typeof value === "string" && (AUDIT_ACTIONS as readonly string[]).includes(value);
+}
 
 /**
  * Governance-critical actions that get anchored individually and
