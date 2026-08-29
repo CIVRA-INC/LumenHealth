@@ -25,7 +25,7 @@ router.post("/password-reset/request", passwordResetRequest);
 router.post("/password-reset/confirm", passwordResetConfirm);
 router.post("/verify/request", verifyRequest);
 router.post("/verify/complete", verifyComplete);
-router.get("/metrics", metrics);
+router.get("/metrics", metrics, resolveAuthContext);
 router.get("/me", resolveAuthContext, me);
 router.get("/owner-only", resolveAuthContext, ownerOnly);
 
