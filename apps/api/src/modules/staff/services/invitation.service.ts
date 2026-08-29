@@ -4,6 +4,8 @@ import type { Invitation, SendInvitationRequest, UserRole } from '@lumen/types';
 import { invitationStore } from '../repositories/invitation.repository.js';
 import { identityStore } from '../../auth/repositories/identity.repository.js';
 import { authLogger } from '../../../shared/logger/index.js';
+import { validatePassword } from '../../auth/validators/password.validator.js';
+import { createStaffFromInvitation } from './staff.service.js';
 
 const EXPIRY_HOURS = 72;
 
@@ -83,6 +85,11 @@ export async function acceptInvitation(
     return { error: 'INVITATION_EXPIRED', message: 'invitation has expired' };
   }
 
+  const pwdErr = validatePassword(password);
+  if (pwdErr) {
+    authLogger.warn('auth.login.failure', { meta: { reason: pwdErr } });
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
   const userId = randomUUID();
 
@@ -95,6 +102,14 @@ export async function acceptInvitation(
     status: 'active',
     createdAt: new Date().toISOString(),
   });
+
+  createStaffFromInvitation(
+    invitation.email,
+    invitation.clinicId,
+    invitation.email,
+    _name,
+    invitation.role,
+  );
 
   invitationStore.save({
     ...invitation,
