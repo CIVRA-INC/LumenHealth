@@ -56,7 +56,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   identityStore.save({ userId, clinicId, email: body.email, passwordHash, role: "owner", status: "active", createdAt: new Date().toISOString() });
   const accessToken = accessTokenSigner.sign({ sub: userId, clinicId, role: "owner" });
   const refreshToken = randomUUID();
-  sessionStore.save(makeSession({ sessionId: accessToken, userId, clinicId, accessToken, refreshToken }));
+  sessionStore.save(makeSession({ sessionId: randomUUID(), userId, clinicId, accessToken, refreshToken }));
   const payload: RegisterResponse = { session: { userId, clinicId, role: "owner", accessToken } };
   res.status(201).json(payload);
 }
@@ -98,7 +98,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
   const accessToken = accessTokenSigner.sign({ sub: identity.userId, clinicId: identity.clinicId, role: identity.role });
   const refreshToken = randomUUID();
-  sessionStore.save(makeSession({ sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken }));
+  sessionStore.save(makeSession({ sessionId: randomUUID(), userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken }));
   seenRefreshTokens.add(refreshToken);
   incrementMetric("auth_login_success_total");
   authLogger.info("auth.login.success", { requestId, userId: identity.userId, clinicId: identity.clinicId });
