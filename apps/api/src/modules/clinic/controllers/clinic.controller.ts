@@ -51,7 +51,7 @@ export function update(req: Request, res: Response): void {
   }
 
   const patch = req.body as UpdateClinicRequest;
-  const clinic = updateClinic(String(req.params.clinicId), req.auth!.clinicId, patch);
+  const clinic = updateClinic(String(req.params.clinicId), req.auth!.clinicId, patch, req.auth!.userId, req.auth!.role);
   if (!clinic) {
     res.status(404).json({ error: "CLINIC_NOT_FOUND", message: "clinic not found" });
     return;

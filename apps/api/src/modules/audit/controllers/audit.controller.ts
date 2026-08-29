@@ -10,6 +10,20 @@ function firstNonStringParam(params: Record<string, unknown>): string | undefine
   }
   return undefined;
 }
+
+/**
+ * Parses an optional pagination param: `undefined` when absent, the number
+ * when it's a positive integer, or the literal `"invalid"` sentinel when it's
+ * present but not a positive integer (so the caller can 400 instead of letting
+ * a NaN through).
+ */
+function parsePositiveInt(value: unknown): number | undefined | "invalid" {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") return "invalid";
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) return "invalid";
+  return n;
+}
 import {
   AnchoringNotConfiguredError,
   InvalidExportBundleError,
@@ -42,6 +56,20 @@ export function list(req: Request, res: Response): void {
     return;
   }
 
+  // `?page=abc` would otherwise become NaN and slip past the repository's
+  // `?? 1`/`?? 50` fallbacks, silently yielding an empty/incorrect page instead
+  // of a clear 400 (see issue #1013).
+  const pageNum = parsePositiveInt(page);
+  if (pageNum === "invalid") {
+    res.status(400).json({ error: "INVALID_QUERY", message: "page must be a positive integer" });
+    return;
+  }
+  const limitNum = parsePositiveInt(limit);
+  if (limitNum === "invalid") {
+    res.status(400).json({ error: "INVALID_QUERY", message: "limit must be a positive integer" });
+    return;
+  }
+
   const result = queryAuditLog({
     clinicId,
     action: action as AuditAction | undefined,
@@ -49,8 +77,8 @@ export function list(req: Request, res: Response): void {
     targetId: targetId as string | undefined,
     from: from as string | undefined,
     to: to as string | undefined,
-    page: page ? Number(page) : undefined,
-    limit: limit ? Number(limit) : undefined,
+    page: pageNum,
+    limit: limitNum,
   });
 
   res.json(result);

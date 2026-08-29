@@ -4,6 +4,7 @@ import type { Invitation, SendInvitationRequest, UserRole } from '@lumen/types';
 import { invitationStore } from '../repositories/invitation.repository.js';
 import { identityStore } from '../../auth/repositories/identity.repository.js';
 import { authLogger } from '../../../shared/logger/index.js';
+import { recordAudit } from '../../audit/services/audit.service.js';
 
 const EXPIRY_HOURS = 72;
 
@@ -11,6 +12,7 @@ export function sendInvitation(
   body: SendInvitationRequest,
   clinicId: string,
   invitedBy: string,
+  invitedByRole: UserRole,
 ): { invitation: Invitation } | { error: string; message: string } {
   const existing = invitationStore.findByEmail(clinicId, body.email);
   if (existing?.status === 'pending') {
@@ -46,6 +48,16 @@ export function sendInvitation(
   };
 
   invitationStore.save(invitation);
+
+  recordAudit({
+    clinicId,
+    action: 'staff.invited',
+    actorId: invitedBy,
+    actorRole: invitedByRole,
+    targetId: invitation.invitationId,
+    targetType: 'invitation',
+    after: { email: invitation.email, role: invitation.role },
+  });
 
   authLogger.info('invitation.sent', {
     clinicId,
@@ -102,12 +114,26 @@ export async function acceptInvitation(
     acceptedAt: new Date().toISOString(),
   });
 
+  // The actor here is the invitee accepting on their own behalf — this path is
+  // unauthenticated (token-based), so the role comes from the invitation itself.
+  recordAudit({
+    clinicId: invitation.clinicId,
+    action: 'staff.invitation_accepted',
+    actorId: userId,
+    actorRole: invitation.role,
+    targetId: invitation.invitationId,
+    targetType: 'invitation',
+    after: { email: invitation.email, role: invitation.role },
+  });
+
   return { ok: true, userId };
 }
 
 export function revokeInvitation(
   invitationId: string,
   clinicId: string,
+  actorId: string,
+  actorRole: UserRole,
 ): { ok: true } | { error: string; message: string } {
   const invitation = invitationStore.findById(invitationId);
 
@@ -122,5 +148,17 @@ export function revokeInvitation(
   }
 
   invitationStore.save({ ...invitation, status: 'revoked' });
+
+  recordAudit({
+    clinicId,
+    action: 'staff.invitation_revoked',
+    actorId,
+    actorRole,
+    targetId: invitation.invitationId,
+    targetType: 'invitation',
+    before: { email: invitation.email, status: invitation.status },
+    after: { status: 'revoked' },
+  });
+
   return { ok: true };
 }

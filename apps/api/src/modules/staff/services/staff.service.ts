@@ -3,6 +3,13 @@ import type { StaffMember, UpdateStaffRoleRequest, UserRole } from "@lumen/types
 import { staffStore } from "../repositories/staff.repository.js";
 import { recordAudit } from "../../audit/services/audit.service.js";
 
+/** Roles a staff member may be assigned via updateStaffRole (owner/system are not reassignable here). */
+const ASSIGNABLE_STAFF_ROLES: readonly UserRole[] = ["admin", "clinician", "cashier"];
+
+function isAssignableStaffRole(role: unknown): role is UserRole {
+  return typeof role === "string" && (ASSIGNABLE_STAFF_ROLES as readonly string[]).includes(role);
+}
+
 export function listStaff(clinicId: string): StaffMember[] {
   return staffStore.listByClinic(clinicId);
 }
@@ -14,6 +21,13 @@ export function updateStaffRole(
   callerUserId: string,
   callerRole: UserRole,
 ): StaffMember | { error: string; message: string } {
+  // Defense-in-depth: the controller validates body.role, but any other caller
+  // of this service must not be able to write an arbitrary string into the role
+  // field (see issue #1012).
+  if (!isAssignableStaffRole(body.role)) {
+    return { error: "STAFF_INVALID_ROLE", message: "role must be one of: admin, clinician, cashier" };
+  }
+
   const member = staffStore.findById(staffId);
 
   if (!member || member.clinicId !== callerClinicId) {
@@ -27,7 +41,7 @@ export function updateStaffRole(
   const previousRole = member.role;
   const updated: StaffMember = {
     ...member,
-    role: body.role as UserRole,
+    role: body.role,
     updatedAt: new Date().toISOString(),
   };
 
