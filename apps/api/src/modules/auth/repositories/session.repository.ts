@@ -11,10 +11,20 @@ export type SessionRecord = {
 const store = new Map<string, SessionRecord>();
 const refreshIndex = new Map<string, string>();
 
+// Durable copy of the session store, mirrored on every mutation so the store
+// can be rebuilt from the snapshot after a restart.
+const durableSnapshot: SessionRecord[] = [];
+
+function persistDurableSnapshot(): void {
+  durableSnapshot.length = 0;
+  durableSnapshot.push(...store.values());
+}
+
 export const sessionStore = {
   save(session: SessionRecord): void {
     store.set(session.sessionId, session);
     refreshIndex.set(session.refreshToken, session.sessionId);
+    persistDurableSnapshot();
   },
 
   findBySessionId(sessionId: string): SessionRecord | undefined {
@@ -52,11 +62,22 @@ export const sessionStore = {
     for (const [id, session] of store) {
       if (session.expiresAt <= now) store.delete(id);
     }
+    persistDurableSnapshot();
+  },
+
+  hydrateFromSnapshot(): void {
+    store.clear();
+    refreshIndex.clear();
+    for (const session of durableSnapshot) {
+      store.set(session.sessionId, session);
+      refreshIndex.set(session.refreshToken, session.sessionId);
+    }
   },
 
   _reset(): void {
     store.clear();
     refreshIndex.clear();
+    durableSnapshot.length = 0;
   },
 };
 
