@@ -8,15 +8,34 @@ export type MerkleTree = {
   layers: string[][];
 };
 
-function hashPair(left: string, right: string): string {
-  return createHash("sha256").update(left).update(right).digest("hex");
+/**
+ * Domain-separation prefix for *internal* node hashes. Because an internal
+ * node is hashed as SHA-256(0x01 ‖ left ‖ right) while a leaf is a plain
+ * SHA-256 digest of audit content (no prefix), an internal node hash can never
+ * be reinterpreted as a leaf. This closes the CVE-2012-2459 class of
+ * second-preimage weakness that the old un-prefixed construction had (see
+ * issue #1019). Combined with promotion (below), it removes the ambiguity the
+ * attack relied on.
+ */
+const INTERNAL_NODE_PREFIX = Buffer.from([0x01]);
+
+function hashNode(left: string, right: string): string {
+  return createHash("sha256").update(INTERNAL_NODE_PREFIX).update(left).update(right).digest("hex");
 }
 
 /**
  * Builds a bottom-up Merkle tree over `leaves` (expected to already be
- * SHA-256 hex digests, e.g. `AuditEntry.sha256Hash`). An odd node at any
- * level is paired with itself (standard "duplicate last node" rule) so
- * every level has an even width.
+ * SHA-256 hex digests, e.g. `AuditEntry.sha256Hash`). Internal nodes are
+ * domain-separated (see {@link hashNode}), and an odd trailing node is
+ * *promoted* unchanged to the next level rather than duplicated against
+ * itself — the old "duplicate last node" rule is exactly the CVE-2012-2459
+ * weakness (an attacker could append a copy of the last leaf to forge an
+ * equivalent-looking root). Promotion makes an N-leaf tree and its
+ * duplicate-padded (N+1) variant produce different roots (issue #1019).
+ *
+ * Leaves are left un-prefixed so a single-leaf tree's root is the leaf itself
+ * (root == leaves[0]) and an empty proof verifies — the anchoring layer and
+ * its callers rely on that for single-entry immediate anchors.
  */
 export function buildMerkleTree(leaves: string[]): MerkleTree {
   if (leaves.length === 0) {
@@ -29,9 +48,12 @@ export function buildMerkleTree(leaves: string[]): MerkleTree {
   while (layer.length > 1) {
     const next: string[] = [];
     for (let i = 0; i < layer.length; i += 2) {
-      const left = layer[i]!;
-      const right = i + 1 < layer.length ? layer[i + 1]! : left;
-      next.push(hashPair(left, right));
+      if (i + 1 < layer.length) {
+        next.push(hashNode(layer[i]!, layer[i + 1]!));
+      } else {
+        // Odd node out: promote it unchanged instead of duplicating it.
+        next.push(layer[i]!);
+      }
     }
     layers.push(next);
     layer = next;
@@ -53,9 +75,13 @@ export function getMerkleProof(tree: MerkleTree, leafIndex: number): MerkleProof
     const currentLayer = tree.layers[level]!;
     const isRightNode = index % 2 === 1;
     const siblingIndex = isRightNode ? index - 1 : index + 1;
-    const sibling = siblingIndex < currentLayer.length ? currentLayer[siblingIndex]! : currentLayer[index]!;
 
-    proof.push({ hash: sibling, position: isRightNode ? "left" : "right" });
+    if (siblingIndex < currentLayer.length) {
+      proof.push({ hash: currentLayer[siblingIndex]!, position: isRightNode ? "left" : "right" });
+    }
+    // else: this node was promoted (no sibling at this level) — contributes no
+    // proof step, matching buildMerkleTree's promotion of odd trailing nodes.
+
     index = Math.floor(index / 2);
   }
 
@@ -66,7 +92,7 @@ export function getMerkleProof(tree: MerkleTree, leafIndex: number): MerkleProof
 export function verifyMerkleProof(leaf: string, proof: MerkleProofStep[], root: string): boolean {
   let computed = leaf;
   for (const step of proof) {
-    computed = step.position === "left" ? hashPair(step.hash, computed) : hashPair(computed, step.hash);
+    computed = step.position === "left" ? hashNode(step.hash, computed) : hashNode(computed, step.hash);
   }
   return computed === root;
 }

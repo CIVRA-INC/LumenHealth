@@ -40,6 +40,14 @@ export function updateStaffRole(
     return { error: "STAFF_CANNOT_SELF_UPDATE", message: "you cannot change your own role" };
   }
 
+  // Only the owner may promote someone to admin or change an existing admin's
+  // role. This prevents admin-to-admin privilege ping-pong where two colluding
+  // or compromised admins lock each other (and everyone else) out (issue #1021).
+  const adminInvolved = member.role === "admin" || body.role === "admin";
+  if (adminInvolved && callerRole !== "owner") {
+    return { error: "STAFF_ADMIN_CHANGE_OWNER_ONLY", message: "only the owner can change admin roles" };
+  }
+
   const previousRole = member.role;
   const updated: StaffMember = {
     ...member,

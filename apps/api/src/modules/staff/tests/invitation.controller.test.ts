@@ -74,6 +74,16 @@ describe("POST /api/v1/staff/invitations — send", () => {
     expect(inv.token).toHaveLength(64); // 32 bytes hex
   });
 
+  it("blocks a duplicate invite that differs only in email case (issue #1022)", async () => {
+    const { a } = buildTwoClinicFixture();
+    const first = await req(app, "POST", "/api/v1/staff/invitations", { email: "casey@clinic.test", role: "clinician" }, a.token);
+    expect(first.status).toBe(201);
+
+    const second = await req(app, "POST", "/api/v1/staff/invitations", { email: "Casey@Clinic.test", role: "clinician" }, a.token);
+    expect(second.status).toBe(409);
+    expect((second.body as { error: string }).error).toBe("INVITATION_ALREADY_PENDING");
+  });
+
   it("records a staff.invited audit entry (issue #1011)", async () => {
     auditStore._reset();
     const { a } = buildTwoClinicFixture();
