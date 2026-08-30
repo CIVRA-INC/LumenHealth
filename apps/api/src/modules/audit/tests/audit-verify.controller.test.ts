@@ -9,7 +9,7 @@ import { sessionStore } from "../../auth/repositories/session.repository.js";
 import { _resetAuthStateForTests } from "../../auth/controllers/auth.controller.js";
 import { buildTwoClinicFixture } from "../../auth/tests/fixtures.js";
 import { accessTokenSigner } from "../../auth/services/token.service.js";
-import { recordAudit, applyBatchAnchorResult } from "../services/audit.service.js";
+import { recordAudit, applyBatchAnchorResult, _resetAnchoredRootCache } from "../services/audit.service.js";
 
 vi.mock("../services/stellar-verifier.client.js", () => ({
   fetchAnchoredMerkleRoot: vi.fn(),
@@ -77,6 +77,7 @@ describe("GET /api/v1/audit/:auditId/verify", () => {
     identityStore._reset();
     sessionStore._reset();
     auditStore._reset();
+    _resetAnchoredRootCache();
     vi.mocked(fetchAnchoredMerkleRoot).mockReset();
   });
 
@@ -104,6 +105,30 @@ describe("GET /api/v1/audit/:auditId/verify", () => {
       storedHash: entry.sha256Hash,
       recomputedHash: entry.sha256Hash,
     });
+  });
+
+  it("caches the on-chain root lookup across repeated verifies of the same tx (issue #1024)", async () => {
+    const { a } = buildTwoClinicFixture();
+    const entry = recordAudit({
+      clinicId: a.clinicId,
+      action: "staff.role_changed",
+      actorId: "actor-1",
+      actorRole: "owner",
+      targetId: "staff-1",
+      targetType: "staff",
+      before: { role: "clinician" },
+      after: { role: "admin" },
+    });
+    anchorSingleEntry(entry.auditId, entry.sha256Hash);
+    vi.mocked(fetchAnchoredMerkleRoot).mockResolvedValue(entry.sha256Hash);
+
+    const first = await req(app, `/api/v1/audit/${entry.auditId}/verify`, a.token);
+    const second = await req(app, `/api/v1/audit/${entry.auditId}/verify`, a.token);
+
+    expect(first.body).toMatchObject({ status: "verified" });
+    expect(second.body).toMatchObject({ status: "verified" });
+    // Second verify hit the short-TTL cache instead of re-fetching the tx.
+    expect(fetchAnchoredMerkleRoot).toHaveBeenCalledTimes(1);
   });
 
   it("reports 'unanchored' for an entry not yet included in a batch", async () => {

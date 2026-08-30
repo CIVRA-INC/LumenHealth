@@ -70,6 +70,16 @@ describe("POST /api/v1/auth/register — validation failures", () => {
     expect(status).toBe(400);
     expect((body as { error: string }).error).toBe("AUTH_MISSING_CREDENTIALS");
   });
+
+  it("returns 400 when the password is trivially derived from the email local-part", async () => {
+    const { status, body } = await request(app, "POST", "/api/v1/auth/register", {
+      email: "clinicadmin@clinic.test",
+      password: "clinicadmin",
+      clinicName: "Test Clinic",
+    });
+    expect(status).toBe(400);
+    expect((body as { error: string }).error).toBe("AUTH_MISSING_CREDENTIALS");
+  });
 });
 
 describe("POST /api/v1/auth/login — validation failures", () => {

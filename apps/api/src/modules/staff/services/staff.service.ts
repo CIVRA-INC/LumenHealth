@@ -2,6 +2,14 @@ import { randomUUID } from "crypto";
 import type { StaffMember, UpdateStaffRoleRequest, UserRole } from "@lumen/types";
 import { staffStore } from "../repositories/staff.repository.js";
 import { recordAudit } from "../../audit/services/audit.service.js";
+import type { RequestAuditMeta } from "../../../shared/http/audit-meta.js";
+
+/** Roles a staff member may be assigned via updateStaffRole (owner/system are not reassignable here). */
+const ASSIGNABLE_STAFF_ROLES: readonly UserRole[] = ["admin", "clinician", "cashier"];
+
+function isAssignableStaffRole(role: unknown): role is UserRole {
+  return typeof role === "string" && (ASSIGNABLE_STAFF_ROLES as readonly string[]).includes(role);
+}
 
 export function listStaff(clinicId: string): StaffMember[] {
   return staffStore.listByClinic(clinicId);
@@ -13,7 +21,15 @@ export function updateStaffRole(
   callerClinicId: string,
   callerUserId: string,
   callerRole: UserRole,
+  meta: RequestAuditMeta = {},
 ): StaffMember | { error: string; message: string } {
+  // Defense-in-depth: the controller validates body.role, but any other caller
+  // of this service must not be able to write an arbitrary string into the role
+  // field (see issue #1012).
+  if (!isAssignableStaffRole(body.role)) {
+    return { error: "STAFF_INVALID_ROLE", message: "role must be one of: admin, clinician, cashier" };
+  }
+
   const member = staffStore.findById(staffId);
 
   if (!member || member.clinicId !== callerClinicId) {
@@ -24,10 +40,18 @@ export function updateStaffRole(
     return { error: "STAFF_CANNOT_SELF_UPDATE", message: "you cannot change your own role" };
   }
 
+  // Only the owner may promote someone to admin or change an existing admin's
+  // role. This prevents admin-to-admin privilege ping-pong where two colluding
+  // or compromised admins lock each other (and everyone else) out (issue #1021).
+  const adminInvolved = member.role === "admin" || body.role === "admin";
+  if (adminInvolved && callerRole !== "owner") {
+    return { error: "STAFF_ADMIN_CHANGE_OWNER_ONLY", message: "only the owner can change admin roles" };
+  }
+
   const previousRole = member.role;
   const updated: StaffMember = {
     ...member,
-    role: body.role as UserRole,
+    role: body.role,
     updatedAt: new Date().toISOString(),
   };
 
@@ -45,6 +69,8 @@ export function updateStaffRole(
     targetType: "staff",
     before: { role: previousRole },
     after: { role: saved.role },
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
   });
 
   return saved;

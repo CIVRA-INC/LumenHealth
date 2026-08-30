@@ -1,23 +1,43 @@
 import type { UserRole } from "./auth.js";
 
-export type AuditAction =
-  | "staff.invited"
-  | "staff.invitation_accepted"
-  | "staff.invitation_revoked"
-  | "staff.role_changed"
-  | "staff.deactivated"
-  | "staff.reactivated"
-  | "clinic.updated"
-  | "clinic.archived"
-  | "auth.password_reset_requested"
-  | "auth.password_reset_completed"
-  | "batch.anchored";
+/**
+ * Every valid audit action, as a runtime-inspectable tuple. `AuditAction` is
+ * derived from this so the type and the runtime list can never drift apart —
+ * callers validating untrusted input (e.g. an `?action=` query param) can use
+ * `isAuditAction` instead of an unchecked `as AuditAction` cast.
+ */
+export const AUDIT_ACTIONS = [
+  "staff.invited",
+  "staff.invitation_accepted",
+  "staff.invitation_revoked",
+  "staff.role_changed",
+  "staff.deactivated",
+  "staff.reactivated",
+  "clinic.updated",
+  "clinic.archived",
+  "auth.password_reset_requested",
+  "auth.password_reset_completed",
+  "batch.anchored",
+] as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+/** Runtime type guard: is `value` one of the known `AuditAction`s? */
+export function isAuditAction(value: unknown): value is AuditAction {
+  return typeof value === "string" && (AUDIT_ACTIONS as readonly string[]).includes(value);
+}
 
 /**
  * Governance-critical actions that get anchored individually and
  * immediately, rather than waiting for the next scheduled batch — a
  * staff-role change or clinic archival should never sit in a window where
  * it's provably un-anchored just because the batch interval hasn't elapsed.
+ *
+ * `batch.anchored` is intentionally excluded (issue #1025): treating the
+ * "a batch was anchored" meta-entry as critical would fire an extra immediate
+ * anchor per clinic on every batch. It instead rides along in the next routine
+ * batch, so it's provably immutable one cycle later — see the note on
+ * `applyBatchAnchorResult` in apps/api's audit.service.ts.
  */
 export const CRITICAL_AUDIT_ACTIONS: readonly AuditAction[] = ["staff.role_changed", "clinic.archived"];
 

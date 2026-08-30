@@ -4,8 +4,8 @@ import type { Invitation, SendInvitationRequest, UserRole } from '@lumen/types';
 import { invitationStore } from '../repositories/invitation.repository.js';
 import { identityStore } from '../../auth/repositories/identity.repository.js';
 import { authLogger } from '../../../shared/logger/index.js';
-import { validatePassword } from '../../auth/validators/password.validator.js';
-import { createStaffFromInvitation } from './staff.service.js';
+simport { recordAudit } from '../../audit/services/audit.service.js';
+import type { RequestAuditMeta } from '../../../shared/http/audit-meta.js';
 
 const EXPIRY_HOURS = 72;
 
@@ -13,6 +13,8 @@ export function sendInvitation(
   body: SendInvitationRequest,
   clinicId: string,
   invitedBy: string,
+  invitedByRole: UserRole,
+  meta: RequestAuditMeta = {},
 ): { invitation: Invitation } | { error: string; message: string } {
   const existing = invitationStore.findByEmail(clinicId, body.email);
   if (existing?.status === 'pending') {
@@ -49,6 +51,18 @@ export function sendInvitation(
 
   invitationStore.save(invitation);
 
+  recordAudit({
+    clinicId,
+    action: 'staff.invited',
+    actorId: invitedBy,
+    actorRole: invitedByRole,
+    targetId: invitation.invitationId,
+    targetType: 'invitation',
+    after: { email: invitation.email, role: invitation.role },
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
+  });
+
   authLogger.info('invitation.sent', {
     clinicId,
     requestId: invitation.invitationId,
@@ -62,6 +76,7 @@ export async function acceptInvitation(
   token: string,
   password: string,
   _name: string,
+  meta: RequestAuditMeta = {},
 ): Promise<{ ok: true; userId: string } | { error: string; message: string }> {
   const invitation = invitationStore.findByToken(token);
 
@@ -117,12 +132,29 @@ export async function acceptInvitation(
     acceptedAt: new Date().toISOString(),
   });
 
+  // The actor here is the invitee accepting on their own behalf — this path is
+  // unauthenticated (token-based), so the role comes from the invitation itself.
+  recordAudit({
+    clinicId: invitation.clinicId,
+    action: 'staff.invitation_accepted',
+    actorId: userId,
+    actorRole: invitation.role,
+    targetId: invitation.invitationId,
+    targetType: 'invitation',
+    after: { email: invitation.email, role: invitation.role },
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
+  });
+
   return { ok: true, userId };
 }
 
 export function revokeInvitation(
   invitationId: string,
   clinicId: string,
+  actorId: string,
+  actorRole: UserRole,
+  meta: RequestAuditMeta = {},
 ): { ok: true } | { error: string; message: string } {
   const invitation = invitationStore.findById(invitationId);
 
@@ -137,5 +169,19 @@ export function revokeInvitation(
   }
 
   invitationStore.save({ ...invitation, status: 'revoked' });
+
+  recordAudit({
+    clinicId,
+    action: 'staff.invitation_revoked',
+    actorId,
+    actorRole,
+    targetId: invitation.invitationId,
+    targetType: 'invitation',
+    before: { email: invitation.email, status: invitation.status },
+    after: { status: 'revoked' },
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
+  });
+
   return { ok: true };
 }

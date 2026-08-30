@@ -163,4 +163,30 @@ describe("internal audit routes", () => {
     });
     expect(status).toBe(400);
   });
+
+  it("paginates the unanchored listing and reports a total (issue #1028)", async () => {
+    for (let i = 0; i < 5; i++) {
+      recordAudit({ clinicId: "c-1", action: "staff.invited", actorId: `actor-${i}`, actorRole: "owner" });
+    }
+
+    const { status, body } = await req(app, "GET", "/internal/audit/unanchored?page=1&limit=2", {
+      token: serverConfig.internalServiceToken,
+    });
+
+    expect(status).toBe(200);
+    const result = body as { entries: unknown[]; total: number; page: number; limit: number };
+    expect(result.entries).toHaveLength(2);
+    expect(result.total).toBe(5);
+    expect(result.limit).toBe(2);
+  });
+
+  it("rejects an anchor result carrying too many entries (issue #1028)", async () => {
+    const entries = Array.from({ length: 2001 }, (_, i) => ({ auditId: `a-${i}`, merkleProof: [] }));
+    const { status, body } = await req(app, "POST", "/internal/audit/anchor-result", {
+      token: serverConfig.internalServiceToken,
+      body: { merkleRoot: "r", stellarTxHash: "t", anchoredAt: new Date().toISOString(), mode: "batched", entries },
+    });
+    expect(status).toBe(413);
+    expect((body as { error: string }).error).toBe("PAYLOAD_TOO_LARGE");
+  });
 });

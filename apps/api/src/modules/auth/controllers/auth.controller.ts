@@ -8,9 +8,10 @@ import { unauthorized } from "../../../shared/middleware/response-helpers.js";
 import { accessTokenSigner } from "../services/token.service.js";
 import { makeSession, sessionStore } from "../repositories/session.repository.js";
 import { identityStore } from "../repositories/identity.repository.js";
-import { validatePassword } from "../validators/password.validator.js";
+import { validatePassword, passwordResemblesIdentifier } from "../validators/password.validator.js";
 import { accountStatusError } from "../services/account-status.service.js";
 import { incrementMetric, getAuthMetricsSnapshot } from "../services/metrics.service.js";
+import { recordAudit } from "../../audit/services/audit.service.js";
 
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 const seenRefreshTokens = new Set<string>();
@@ -46,6 +47,10 @@ export async function register(req: Request, res: Response): Promise<void> {
     res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: pwdErr });
     return;
   }
+  if (passwordResemblesIdentifier(body.password, [body.email.split("@")[0], body.clinicName])) {
+    res.status(400).json({ error: "AUTH_MISSING_CREDENTIALS", message: "password must not be derived from your email or clinic name" });
+    return;
+  }
   if (identityStore.findByEmail(body.email)) {
     res.status(authErrorStatus("AUTH_EMAIL_TAKEN")).json({ error: "AUTH_EMAIL_TAKEN", message: "an account with that email already exists" });
     return;
@@ -57,6 +62,19 @@ export async function register(req: Request, res: Response): Promise<void> {
   const accessToken = accessTokenSigner.sign({ sub: userId, clinicId, role: "owner" });
   const refreshToken = randomUUID();
   sessionStore.save(makeSession({ sessionId: accessToken, userId, clinicId, accessToken, refreshToken }));
+
+  // Email verification is intentionally *deferred* here (issue #1030): the
+  // account is created active and a session is issued immediately so the owner
+  // can start onboarding their clinic, rather than being blocked behind an email
+  // round-trip. We still kick off the verification flow now — issuing and
+  // storing a verification token — so verification is actually initiated at
+  // signup instead of relying on the separate verifyRequest endpoint being
+  // called manually. Gating sensitive actions on verified status is tracked
+  // separately (see #987, which must persist the verified flag first).
+  const verificationToken = randomUUID();
+  verifyTokens.set(verificationToken, { userId, email: body.email, expiresAt: Date.now() + 24 * 60 * 60_000 });
+  console.info(`[auth] email verification initiated for new registration ${userId} (token ${verificationToken.slice(0, 8)}…)`);
+
   const payload: RegisterResponse = { session: { userId, clinicId, role: "owner", accessToken } };
   res.status(201).json(payload);
 }
@@ -186,6 +204,18 @@ export function passwordResetRequest(req: Request, res: Response): void {
   const identity = identityStore.findByEmail(email);
   if (identity) {
     resetTokens.set(token, { userId: identity.userId, expiresAt: Date.now() + 15 * 60_000 });
+    // Only recorded when the email maps to a real account — recording for
+    // unknown emails too would let the audit log confirm which addresses exist.
+    recordAudit({
+      clinicId: identity.clinicId,
+      action: "auth.password_reset_requested",
+      actorId: identity.userId,
+      actorRole: identity.role,
+      targetId: identity.userId,
+      targetType: "staff",
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent"),
+    });
   }
   authLogger.info("auth.recovery.requested", { meta: { tokenPreview: token.slice(0, 8) } });
   res.json({ ok: true });
@@ -209,6 +239,19 @@ export function passwordResetConfirm(req: Request, res: Response): void {
     return;
   }
   resetTokens.delete(token);
+  const identity = identityStore.findById(reset.userId);
+  if (identity) {
+    recordAudit({
+      clinicId: identity.clinicId,
+      action: "auth.password_reset_completed",
+      actorId: identity.userId,
+      actorRole: identity.role,
+      targetId: identity.userId,
+      targetType: "staff",
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent"),
+    });
+  }
   authLogger.info("auth.recovery.completed", { userId: reset.userId });
   res.json({ ok: true });
 }
@@ -254,5 +297,12 @@ export function errorHandler(
   _next: import("express").NextFunction
 ): void {
   const normalized = normalizeAuthError(err);
-  res.status(authErrorStatus(normalized.error)).json(normalized);
+  if (normalized) {
+    res.status(authErrorStatus(normalized.error)).json(normalized);
+    return;
+  }
+  // Unexpected/unknown error: log the real error server-side only, and return a
+  // generic 500 so we don't leak internal exception text to the client (#1014).
+  console.error("[auth] unhandled error:", err);
+  res.status(500).json({ error: "INTERNAL_ERROR", message: "internal server error" });
 }
