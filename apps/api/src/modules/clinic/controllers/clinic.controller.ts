@@ -21,6 +21,11 @@ export function create(req: Request, res: Response): void {
   }
 
   const body = req.body as CreateClinicRequest;
+  const role = req.auth!.role;
+  if (role !== "owner" && role !== "clinician" && role !== "admin") {
+    res.status(403).json({ error: "AUTH_FORBIDDEN", message: "insufficient role" });
+    return;
+  }
   const clinic = createClinic(body, req.auth!.userId, req.auth!.clinicId);
   res.status(201).json({ clinic });
 }

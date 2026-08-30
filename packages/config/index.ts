@@ -51,6 +51,12 @@ export const serverConfig = {
   public: getPublicRuntimeConfig(),
 };
 
+// Fail loudly if the shared internal token is left at its well-known dev
+// default outside of local development.
+if (process.env.NODE_ENV === "production" && serverConfig.internalServiceToken === "dev-internal-token") {
+  throw new Error("[config] INTERNAL_SERVICE_TOKEN must be set outside of development");
+}
+
 // Auth-specific config — Closes #441
 export const authConfig = {
   jwtSecret: read("JWT_SECRET"),
