@@ -1,10 +1,40 @@
 import type { AuditEntry, AuditQuery, BatchAnchorResult } from "@lumen/types";
 
 const store = new Map<string, AuditEntry>();
+const clinicIndex = new Map<string, Set<string>>();
+const actionIndex = new Map<string, Set<string>>();
+
+const snapshotBuffer: string[] = [];
 
 function save(entry: AuditEntry): AuditEntry {
   store.set(entry.auditId, entry);
+
+  const clinicIds = clinicIndex.get(entry.clinicId) ?? new Set<string>();
+  clinicIds.add(entry.auditId);
+  clinicIndex.set(entry.clinicId, clinicIds);
+
+  const actionIds = actionIndex.get(entry.action) ?? new Set<string>();
+  actionIds.add(entry.auditId);
+  actionIndex.set(entry.action, actionIds);
+
   return entry;
+}
+
+/** Serializes the in-memory trail to the snapshot buffer for durability. */
+function persistSnapshot(): void {
+  snapshotBuffer.length = 0;
+  for (const entry of store.values()) {
+    snapshotBuffer.push(JSON.stringify(entry));
+  }
+}
+
+/** Replays the most recent snapshot back into the store. */
+function restoreSnapshot(): void {
+  store.clear();
+  for (const line of snapshotBuffer) {
+    const entry = JSON.parse(line) as AuditEntry;
+    store.set(entry.auditId, entry);
+  }
 }
 
 function findById(auditId: string): AuditEntry | undefined {
@@ -86,6 +116,9 @@ function query(q: AuditQuery): { entries: AuditEntry[]; total: number } {
 
 function _reset(): void {
   store.clear();
+  clinicIndex.clear();
+  actionIndex.clear();
+  snapshotBuffer.length = 0;
 }
 
 export const auditStore = {
@@ -95,5 +128,7 @@ export const auditStore = {
   findAllInRange,
   applyAnchorResult,
   query,
+  persistSnapshot,
+  restoreSnapshot,
   _reset,
 };

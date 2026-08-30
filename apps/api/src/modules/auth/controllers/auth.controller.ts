@@ -116,7 +116,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
   const accessToken = accessTokenSigner.sign({ sub: identity.userId, clinicId: identity.clinicId, role: identity.role });
   const refreshToken = randomUUID();
-  sessionStore.save(makeSession({ sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken }));
+  sessionStore.save(makeSession({ sessionId: randomUUID(), userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken }));
   seenRefreshTokens.add(refreshToken);
   incrementMetric("auth_login_success_total");
   authLogger.info("auth.login.success", { requestId, userId: identity.userId, clinicId: identity.clinicId });
