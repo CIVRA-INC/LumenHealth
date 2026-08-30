@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { canonicalize, sha256Hash, hashAuditEntry } from "../hashing.js";
+import {
+  canonicalize,
+  sha256Hash,
+  hashAuditEntry,
+  CanonicalizeLimitError,
+  CANONICALIZE_MAX_DEPTH,
+  CANONICALIZE_MAX_NODES,
+} from "../hashing.js";
 import type { HashableAuditEntry } from "../audit.js";
 
 describe("canonicalize", () => {
@@ -37,6 +44,23 @@ describe("canonicalize", () => {
     const a = { x: 1 };
     const b = { x: 2 };
     expect(canonicalize(a)).not.toBe(canonicalize(b));
+  });
+
+  it("rejects input nested deeper than the depth limit (issue #1027)", () => {
+    let deep: Record<string, unknown> = { leaf: 1 };
+    for (let i = 0; i < CANONICALIZE_MAX_DEPTH + 5; i++) {
+      deep = { nested: deep };
+    }
+    expect(() => canonicalize(deep)).toThrow(CanonicalizeLimitError);
+  });
+
+  it("rejects input with more nodes than the size limit (issue #1027)", () => {
+    const huge = Array.from({ length: CANONICALIZE_MAX_NODES + 10 }, (_, i) => i);
+    expect(() => canonicalize(huge)).toThrow(CanonicalizeLimitError);
+  });
+
+  it("still canonicalizes normal, bounded audit payloads", () => {
+    expect(() => canonicalize({ before: { role: "clinician" }, after: { role: "admin" } })).not.toThrow();
   });
 });
 

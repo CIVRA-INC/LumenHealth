@@ -62,6 +62,19 @@ export async function register(req: Request, res: Response): Promise<void> {
   const accessToken = accessTokenSigner.sign({ sub: userId, clinicId, role: "owner" });
   const refreshToken = randomUUID();
   sessionStore.save(makeSession({ sessionId: accessToken, userId, clinicId, accessToken, refreshToken }));
+
+  // Email verification is intentionally *deferred* here (issue #1030): the
+  // account is created active and a session is issued immediately so the owner
+  // can start onboarding their clinic, rather than being blocked behind an email
+  // round-trip. We still kick off the verification flow now — issuing and
+  // storing a verification token — so verification is actually initiated at
+  // signup instead of relying on the separate verifyRequest endpoint being
+  // called manually. Gating sensitive actions on verified status is tracked
+  // separately (see #987, which must persist the verified flag first).
+  const verificationToken = randomUUID();
+  verifyTokens.set(verificationToken, { userId, email: body.email, expiresAt: Date.now() + 24 * 60 * 60_000 });
+  console.info(`[auth] email verification initiated for new registration ${userId} (token ${verificationToken.slice(0, 8)}…)`);
+
   const payload: RegisterResponse = { session: { userId, clinicId, role: "owner", accessToken } };
   res.status(201).json(payload);
 }
