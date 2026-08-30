@@ -35,10 +35,30 @@ describe("buildMerkleTree", () => {
     expect(buildMerkleTree(l).root).not.toBe(buildMerkleTree(reordered).root);
   });
 
-  it("handles odd leaf counts via duplicate-last-node", () => {
+  it("promotes an odd trailing node (root is still a 64-hex digest)", () => {
     const l = leaves(3);
     const tree = buildMerkleTree(l);
     expect(tree.root).toHaveLength(64);
+  });
+
+  it("is not forgeable by duplicating the last leaf (CVE-2012-2459 / issue #1019)", () => {
+    const l = leaves(3);
+    // The classic attack: append a copy of the last leaf. With the old
+    // duplicate-last-node rule this produced an identical root; promotion +
+    // domain separation must now yield a different root.
+    const forged = [...l, l[2]!];
+    expect(buildMerkleTree(l).root).not.toBe(buildMerkleTree(forged).root);
+  });
+
+  it("domain-separates internal nodes from leaves (issue #1019)", () => {
+    // The two-leaf root is SHA-256(0x01 ‖ l0 ‖ l1): a leaf value can never equal
+    // an internal node hash of a tree containing it, which is what defeats the
+    // second-preimage weakness.
+    const [a, b] = leaves(2);
+    const twoLeafRoot = buildMerkleTree([a!, b!]).root;
+    expect(twoLeafRoot).toHaveLength(64);
+    expect(twoLeafRoot).not.toBe(a);
+    expect(twoLeafRoot).not.toBe(b);
   });
 });
 

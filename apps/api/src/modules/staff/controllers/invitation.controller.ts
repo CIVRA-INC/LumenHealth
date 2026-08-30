@@ -3,6 +3,7 @@ import type { SendInvitationRequest, AcceptInvitationRequest, InvitationStatus }
 import { validateSendInvitation, validateAcceptInvitation } from "../validators/invitation.validator.js";
 import { sendInvitation, acceptInvitation, revokeInvitation } from "../services/invitation.service.js";
 import { invitationStore } from "../repositories/invitation.repository.js";
+import { auditMetaFromRequest } from "../../../shared/http/audit-meta.js";
 
 export function send(req: Request, res: Response): void {
   const role = req.auth!.role;
@@ -18,7 +19,7 @@ export function send(req: Request, res: Response): void {
   }
 
   const body = req.body as SendInvitationRequest;
-  const result = sendInvitation(body, req.auth!.clinicId, req.auth!.userId);
+  const result = sendInvitation(body, req.auth!.clinicId, req.auth!.userId, req.auth!.role, auditMetaFromRequest(req));
 
   if ("error" in result) {
     const status = result.error === "INVITATION_ALREADY_PENDING" || result.error === "STAFF_ALREADY_EXISTS" ? 409 : 400;
@@ -37,7 +38,7 @@ export async function accept(req: Request, res: Response): Promise<void> {
   }
 
   const { token, password, name } = req.body as AcceptInvitationRequest;
-  const result = await acceptInvitation(token, password, name);
+  const result = await acceptInvitation(token, password, name, auditMetaFromRequest(req));
 
   if ("error" in result) {
     const status =
@@ -70,7 +71,7 @@ export function revoke(req: Request, res: Response): void {
     return;
   }
 
-  const result = revokeInvitation(String(req.params.invitationId), req.auth!.clinicId);
+  const result = revokeInvitation(String(req.params.invitationId), req.auth!.clinicId, req.auth!.userId, req.auth!.role, auditMetaFromRequest(req));
 
   if ("error" in result) {
     const status = result.error === "INVITATION_NOT_FOUND" ? 404 : 400;

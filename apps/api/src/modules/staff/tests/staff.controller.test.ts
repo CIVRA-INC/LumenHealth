@@ -9,7 +9,7 @@ import { sessionStore } from "../../auth/repositories/session.repository.js";
 import { _resetAuthStateForTests } from "../../auth/controllers/auth.controller.js";
 import { buildTwoClinicFixture } from "../../auth/tests/fixtures.js";
 import { accessTokenSigner } from "../../auth/services/token.service.js";
-import { createStaffFromInvitation } from "../services/staff.service.js";
+import { createStaffFromInvitation, updateStaffRole } from "../services/staff.service.js";
 import { auditStore } from "../../audit/repositories/audit.repository.js";
 import type { UserRole } from "@lumen/types";
 
@@ -96,6 +96,13 @@ describe("GET /api/v1/staff — list", () => {
     const { status } = await req(app, "GET", "/api/v1/staff", undefined, clinicianToken);
     expect(status).toBe(200);
   });
+
+  it("rejects a token claiming the reserved 'system' role with 401 (issue #1029)", async () => {
+    const { a } = buildTwoClinicFixture();
+    const systemToken = tokenWithRole(a.clinicId, "system");
+    const { status } = await req(app, "GET", "/api/v1/staff", undefined, systemToken);
+    expect(status).toBe(401);
+  });
 });
 
 describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
@@ -139,6 +146,20 @@ describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
     expect(event.after).toEqual({ role: "admin" });
   });
 
+  it("populates ipAddress/userAgent on the audit entry from request meta (issue #1026)", () => {
+    const { a } = buildTwoClinicFixture();
+    const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
+
+    updateStaffRole(member.staffId, { role: "admin" }, a.clinicId, a.userId, "owner", {
+      ipAddress: "203.0.113.7",
+      userAgent: "vitest-agent/1.0",
+    });
+
+    const events = auditStore.query({ clinicId: a.clinicId, action: "staff.role_changed" });
+    expect(events.entries[0]!.ipAddress).toBe("203.0.113.7");
+    expect(events.entries[0]!.userAgent).toBe("vitest-agent/1.0");
+  });
+
   it("returns 400 when role is 'owner'", async () => {
     const { a } = buildTwoClinicFixture();
     const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
@@ -152,6 +173,38 @@ describe("PATCH /api/v1/staff/:staffId/role — updateRole", () => {
     );
     expect(status).toBe(400);
     expect((body as { field: string }).field).toBe("role");
+  });
+
+  it("returns 403 when an admin tries to promote someone to admin (owner-only) (issue #1021)", async () => {
+    const { a } = buildTwoClinicFixture();
+    const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
+    const adminToken = tokenWithRole(a.clinicId, "admin");
+
+    const { status, body } = await req(
+      app,
+      "PATCH",
+      `/api/v1/staff/${member.staffId}/role`,
+      { role: "admin" },
+      adminToken,
+    );
+    expect(status).toBe(403);
+    expect((body as { error: string }).error).toBe("STAFF_ADMIN_CHANGE_OWNER_ONLY");
+  });
+
+  it("still lets an admin change a non-admin between non-admin roles (issue #1021)", async () => {
+    const { a } = buildTwoClinicFixture();
+    const member = createStaffFromInvitation("u1", a.clinicId, "alice@a.test", "Alice", "clinician");
+    const adminToken = tokenWithRole(a.clinicId, "admin");
+
+    const { status, body } = await req(
+      app,
+      "PATCH",
+      `/api/v1/staff/${member.staffId}/role`,
+      { role: "cashier" },
+      adminToken,
+    );
+    expect(status).toBe(200);
+    expect((body as { staff: { role: string } }).staff.role).toBe("cashier");
   });
 
   it("returns 403 when a clinician tries to update a role", async () => {

@@ -31,10 +31,18 @@ export function resolveAuthContext(
 
   if (!claims.clinicId) return unauthorized(res, 'token missing clinic scope');
   const identity = identityStore.findById(claims.sub);
+  const role = (identity?.role ?? claims.role) as UserRole;
+
+  // `system` is reserved for automated/internal actors (e.g. the anchoring job
+  // recording audit events) and is never a real, authenticatable user role. Even
+  // if a token ever claimed it, reject it here so it can't reach any handler as a
+  // real request (see issue #1029).
+  if (role === 'system') return unauthorized(res, 'system role is not permitted for user requests');
+
   req.auth = {
     userId: claims.sub,
     clinicId: claims.clinicId,
-    role: (identity?.role ?? claims.role) as UserRole,
+    role,
     accessToken: token,
   };
   next();

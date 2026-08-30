@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import type { CreateClinicRequest, UpdateClinicRequest } from "@lumen/types";
 import { validateCreateClinic, validateUpdateClinic } from "../validators/clinic.validator.js";
+import { auditMetaFromRequest } from "../../../shared/http/audit-meta.js";
 import {
   createClinic,
   getClinic,
@@ -51,7 +52,7 @@ export function update(req: Request, res: Response): void {
   }
 
   const patch = req.body as UpdateClinicRequest;
-  const clinic = updateClinic(String(req.params.clinicId), req.auth!.clinicId, patch);
+  const clinic = updateClinic(String(req.params.clinicId), req.auth!.clinicId, patch, req.auth!.userId, req.auth!.role, auditMetaFromRequest(req));
   if (!clinic) {
     res.status(404).json({ error: "CLINIC_NOT_FOUND", message: "clinic not found" });
     return;
@@ -65,7 +66,7 @@ export function archive(req: Request, res: Response): void {
     return;
   }
 
-  const clinic = archiveClinic(String(req.params.clinicId), req.auth!.clinicId, req.auth!.userId, req.auth!.role);
+  const clinic = archiveClinic(String(req.params.clinicId), req.auth!.clinicId, req.auth!.userId, req.auth!.role, auditMetaFromRequest(req));
   if (!clinic) {
     res.status(404).json({ error: "CLINIC_NOT_FOUND", message: "clinic not found" });
     return;

@@ -109,6 +109,15 @@ export function getUnanchoredEntries(): { auditId: string; sha256Hash: string; c
 /**
  * Applies a completed Stellar batch anchor result to the entries it covers,
  * then records one `batch.anchored` audit entry per affected clinic.
+ *
+ * Note (issue #1025): `batch.anchored` is deliberately NOT in
+ * `CRITICAL_AUDIT_ACTIONS`, so each of these meta-entries stays unanchored
+ * until the *next* routine batch picks it up (it's unanchored, so
+ * `getUnanchoredEntries` will include it). This is intentional: making it
+ * critical would fire an extra immediate single-entry Stellar anchor for every
+ * clinic on every batch, roughly doubling anchoring transactions, to close a
+ * window that self-heals within one batch interval. The record that "a batch
+ * was anchored" is therefore provably immutable one cycle later, not instantly.
  */
 export function applyBatchAnchorResult(result: BatchAnchorResult): AuditEntry[] {
   const updated = auditStore.applyAnchorResult(result);
@@ -134,19 +143,46 @@ export function applyBatchAnchorResult(result: BatchAnchorResult): AuditEntry[] 
 }
 
 /**
+ * Short-TTL cache for on-chain Merkle roots keyed by Stellar tx hash. Many
+ * audit entries anchored in the same batch share one `stellarTxHash`, so
+ * verifying several of them (or the same one repeatedly) would otherwise
+ * re-fetch the identical manage-data operation each time. The offline
+ * verify-export tool already caches this; the live single-entry verify path
+ * did not (see issue #1024).
+ */
+const anchoredRootCache = new Map<string, { root: string | null; expiresAt: number }>();
+const ANCHORED_ROOT_CACHE_TTL_MS = 30_000;
+
+async function cachedFetchAnchoredMerkleRoot(txHash: string): Promise<string | null> {
+  const now = Date.now();
+  const hit = anchoredRootCache.get(txHash);
+  if (hit && hit.expiresAt > now) {
+    return hit.root;
+  }
+  const root = await fetchAnchoredMerkleRoot(txHash);
+  anchoredRootCache.set(txHash, { root, expiresAt: now + ANCHORED_ROOT_CACHE_TTL_MS });
+  return root;
+}
+
+/** Clears the anchored-root cache — used by tests to keep runs isolated. */
+export function _resetAnchoredRootCache(): void {
+  anchoredRootCache.clear();
+}
+
+/**
  * Recomputes an entry's hash from its currently stored content and, if
  * anchored, walks its Merkle proof against the root actually written on
  * Stellar. Returns `null` if the entry doesn't exist or belongs to a
  * different clinic (caller should treat that as a 404 — never leak that a
  * given auditId exists under someone else's clinic).
  *
- * `fetchAnchoredRoot` is injectable for tests; defaults to the real
- * stellar-service HTTP client.
+ * `fetchAnchoredRoot` is injectable for tests; defaults to a short-TTL cached
+ * wrapper over the real stellar-service HTTP client (see issue #1024).
  */
 export async function verifyAuditEntry(
   clinicId: string,
   auditId: string,
-  fetchAnchoredRoot: (txHash: string) => Promise<string | null> = fetchAnchoredMerkleRoot,
+  fetchAnchoredRoot: (txHash: string) => Promise<string | null> = cachedFetchAnchoredMerkleRoot,
 ): Promise<AuditVerifyResponse | null> {
   const entry = auditStore.findById(auditId);
   if (!entry || entry.clinicId !== clinicId) {
@@ -216,6 +252,26 @@ export async function verifyAuditEntry(
   };
 }
 
+/**
+ * Hard cap on how many entries a single compliance export may contain. A
+ * clinic with years of history could otherwise produce an unbounded JSON
+ * response (each entry carries full before/after payloads plus a Merkle
+ * proof). Callers that hit this should narrow their `from`/`to` range — see
+ * `AuditExportTooLargeError` and issue #1034.
+ */
+export const MAX_AUDIT_EXPORT_ENTRIES = 10_000;
+
+/** Thrown by `buildAuditExport` when a requested range exceeds `MAX_AUDIT_EXPORT_ENTRIES`. */
+export class AuditExportTooLargeError extends Error {
+  constructor(
+    readonly count: number,
+    readonly max: number,
+  ) {
+    super(`audit export range contains ${count} entries, exceeding the ${max}-entry limit; narrow the from/to range`);
+    this.name = "AuditExportTooLargeError";
+  }
+}
+
 function computeEntriesDigest(entries: AuditEntry[]): string {
   const sorted = entries
     .map((entry) => ({ auditId: entry.auditId, sha256Hash: entry.sha256Hash }))
@@ -238,8 +294,13 @@ export async function buildAuditExport(
   from?: string,
   to?: string,
   sign: (payload: string) => Promise<SignedPayload> = signExportManifest,
+  maxEntries: number = MAX_AUDIT_EXPORT_ENTRIES,
 ): Promise<AuditExportBundle> {
   const entries = auditStore.findAllInRange(clinicId, from, to);
+
+  if (entries.length > maxEntries) {
+    throw new AuditExportTooLargeError(entries.length, maxEntries);
+  }
 
   const manifest: AuditExportManifest = {
     clinicId,

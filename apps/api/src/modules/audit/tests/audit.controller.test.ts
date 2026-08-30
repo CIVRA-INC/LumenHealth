@@ -130,6 +130,52 @@ describe("GET /api/v1/audit", () => {
     expect(result.entries[0].action).toBe("staff.invited");
   });
 
+  it("returns 400 for an unrecognized action query parameter", async () => {
+    const { a } = buildTwoClinicFixture();
+    seedAuditEntries(a.clinicId);
+
+    const { status, body } = await req(
+      app,
+      "GET",
+      "/api/v1/audit?action=not.a.real.action",
+      a.token,
+    );
+    expect(status).toBe(400);
+    expect((body as { error: string }).error).toBe("INVALID_QUERY");
+  });
+
+  it("returns 400 when a query param is repeated (parsed as an array)", async () => {
+    const { a } = buildTwoClinicFixture();
+    seedAuditEntries(a.clinicId);
+
+    const { status, body } = await req(
+      app,
+      "GET",
+      "/api/v1/audit?actorId=x&actorId=y",
+      a.token,
+    );
+    expect(status).toBe(400);
+    expect((body as { error: string }).error).toBe("INVALID_QUERY");
+  });
+
+  it("returns 400 for a non-integer page param instead of silently returning nothing", async () => {
+    const { a } = buildTwoClinicFixture();
+    seedAuditEntries(a.clinicId);
+
+    const { status, body } = await req(app, "GET", "/api/v1/audit?page=abc", a.token);
+    expect(status).toBe(400);
+    expect((body as { error: string }).error).toBe("INVALID_QUERY");
+  });
+
+  it("returns 400 for a zero/negative limit param", async () => {
+    const { a } = buildTwoClinicFixture();
+    seedAuditEntries(a.clinicId);
+
+    const { status, body } = await req(app, "GET", "/api/v1/audit?limit=0", a.token);
+    expect(status).toBe(400);
+    expect((body as { error: string }).error).toBe("INVALID_QUERY");
+  });
+
   it("returns empty list when no entries exist", async () => {
     const { a } = buildTwoClinicFixture();
     const { status, body } = await req(app, "GET", "/api/v1/audit", a.token);

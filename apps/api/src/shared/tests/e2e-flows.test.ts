@@ -195,7 +195,8 @@ describe("E2E: clinic isolation across two tenants", () => {
     expect(listA.status).toBe(200);
     const invitationsA = listA.body.invitations as Body[];
     expect(invitationsA).toHaveLength(1);
-    expect(invitationsA[0].email).toBe("staffA@a.test");
+    // Invitation emails are normalized to lowercase to match identityStore (#1022).
+    expect(invitationsA[0].email).toBe("staffa@a.test");
 
     // A cannot access B's clinic
     const crossClinic = await request(

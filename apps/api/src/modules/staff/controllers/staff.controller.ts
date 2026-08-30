@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import type { UpdateStaffRoleRequest } from "@lumen/types";
 import { listStaff, updateStaffRole } from "../services/staff.service.js";
+import { auditMetaFromRequest } from "../../../shared/http/audit-meta.js";
 
 export function list(req: Request, res: Response): void {
   const staff = listStaff(req.auth!.clinicId);
@@ -20,7 +21,7 @@ export function updateRole(req: Request, res: Response): void {
     return;
   }
 
-  const result = updateStaffRole(String(req.params.staffId), body, req.auth!.clinicId, req.auth!.userId, role);
+  const result = updateStaffRole(String(req.params.staffId), body, req.auth!.clinicId, req.auth!.userId, role, auditMetaFromRequest(req));
 
   if ("error" in result) {
     const status = result.error === "STAFF_NOT_FOUND" ? 404 : 403;
