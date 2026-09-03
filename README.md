@@ -1,4 +1,4 @@
-# LumenHealth
+# LumenHealth.
 
 **LumenHealth** is a clinical operations platform designed to help healthcare facilities manage patients, staff workflows, encounters, and billing in a unified system.
 
