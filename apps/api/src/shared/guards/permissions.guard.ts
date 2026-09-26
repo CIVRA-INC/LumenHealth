@@ -1,12 +1,15 @@
 import { CanActivate, ExecutionContext, Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { getRolePolicy } from '../types/role-policies.js';
+import { RolePolicyService } from '../role-policy/role-policy.service.js';
 import type { Permission } from '@lumen/types';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    private rolePolicyService: RolePolicyService
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredPermissions = this.reflector.get<Permission[]>('permissions', context.getHandler());
@@ -20,14 +23,10 @@ export class PermissionsGuard implements CanActivate {
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "authentication required" }, HttpStatus.UNAUTHORIZED);
     }
 
-    const policy = getRolePolicy(role);
+    const policy = this.rolePolicyService.getRolePolicy(role);
     const hasPermission = requiredPermissions.every(permission => policy.permissions.includes(permission));
     
     if (!hasPermission) {
-      // Keep exact error messages based on the endpoint for tests, or just a generic one
-      // The tests expect specific error messages, but we'll use a generic one and fix tests if we had to.
-      // Wait, the tests for invitation controller expect: "only owner or admin can..."
-      // I'll just return a generic one, which is standard for Nest.
       const isStaffRoute = req.path.includes('/staff/');
       const message = isStaffRoute 
         ? (req.method === 'GET' ? "only owner or admin can list invitations" 
