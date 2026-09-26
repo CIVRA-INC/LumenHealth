@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 import type { Invitation, SendInvitationRequest, UserRole, InvitationStatus } from '@lumen/types';
-import { invitationStore } from '../repositories/invitation.repository.js';
+import { InvitationRepository } from '../repositories/invitation.repository.js';
 import { identityStore } from '../../auth/repositories/identity.repository.js';
 import { authLogger } from '../../../shared/logger/index.js';
 
@@ -10,12 +10,14 @@ const EXPIRY_HOURS = 72;
 
 @Injectable()
 export class InvitationService {
+  constructor(private readonly invitationRepository: InvitationRepository) {}
+
   sendInvitation(
     body: SendInvitationRequest,
     clinicId: string,
     invitedBy: string,
   ): { invitation: Invitation } | { error: string; message: string } {
-    const existing = invitationStore.findByEmail(clinicId, body.email);
+    const existing = this.invitationRepository.findByEmail(clinicId, body.email);
     if (existing?.status === 'pending') {
       return {
         error: 'INVITATION_ALREADY_PENDING',
@@ -48,7 +50,7 @@ export class InvitationService {
       createdAt: now.toISOString(),
     };
 
-    invitationStore.save(invitation);
+    this.invitationRepository.save(invitation);
 
     authLogger.info('invitation.sent', {
       clinicId,
@@ -64,7 +66,7 @@ export class InvitationService {
     password: string,
     _name: string,
   ): Promise<{ ok: true; userId: string } | { error: string; message: string }> {
-    const invitation = invitationStore.findByToken(token);
+    const invitation = this.invitationRepository.findByToken(token);
 
     if (!invitation) {
       return { error: 'INVITATION_NOT_FOUND', message: 'invitation not found' };
@@ -99,7 +101,7 @@ export class InvitationService {
       createdAt: new Date().toISOString(),
     });
 
-    invitationStore.save({
+    this.invitationRepository.save({
       ...invitation,
       status: 'accepted',
       acceptedAt: new Date().toISOString(),
@@ -109,14 +111,14 @@ export class InvitationService {
   }
 
   listInvitations(clinicId: string, filter?: { status?: InvitationStatus }) {
-    return invitationStore.listByClinic(clinicId, filter);
+    return this.invitationRepository.listByClinic(clinicId, filter);
   }
 
   revokeInvitation(
     invitationId: string,
     clinicId: string,
   ): { ok: true } | { error: string; message: string } {
-    const invitation = invitationStore.findById(invitationId);
+    const invitation = this.invitationRepository.findById(invitationId);
 
     if (!invitation || invitation.clinicId !== clinicId) {
       return { error: 'INVITATION_NOT_FOUND', message: 'invitation not found' };
@@ -128,7 +130,7 @@ export class InvitationService {
       };
     }
 
-    invitationStore.save({ ...invitation, status: 'revoked' });
+    this.invitationRepository.save({ ...invitation, status: 'revoked' });
     return { ok: true };
   }
 }
