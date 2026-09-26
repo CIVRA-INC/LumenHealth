@@ -11,13 +11,7 @@ import type {
   UserRole,
 } from "@lumen/types";
 import { AuditRepository } from "../repositories/audit.repository.js";
-import {
-  anchorEntriesImmediately,
-  fetchAnchoredMerkleRoot,
-  signExportManifest,
-  type ImmediateAnchorEntry,
-} from "./stellar-verifier.client.js";
-import type { SignedPayload } from "./stellar-verifier.client.js";
+import { StellarVerifierClient } from "./stellar-verifier.client.js";
 
 function canonicalize(data: unknown): string {
   if (data === null || typeof data !== "object") return JSON.stringify(data);
@@ -74,7 +68,10 @@ export type RecordAuditParams = {
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly auditRepository: AuditRepository) {}
+  constructor(
+    private readonly auditRepository: AuditRepository,
+    private readonly stellarVerifierClient: StellarVerifierClient
+  ) {}
 
   recordAudit(params: RecordAuditParams): AuditEntry {
     const unhashed = {
@@ -108,10 +105,9 @@ export class AuditService {
   }
 
   async anchorImmediately(
-    entry: Pick<AuditEntry, "auditId" | "sha256Hash" | "createdAt">,
-    anchor: (entries: ImmediateAnchorEntry[]) => Promise<BatchAnchorResult> = anchorEntriesImmediately,
+    entry: Pick<AuditEntry, "auditId" | "sha256Hash" | "createdAt">
   ): Promise<AuditEntry | null> {
-    const result = await anchor([{ auditId: entry.auditId, sha256Hash: entry.sha256Hash, createdAt: entry.createdAt }]);
+    const result = await this.stellarVerifierClient.anchorEntriesImmediately([{ auditId: entry.auditId, sha256Hash: entry.sha256Hash, createdAt: entry.createdAt }]);
     const [updated] = this.auditRepository.applyAnchorResult(result);
     return updated ?? null;
   }
@@ -153,8 +149,7 @@ export class AuditService {
 
   async verifyAuditEntry(
     clinicId: string,
-    auditId: string,
-    fetchAnchoredRoot: (txHash: string) => Promise<string | null> = fetchAnchoredMerkleRoot,
+    auditId: string
   ): Promise<AuditVerifyResponse | null> {
     const entry = this.auditRepository.findById(auditId);
     if (!entry || entry.clinicId !== clinicId) {
@@ -184,7 +179,7 @@ export class AuditService {
       return { auditId, status: "unanchored", recomputedHash, storedHash, checkedAt };
     }
 
-    const chainRoot = await fetchAnchoredRoot(stellarTxHash);
+    const chainRoot = await this.stellarVerifierClient.fetchAnchoredMerkleRoot(stellarTxHash);
 
     if (chainRoot === null || chainRoot !== merkleRoot) {
       return {
@@ -227,8 +222,7 @@ export class AuditService {
   async buildAuditExport(
     clinicId: string,
     from?: string,
-    to?: string,
-    sign: (payload: string) => Promise<SignedPayload> = signExportManifest,
+    to?: string
   ): Promise<AuditExportBundle> {
     const entries = this.auditRepository.findAllInRange(clinicId, from, to);
 
@@ -247,7 +241,7 @@ export class AuditService {
       entriesDigest: computeEntriesDigest(entries),
     };
 
-    const { signature, publicKey } = await sign(canonicalize(manifest));
+    const { signature, publicKey } = await this.stellarVerifierClient.signExportManifest(canonicalize(manifest));
 
     return { manifest, signature, signingPublicKey: publicKey, entries };
   }
