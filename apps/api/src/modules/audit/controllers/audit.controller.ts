@@ -8,13 +8,15 @@ import { AuditService } from "../services/audit.service.js";
 import {
   AnchoringNotConfiguredError,
   InvalidExportBundleError,
-  fetchAnchoringHealth,
-  verifyExportBundleRemote,
+  StellarVerifierClient,
 } from "../services/stellar-verifier.client.js";
 
 @Controller('audit')
 export class AuditController {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly stellarVerifierClient: StellarVerifierClient
+  ) {}
 
   @Get()
   @UseGuards(AuthGuard, PermissionsGuard)
@@ -79,7 +81,7 @@ export class AuditController {
     }
 
     try {
-      const health = await fetchAnchoringHealth();
+      const health = await this.stellarVerifierClient.fetchAnchoringHealth();
       return res.json(health);
     } catch (error) {
       if (error instanceof AnchoringNotConfiguredError) {
@@ -141,7 +143,7 @@ export class AuditController {
     }
 
     try {
-      const report = await verifyExportBundleRemote(bundle);
+      const report = await this.stellarVerifierClient.verifyExportBundleRemote(bundle as AuditExportBundle);
       return res.json(report);
     } catch (error) {
       if (error instanceof InvalidExportBundleError) {
