@@ -1,35 +1,25 @@
-import { Controller, Post, Get, Patch, Delete, Body, Req, Res, Param, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Req, Res, Param, HttpException, HttpStatus, UseGuards, UsePipes } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import type { CreateClinicRequest, UpdateClinicRequest } from '@lumen/types';
-import { validateCreateClinic, validateUpdateClinic } from '../validators/clinic.validator.js';
+import { CreateClinicDto, UpdateClinicDto } from '../dto/clinic.dto.js';
+import { clinicValidationPipe } from '../pipes/clinic-validation.pipe.js';
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
+import { ClinicScopeGuard } from '../guards/clinic-scope.guard.js';
 import { ClinicService } from '../services/clinic.service.js';
 
 @Controller('clinics')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, ClinicScopeGuard)
 export class ClinicController {
   constructor(private readonly clinicService: ClinicService) {}
 
   @Post()
-  create(@Body() body: CreateClinicRequest, @Req() req: Request, @Res() res: Response) {
-    const validation = validateCreateClinic(body);
-    if (!validation.ok) {
-      throw new HttpException({
-        error: "CLINIC_INVALID_INPUT",
-        message: validation.message,
-        field: validation.field,
-      }, HttpStatus.BAD_REQUEST);
-    }
-
-    const clinic = this.clinicService.createClinic(body, req.auth!.userId, req.auth!.clinicId);
+  @UsePipes(clinicValidationPipe)
+  create(@Body() body: CreateClinicDto, @Req() req: Request, @Res() res: Response) {
+    const clinic = this.clinicService.createClinic(body as any, req.auth!.userId, req.auth!.clinicId);
     return res.status(HttpStatus.CREATED).json({ clinic });
   }
 
   @Get(':clinicId')
   get(@Param('clinicId') clinicId: string, @Req() req: Request, @Res() res: Response) {
-    if (clinicId && clinicId !== req.auth?.clinicId) {
-      throw new HttpException({ error: "AUTH_FORBIDDEN", message: "cross-clinic access denied" }, HttpStatus.FORBIDDEN);
-    }
     const clinic = this.clinicService.getClinic(clinicId, req.auth!.clinicId);
     if (!clinic) {
       throw new HttpException({ error: "CLINIC_NOT_FOUND", message: "clinic not found" }, HttpStatus.NOT_FOUND);
@@ -38,25 +28,14 @@ export class ClinicController {
   }
 
   @Patch(':clinicId')
-  update(@Param('clinicId') clinicId: string, @Body() body: UpdateClinicRequest, @Req() req: Request, @Res() res: Response) {
-    if (clinicId && clinicId !== req.auth?.clinicId) {
-      throw new HttpException({ error: "AUTH_FORBIDDEN", message: "cross-clinic access denied" }, HttpStatus.FORBIDDEN);
-    }
-    const validation = validateUpdateClinic(body);
-    if (!validation.ok) {
-      throw new HttpException({
-        error: "CLINIC_INVALID_INPUT",
-        message: validation.message,
-        field: validation.field,
-      }, HttpStatus.BAD_REQUEST);
-    }
-
+  @UsePipes(clinicValidationPipe)
+  update(@Param('clinicId') clinicId: string, @Body() body: UpdateClinicDto, @Req() req: Request, @Res() res: Response) {
     const role = req.auth!.role;
     if (role !== "owner" && role !== "admin") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "insufficient role" }, HttpStatus.FORBIDDEN);
     }
 
-    const clinic = this.clinicService.updateClinic(clinicId, req.auth!.clinicId, body);
+    const clinic = this.clinicService.updateClinic(clinicId, req.auth!.clinicId, body as any);
     if (!clinic) {
       throw new HttpException({ error: "CLINIC_NOT_FOUND", message: "clinic not found" }, HttpStatus.NOT_FOUND);
     }
@@ -65,9 +44,6 @@ export class ClinicController {
 
   @Delete(':clinicId')
   archive(@Param('clinicId') clinicId: string, @Req() req: Request, @Res() res: Response) {
-    if (clinicId && clinicId !== req.auth?.clinicId) {
-      throw new HttpException({ error: "AUTH_FORBIDDEN", message: "cross-clinic access denied" }, HttpStatus.FORBIDDEN);
-    }
     if (req.auth!.role !== "owner") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only the owner may archive a clinic" }, HttpStatus.FORBIDDEN);
     }
