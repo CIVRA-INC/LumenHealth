@@ -1,31 +1,36 @@
+import { Injectable } from '@nestjs/common';
 import type { Clinic, ClinicStatus } from '@lumen/types';
 
-const store = new Map<string, Clinic>();
-const slugIndex = new Map<string, string>();
-export const clinicStore = {
+@Injectable()
+export class ClinicRepository {
+  private store = new Map<string, Clinic>();
+  private slugIndex = new Map<string, string>();
+
   save(clinic: Clinic): Clinic {
-    store.set(clinic.clinicId, clinic);
-    slugIndex.set(clinic.slug, clinic.clinicId);
+    this.store.set(clinic.clinicId, clinic);
+    this.slugIndex.set(clinic.slug, clinic.clinicId);
     return clinic;
-  },
+  }
 
   findById(clinicId: string): Clinic | undefined {
-    return store.get(clinicId);
-  },
+    return this.store.get(clinicId);
+  }
 
   findBySlug(slug: string): Clinic | undefined {
-    const id = slugIndex.get(slug);
-    return id ? store.get(id) : undefined;
-  },
+    const id = this.slugIndex.get(slug);
+    return id ? this.store.get(id) : undefined;
+  }
 
   list(filter?: { status?: ClinicStatus }): Clinic[] {
-    const all = Array.from(store.values());
+    const all = Array.from(this.store.values());
     if (!filter?.status) return all;
     return all.filter((c) => c.status === filter.status);
-  },
+  }
 
   _reset(): void {
-    store.clear();
-    slugIndex.clear();
-  },
-};
+    this.store.clear();
+    this.slugIndex.clear();
+  }
+}
+
+export const clinicStore = new ClinicRepository();
