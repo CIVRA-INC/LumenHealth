@@ -1,10 +1,10 @@
-import { Controller, Get, Req, Res, UseGuards, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Req, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param } from '@nestjs/common';
 import type { Request, Response } from "express";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
 import { PermissionsGuard } from '../../../shared/guards/permissions.guard.js';
 import { RequirePermissions } from '../../../shared/decorators/permissions.decorator.js';
-import { buildAuditExport, queryAuditLog, verifyAuditEntry } from "../services/audit.service.js";
+import { AuditService } from "../services/audit.service.js";
 import {
   AnchoringNotConfiguredError,
   InvalidExportBundleError,
@@ -14,10 +14,11 @@ import {
 
 @Controller('audit')
 export class AuditController {
+  constructor(private readonly auditService: AuditService) {}
 
   @Get()
   @UseGuards(AuthGuard, PermissionsGuard)
-  @RequirePermissions('clinic:read') // Wait, owners and admins only... Let me use 'auth:write' or whatever owner/admin shares that clinician lacks? Actually 'staff:write' is owner/admin only. Let's use 'staff:write' or just enforce owner/admin role explicitly. Wait, role-policies say owner/admin have `staff:write` but clinician doesn't. Or maybe `billing:write`. The original code checks `role !== "owner" && role !== "admin"`.
+  @RequirePermissions('staff:write')
   list(@Req() req: Request, @Res() res: Response) {
     const role = req.auth!.role;
     if (role !== "owner" && role !== "admin") {
@@ -27,7 +28,7 @@ export class AuditController {
     const clinicId = req.auth!.clinicId;
     const { action, actorId, targetId, from, to, page, limit } = req.query;
 
-    const result = queryAuditLog({
+    const result = this.auditService.queryAuditLog({
       clinicId,
       action: action as AuditAction | undefined,
       actorId: actorId as string | undefined,
@@ -42,7 +43,8 @@ export class AuditController {
   }
 
   @Get('export')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @RequirePermissions('staff:write')
   async exportAuditLog(@Req() req: Request, @Res() res: Response) {
     const role = req.auth!.role;
     if (role !== "owner" && role !== "admin") {
@@ -53,7 +55,7 @@ export class AuditController {
     const { from, to } = req.query;
 
     try {
-      const bundle = await buildAuditExport(
+      const bundle = await this.auditService.buildAuditExport(
         clinicId,
         from as string | undefined,
         to as string | undefined,
@@ -66,91 +68,89 @@ export class AuditController {
       }, HttpStatus.BAD_GATEWAY);
     }
   }
-}
 
-function isPlausibleExportBundle(value: unknown): value is AuditExportBundle {
-  if (!value || typeof value !== "object") return false;
-  const b = value as Partial<AuditExportBundle>;
-  return (
-    typeof b.signature === "string" &&
-    typeof b.signingPublicKey === "string" &&
-    Array.isArray(b.entries) &&
-    !!b.manifest &&
-    typeof b.manifest === "object" &&
-    typeof b.manifest.clinicId === "string" &&
-    typeof b.manifest.entriesDigest === "string"
-  );
-}
-
-export async function verifyExport(req: Request, res: Response): Promise<void> {
-  const { bundle } = req.body as { bundle?: unknown };
-
-  if (!isPlausibleExportBundle(bundle)) {
-    res.status(400).json({
-      error: "INVALID_BODY",
-      message: "bundle must be a well-formed AuditExportBundle (manifest, signature, signingPublicKey, entries)",
-    });
-    return;
-  }
-
-  try {
-    const report = await verifyExportBundleRemote(bundle);
-    res.json(report);
-  } catch (error) {
-    if (error instanceof InvalidExportBundleError) {
-      res.status(400).json({ error: "INVALID_BODY", message: error.message });
-      return;
+  @Get('anchoring-health')
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @RequirePermissions('staff:write')
+  async anchoringHealth(@Req() req: Request, @Res() res: Response) {
+    const role = req.auth!.role;
+    if (role !== "owner" && role !== "admin") {
+      throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can view anchoring health" }, HttpStatus.FORBIDDEN);
     }
-    res.status(502).json({
-      error: "STELLAR_SERVICE_UNAVAILABLE",
-      message: error instanceof Error ? error.message : "failed to reach stellar-service",
-    });
-  }
-}
 
-export async function anchoringHealth(req: Request, res: Response): Promise<void> {
-  const role = req.auth!.role;
-  if (role !== "owner" && role !== "admin") {
-    res.status(403).json({ error: "AUTH_FORBIDDEN", message: "only owner or admin can view anchoring health" });
-    return;
-  }
-
-  try {
-    const health = await fetchAnchoringHealth();
-    res.json(health);
-  } catch (error) {
-    if (error instanceof AnchoringNotConfiguredError) {
-      res.status(501).json({ error: "NOT_CONFIGURED", message: error.message });
-      return;
+    try {
+      const health = await fetchAnchoringHealth();
+      return res.json(health);
+    } catch (error) {
+      if (error instanceof AnchoringNotConfiguredError) {
+        throw new HttpException({ error: "NOT_CONFIGURED", message: error.message }, HttpStatus.NOT_IMPLEMENTED);
+      }
+      throw new HttpException({
+        error: "STELLAR_SERVICE_UNAVAILABLE",
+        message: error instanceof Error ? error.message : "failed to reach stellar-service",
+      }, HttpStatus.BAD_GATEWAY);
     }
-    res.status(502).json({
-      error: "STELLAR_SERVICE_UNAVAILABLE",
-      message: error instanceof Error ? error.message : "failed to reach stellar-service",
-    });
-  }
-}
-
-export async function verify(req: Request, res: Response): Promise<void> {
-  const role = req.auth!.role;
-  if (role !== "owner" && role !== "admin") {
-    res.status(403).json({ error: "AUTH_FORBIDDEN", message: "only owner or admin can verify audit logs" });
-    return;
   }
 
-  const clinicId = req.auth!.clinicId;
-  const auditId = req.params.auditId as string;
-
-  try {
-    const result = await verifyAuditEntry(clinicId, auditId);
-    if (!result) {
-      res.status(404).json({ error: "NOT_FOUND", message: "audit entry not found" });
-      return;
+  @Get(':auditId/verify')
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @RequirePermissions('staff:write')
+  async verify(@Param('auditId') auditId: string, @Req() req: Request, @Res() res: Response) {
+    const role = req.auth!.role;
+    if (role !== "owner" && role !== "admin") {
+      throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can verify audit logs" }, HttpStatus.FORBIDDEN);
     }
-    res.json(result);
-  } catch (error) {
-    res.status(502).json({
-      error: "STELLAR_SERVICE_UNAVAILABLE",
-      message: error instanceof Error ? error.message : "failed to reach stellar-service",
-    });
+
+    const clinicId = req.auth!.clinicId;
+
+    try {
+      const result = await this.auditService.verifyAuditEntry(clinicId, auditId);
+      if (!result) {
+        throw new HttpException({ error: "NOT_FOUND", message: "audit entry not found" }, HttpStatus.NOT_FOUND);
+      }
+      return res.json(result);
+    } catch (error) {
+      throw new HttpException({
+        error: "STELLAR_SERVICE_UNAVAILABLE",
+        message: error instanceof Error ? error.message : "failed to reach stellar-service",
+      }, HttpStatus.BAD_GATEWAY);
+    }
+  }
+
+  @Post('verify-export')
+  async verifyExport(@Body('bundle') bundle: unknown, @Req() req: Request, @Res() res: Response) {
+    function isPlausibleExportBundle(value: unknown): value is AuditExportBundle {
+      if (!value || typeof value !== "object") return false;
+      const b = value as Partial<AuditExportBundle>;
+      return (
+        typeof b.signature === "string" &&
+        typeof b.signingPublicKey === "string" &&
+        Array.isArray(b.entries) &&
+        !!b.manifest &&
+        typeof b.manifest === "object" &&
+        typeof b.manifest.clinicId === "string" &&
+        typeof b.manifest.entriesDigest === "string"
+      );
+    }
+
+    if (!isPlausibleExportBundle(bundle)) {
+      throw new HttpException({
+        error: "INVALID_BODY",
+        message: "bundle must be a well-formed AuditExportBundle (manifest, signature, signingPublicKey, entries)",
+      }, HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      const report = await verifyExportBundleRemote(bundle);
+      return res.json(report);
+    } catch (error) {
+      if (error instanceof InvalidExportBundleError) {
+        throw new HttpException({ error: "INVALID_BODY", message: error.message }, HttpStatus.BAD_REQUEST);
+      }
+      throw new HttpException({
+        error: "STELLAR_SERVICE_UNAVAILABLE",
+        message: error instanceof Error ? error.message : "failed to reach stellar-service",
+      }, HttpStatus.BAD_GATEWAY);
+    }
   }
 }
