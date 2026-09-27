@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { RequestMethod } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import * as supertest from "supertest";
 import type { Express } from "express";
 import { app } from "../../app.js";
+import { AppModule } from "../../app.module.js";
 import { identityStore } from "../../modules/auth/repositories/identity.repository.js";
 import { sessionStore } from "../../modules/auth/repositories/session.repository.js";
 import { _resetAuthStateForTests } from "../../modules/auth/controllers/auth.controller.js";
@@ -281,10 +285,28 @@ describe("E2E: role-based access control", () => {
 });
 
 describe("E2E: health check", () => {
+  // `/health` is served by HealthController on the Nest app, not by the raw
+  // Express instance the rest of this file exercises, so it is booted through
+  // the module graph. The prefix/exclude pair mirrors src/server.ts.
   it("returns service status", async () => {
-    const res = await request(app, "GET", "/health");
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const nestApp = moduleRef.createNestApplication();
+    nestApp.setGlobalPrefix("api/v1", {
+      exclude: [
+        { path: "health", method: RequestMethod.GET },
+        { path: "internal/audit/(.*)", method: RequestMethod.ALL },
+      ],
+    });
+    await nestApp.init();
+
+    const res = await supertest.default(nestApp.getHttpServer()).get("/health");
+    await nestApp.close();
+
     expect(res.status).toBe(200);
-    expect(res.body.service).toBe("api");
-    expect(res.body.status).toBe("ok");
+    expect(res.body).toEqual({
+      service: "api",
+      status: "ok",
+      milestone: "staff-invitations",
+    });
   });
 });

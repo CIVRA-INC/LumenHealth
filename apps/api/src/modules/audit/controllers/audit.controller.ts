@@ -1,9 +1,11 @@
-import { Controller, Get, Req, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param } from '@nestjs/common';
-import type { Request, Response } from "express";
+import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param } from '@nestjs/common';
+import type { Response } from "express";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
 import { PermissionsGuard } from '../../../shared/guards/permissions.guard.js';
 import { RequirePermissions } from '../../../shared/decorators/permissions.decorator.js';
+import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
+import type { AuthContextType } from '../../../shared/types/auth-context.js';
 import { AuditService } from "../services/audit.service.js";
 import {
   AnchoringNotConfiguredError,
@@ -21,14 +23,14 @@ export class AuditController {
   @Get()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
-  list(@Req() req: Request, @Res() res: Response) {
-    const role = req.auth!.role;
+  list(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const role = auth.role;
     if (role !== "owner" && role !== "admin") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can view audit logs" }, HttpStatus.FORBIDDEN);
     }
 
-    const clinicId = req.auth!.clinicId;
-    const { action, actorId, targetId, from, to, page, limit } = req.query;
+    const clinicId = auth.clinicId;
+    const { action, actorId, targetId, from, to, page, limit } = query;
 
     const result = this.auditService.queryAuditLog({
       clinicId,
@@ -47,14 +49,14 @@ export class AuditController {
   @Get('export')
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
-  async exportAuditLog(@Req() req: Request, @Res() res: Response) {
-    const role = req.auth!.role;
+  async exportAuditLog(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const role = auth.role;
     if (role !== "owner" && role !== "admin") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can export audit logs" }, HttpStatus.FORBIDDEN);
     }
 
-    const clinicId = req.auth!.clinicId;
-    const { from, to } = req.query;
+    const clinicId = auth.clinicId;
+    const { from, to } = query;
 
     try {
       const bundle = await this.auditService.buildAuditExport(
@@ -74,8 +76,8 @@ export class AuditController {
   @Get('anchoring-health')
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
-  async anchoringHealth(@Req() req: Request, @Res() res: Response) {
-    const role = req.auth!.role;
+  async anchoringHealth(@AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const role = auth.role;
     if (role !== "owner" && role !== "admin") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can view anchoring health" }, HttpStatus.FORBIDDEN);
     }
@@ -97,13 +99,13 @@ export class AuditController {
   @Get(':auditId/verify')
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
-  async verify(@Param('auditId') auditId: string, @Req() req: Request, @Res() res: Response) {
-    const role = req.auth!.role;
+  async verify(@Param('auditId') auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const role = auth.role;
     if (role !== "owner" && role !== "admin") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can verify audit logs" }, HttpStatus.FORBIDDEN);
     }
 
-    const clinicId = req.auth!.clinicId;
+    const clinicId = auth.clinicId;
 
     try {
       const result = await this.auditService.verifyAuditEntry(clinicId, auditId);
@@ -120,7 +122,7 @@ export class AuditController {
   }
 
   @Post('verify-export')
-  async verifyExport(@Body('bundle') bundle: unknown, @Req() req: Request, @Res() res: Response) {
+  async verifyExport(@Body('bundle') bundle: unknown, @Res() res: Response) {
     function isPlausibleExportBundle(value: unknown): value is AuditExportBundle {
       if (!value || typeof value !== "object") return false;
       const b = value as Partial<AuditExportBundle>;
