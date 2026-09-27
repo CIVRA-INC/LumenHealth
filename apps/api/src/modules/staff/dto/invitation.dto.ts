@@ -3,7 +3,18 @@ import type { UserRole } from '@lumen/types';
 
 const ASSIGNABLE_ROLES = ["admin", "clinician", "cashier"];
 
+/**
+ * Error code returned when one of these DTOs fails validation.
+ *
+ * Read by `createGlobalValidationPipe()` (src/shared/validation/) via
+ * `error.target.constructor`, so the app-wide pipe keeps the
+ * invitation-specific error vocabulary that the module-level pipe already used.
+ */
+const VALIDATION_ERROR_CODE = "INVITATION_INVALID_INPUT";
+
 export class SendInvitationDto {
+  static readonly validationErrorCode = VALIDATION_ERROR_CODE;
+
   @IsEmail({}, { message: "a valid email is required" })
   email!: string;
 
@@ -13,6 +24,8 @@ export class SendInvitationDto {
 }
 
 export class AcceptInvitationDto {
+  static readonly validationErrorCode = VALIDATION_ERROR_CODE;
+
   @IsString({ message: "token is required" })
   @MinLength(1, { message: "token is required" })
   token!: string;
