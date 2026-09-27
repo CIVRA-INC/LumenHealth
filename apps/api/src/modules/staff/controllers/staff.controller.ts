@@ -1,10 +1,12 @@
-import { Controller, Get, Patch, Body, Param, Req, Res, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import { Controller, Get, Patch, Body, Param, Res, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import type { UpdateStaffRoleRequest } from '@lumen/types';
 import { StaffService } from '../services/staff.service.js';
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
 import { PermissionsGuard } from '../../../shared/guards/permissions.guard.js';
 import { RequirePermissions } from '../../../shared/decorators/permissions.decorator.js';
+import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
+import type { AuthContextType } from '../../../shared/types/auth-context.js';
 
 @Controller('staff')
 export class StaffController {
@@ -13,8 +15,8 @@ export class StaffController {
   @Get()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:read')
-  list(@Req() req: Request, @Res() res: Response) {
-    const clinicId = req.auth!.clinicId;
+  list(@AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const clinicId = auth.clinicId;
     const staff = this.staffService.listStaff(clinicId);
     return res.json({ staff });
   }
@@ -25,7 +27,7 @@ export class StaffController {
   updateRole(
     @Param('staffId') staffId: string,
     @Body() body: UpdateStaffRoleRequest,
-    @Req() req: Request,
+    @AuthContext() auth: AuthContextType,
     @Res() res: Response
   ) {
     if (!body || !body.role) {
@@ -39,9 +41,9 @@ export class StaffController {
     const result = this.staffService.updateStaffRole(
       staffId,
       body,
-      req.auth!.clinicId,
-      req.auth!.userId,
-      req.auth!.role
+      auth.clinicId,
+      auth.userId,
+      auth.role
     );
 
     if ('error' in result) {

@@ -3,17 +3,16 @@ import type { UserRole } from '@lumen/types';
 import { accessTokenSigner } from '../../modules/auth/services/token.service.js';
 import { identityStore } from '../../modules/auth/repositories/identity.repository.js';
 import { unauthorized } from './response-helpers.js';
+import type { AuthContextType } from '../types/auth-context.js';
 
-export type AuthContext = {
-  userId: string;
-  clinicId: string;
-  role: UserRole;
-  accessToken: string;
-};
+export type { AuthContextType };
+
+/** @deprecated Use `AuthContextType` from `shared/types/auth-context.js`. */
+export type AuthContext = AuthContextType;
 
 declare module 'express-serve-static-core' {
   interface Request {
-    auth?: AuthContext;
+    auth?: AuthContextType;
   }
 }
 
