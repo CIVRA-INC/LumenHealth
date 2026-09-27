@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { serverConfig } from "@lumen/config";
 import type {
   AnchoringHealthReport,
   AuditExportBundle,
   AuditExportVerifyReport,
   BatchAnchorResult,
 } from "@lumen/types";
+import { ConfigService } from "../../../shared/config/config.service.js";
 
 export type SignedPayload = {
   signature: string;
@@ -24,18 +24,20 @@ export type ImmediateAnchorEntry = { auditId: string; sha256Hash: string; create
 
 @Injectable()
 export class StellarVerifierClient {
+  constructor(private readonly config: ConfigService) {}
+
   private getHeaders() {
     return {
       "Content-Type": "application/json",
-      "x-internal-service-token": serverConfig.internalServiceToken,
+      "x-internal-service-token": this.config.internalServiceToken,
     };
   }
 
   async fetchAnchoredMerkleRoot(txHash: string): Promise<string | null> {
     const res = await fetch(
-      `${serverConfig.stellarServiceUrl}/internal/tx/${encodeURIComponent(txHash)}/merkle-root`,
+      `${this.config.stellarServiceUrl}/internal/tx/${encodeURIComponent(txHash)}/merkle-root`,
       {
-        headers: { "x-internal-service-token": serverConfig.internalServiceToken },
+        headers: { "x-internal-service-token": this.config.internalServiceToken },
       },
     );
 
@@ -51,7 +53,7 @@ export class StellarVerifierClient {
   }
 
   async signExportManifest(payload: string): Promise<SignedPayload> {
-    const res = await fetch(`${serverConfig.stellarServiceUrl}/internal/sign`, {
+    const res = await fetch(`${this.config.stellarServiceUrl}/internal/sign`, {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify({ payload }),
@@ -65,7 +67,7 @@ export class StellarVerifierClient {
   }
 
   async verifyExportBundleRemote(bundle: AuditExportBundle): Promise<AuditExportVerifyReport> {
-    const res = await fetch(`${serverConfig.stellarServiceUrl}/internal/verify-export`, {
+    const res = await fetch(`${this.config.stellarServiceUrl}/internal/verify-export`, {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify({ bundle }),
@@ -83,8 +85,8 @@ export class StellarVerifierClient {
   }
 
   async fetchAnchoringHealth(): Promise<AnchoringHealthReport> {
-    const res = await fetch(`${serverConfig.stellarServiceUrl}/internal/anchoring/health`, {
-      headers: { "x-internal-service-token": serverConfig.internalServiceToken },
+    const res = await fetch(`${this.config.stellarServiceUrl}/internal/anchoring/health`, {
+      headers: { "x-internal-service-token": this.config.internalServiceToken },
     });
 
     if (res.status === 501) {
@@ -98,7 +100,7 @@ export class StellarVerifierClient {
   }
 
   async anchorEntriesImmediately(entries: ImmediateAnchorEntry[]): Promise<BatchAnchorResult> {
-    const res = await fetch(`${serverConfig.stellarServiceUrl}/internal/anchor-immediate`, {
+    const res = await fetch(`${this.config.stellarServiceUrl}/internal/anchor-immediate`, {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify({ entries }),
