@@ -1,5 +1,5 @@
-import { Controller, Post, Get, Body, Req, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import { Controller, Post, Get, Body, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
+import type { Response } from 'express';
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import type { UserRole, LoginResponse, LogoutResponse, MeResponse } from '@lumen/types';
@@ -14,6 +14,8 @@ import { authLogger } from '../utils/logger.js';
 import { incrementMetric, getAuthMetricsSnapshot } from '../utils/metrics.js';
 import { limited } from '../utils/rate-limiter.js';
 import { AuthGuard } from '../guards/auth.guard.js';
+import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
+import type { AuthContextType } from '../../../shared/types/auth-context.js';
 
 const seenRefreshTokens = new Set<string>();
 const resetTokens = new Map<string, { userId: string; expiresAt: number }>();
@@ -89,8 +91,8 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(AuthGuard)
-  me(@Req() req: Request, @Res() res: Response) {
-    const identity = identityStore.findById(req.auth!.userId);
+  me(@AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const identity = identityStore.findById(auth.userId);
     if (!identity) { 
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "user not found" }, HttpStatus.UNAUTHORIZED); 
     }
@@ -105,11 +107,11 @@ export class AuthController {
 
   @Get('owner-only')
   @UseGuards(AuthGuard)
-  ownerOnly(@Req() req: Request, @Res() res: Response) {
-    if (req.auth!.role !== "owner") {
+  ownerOnly(@AuthContext() auth: AuthContextType, @Res() res: Response) {
+    if (auth.role !== "owner") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "owner role required" }, HttpStatus.FORBIDDEN);
     }
-    return res.json({ ok: true, userId: req.auth!.userId, clinicId: req.auth!.clinicId });
+    return res.json({ ok: true, userId: auth.userId, clinicId: auth.clinicId });
   }
 
   @Post('refresh')
