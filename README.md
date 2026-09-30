@@ -228,6 +228,7 @@ apps/stellar-service/.env.example
 
 ## Documentation
 
+* [Express → NestJS migration tracker (Epics 0–11)](docs/nestjs-migration-tracker.md)
 * Architecture: `docs/architecture.md`
 * MVP Scope: `docs/mvp-scope.md`
 * Contributor Guide: `CONTRIBUTING.md`
