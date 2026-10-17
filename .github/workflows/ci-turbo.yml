@@ -1,0 +1,6 @@
+name: CI Turbo Cache
+on: [push]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps: []
