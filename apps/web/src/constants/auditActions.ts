@@ -1,0 +1,1 @@
+export const AUDIT_ACTION_OPTIONS = ['CREATE', 'UPDATE', 'DELETE'];
