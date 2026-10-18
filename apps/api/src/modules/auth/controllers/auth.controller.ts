@@ -9,6 +9,8 @@ import { sessionStore } from '../repositories/session.repository.js';
 import { accessTokenSigner } from '../services/token.service.js';
 import { accountStatusError, authErrorStatus, normalizeAuthError } from '../utils/errors.js';
 import { validatePassword } from '../utils/validators.js';
+import { BREACHED_PASSWORD_MESSAGE, checkPasswordBreached } from '../validators/password.validator.js';
+import { performDummyPasswordCompare } from '../services/login-timing.js';
 import { makeSession } from '../utils/session.factory.js';
 import { authLogger } from '../utils/logger.js';
 import { incrementMetric, getAuthMetricsSnapshot } from '../utils/metrics.js';
@@ -53,6 +55,9 @@ export class AuthController {
     
     const identity = identityStore.findByEmail(body.email);
     if (!identity) {
+      // Timing equalization: an unknown email must cost the same wall-clock
+      // time as a wrong password (docs/auth-threat-model.md T7).
+      await performDummyPasswordCompare(body.password);
       incrementMetric("auth_login_failure_total");
       authLogger.warn("auth.login.failure", { requestId, meta: { reason: "AUTH_INVALID_CREDENTIALS" } });
       throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid email or password" }, authErrorStatus("AUTH_INVALID_CREDENTIALS"));
@@ -166,7 +171,7 @@ export class AuthController {
   }
 
   @Post('password-reset/confirm')
-  passwordResetConfirm(@Body() body: any, @Res() res: Response) {
+  async passwordResetConfirm(@Body() body: any, @Res() res: Response) {
     const { token, password } = body;
     if (!token || !password) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "token and password are required" }, HttpStatus.BAD_REQUEST);
@@ -179,6 +184,13 @@ export class AuthController {
     if (!reset || Date.now() > reset.expiresAt) {
       resetTokens.delete(token);
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid or expired reset token" }, HttpStatus.UNAUTHORIZED);
+    }
+    // Known-breached passwords are rejected here. Deliberately *after* the
+    // token check: unauthenticated callers must not be able to make the API
+    // call out to the breach range API (docs/auth-threat-model.md T8).
+    const breach = await checkPasswordBreached(password);
+    if (breach.breached) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: BREACHED_PASSWORD_MESSAGE }, HttpStatus.BAD_REQUEST);
     }
     resetTokens.delete(token);
     authLogger.info("auth.recovery.completed", { userId: reset.userId });

@@ -3,7 +3,9 @@ type CounterKey =
   | "auth_login_failure_total"
   | "auth_account_lockout_total"
   | "auth_refresh_success_total"
-  | "auth_refresh_failure_total";
+  | "auth_refresh_failure_total"
+  | "auth_password_breach_rejected_total"
+  | "auth_password_breach_check_degraded_total";
 
 const counters: Record<CounterKey, number> = {
   auth_login_success_total: 0,
@@ -11,6 +13,8 @@ const counters: Record<CounterKey, number> = {
   auth_account_lockout_total: 0,
   auth_refresh_success_total: 0,
   auth_refresh_failure_total: 0,
+  auth_password_breach_rejected_total: 0,
+  auth_password_breach_check_degraded_total: 0,
 };
 
 export function incrementMetric(key: CounterKey): void {
