@@ -18,11 +18,26 @@ export type AuditAction =
  * immediately, rather than waiting for the next scheduled batch — a
  * staff-role change or clinic archival should never sit in a window where
  * it's provably un-anchored just because the batch interval hasn't elapsed.
+ *
+ * Membership is decided by the three-question test in
+ * `docs/adr/0002-critical-audit-actions.md`; changing this list means
+ * amending that ADR. Adding a new {@link AuditAction} string does **not**
+ * make it critical — see {@link isCriticalAuditAction}.
  */
-export const CRITICAL_AUDIT_ACTIONS: readonly AuditAction[] = ["staff.role_changed", "clinic.archived"];
+export const CRITICAL_AUDIT_ACTIONS: readonly AuditAction[] = [
+  "staff.role_changed",
+  "clinic.archived",
+  "staff.invitation_accepted",
+];
 
-export function isCriticalAuditAction(action: AuditAction): boolean {
-  return CRITICAL_AUDIT_ACTIONS.includes(action);
+/**
+ * Whether `action` must be anchored immediately. Unknown or future action
+ * strings (anything outside {@link CRITICAL_AUDIT_ACTIONS}) default to
+ * batched — see ADR 0002 §4, so a typo or a newly introduced action can
+ * never silently cost one Stellar transaction per occurrence.
+ */
+export function isCriticalAuditAction(action: string): boolean {
+  return (CRITICAL_AUDIT_ACTIONS as readonly string[]).includes(action);
 }
 
 /**
