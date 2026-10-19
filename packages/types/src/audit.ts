@@ -53,6 +53,13 @@ export type AuditEntry = {
   userAgent?: string;
   createdAt: string;
   /**
+   * Per-clinic chain linkage (#1326): sequence numbers increment
+   * monotonically per clinic; `prevHash` is the `sha256Hash` of the previous
+   * entry in that clinic's chain. Together they detect deletion/reordering.
+   */
+  sequence?: number;
+  prevHash?: string;
+  /**
    * SHA-256 hex digest over the canonical serialization of every other
    * field on this entry (see `hashAuditEntry` in `./hashing.js`). Lets a
    * verifier detect any post-write tampering with `before`/`after` or any
@@ -128,6 +135,11 @@ export type AuditVerifyResponse = {
   anchorMode?: AnchorMode;
   checkedAt: string;
   reason?: string;
+  /** Gap/completeness reporting for the range this entry belongs to (#1327). */
+  sequenceGaps?: number[];
+  firstSequence?: number;
+  lastSequence?: number;
+  completeRange?: boolean;
 };
 
 /**
@@ -160,6 +172,14 @@ export type AuditExportBundle = {
   /** Stellar (ed25519) public key of the signer, e.g. "GABC...". */
   signingPublicKey: string;
   entries: AuditEntry[];
+  /**
+   * Gap/completeness reporting for the exported range (#1327): the
+   * sequenced span covered and whether anything inside it is missing.
+   */
+  sequenceGaps?: number[];
+  firstSequence?: number;
+  lastSequence?: number;
+  completeRange?: boolean;
 };
 
 /** Per-entry outcome of independently re-verifying an `AuditExportBundle`. */
@@ -198,4 +218,9 @@ export type AuditExportVerifyReport = {
   signingKeyAuthorized?: boolean;
   /** True only if the signature, digest, every entry, and (when checked) the signing key authorization all check out. */
   ok: boolean;
+  /** Gap/completeness reporting for the exported range (#1327). */
+  sequenceGaps?: number[];
+  firstSequence?: number;
+  lastSequence?: number;
+  completeRange?: boolean;
 };

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditController } from './controllers/audit.controller.js';
 import { InternalAuditController } from './controllers/internal-audit.controller.js';
 import { AuditService } from './services/audit.service.js';
+import { ChainService } from './services/chain.service.js';
 import { AuditRepository, auditStore } from './repositories/audit.repository.js';
 import { StellarVerifierClient } from './services/stellar-verifier.client.js';
 import { InternalServiceTokenGuard } from './guards/internal-service-token.guard.js';
@@ -13,6 +14,7 @@ import { AuthModule } from '../auth/auth.module.js';
   providers: [
     AuditService,
     StellarVerifierClient,
+    ChainService,
     // Listed explicitly so the guard's ConfigService dependency is resolved by
     // the injector rather than by ad-hoc enhancer instantiation.
     InternalServiceTokenGuard,
