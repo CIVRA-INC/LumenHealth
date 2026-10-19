@@ -91,7 +91,9 @@ export type AuthEventType =
   | "auth.account.locked"
   | "invitation.sent"
   | "invitation.accepted"
-  | "invitation.revoked";
+  | "invitation.revoked"
+  | "auth.password_breach.rejected"
+  | "auth.password_breach.check_degraded";
 
 export type AuthEvent = {
   type: AuthEventType;

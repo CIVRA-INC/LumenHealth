@@ -101,6 +101,34 @@ This document covers the authentication surface for the LumenHealth MVP: credent
 
 **Status:** Planned for milestone 1 when cookie auth is implemented.
 
+---
+
+### T7 — Account Enumeration via Response Timing
+
+**Threat:** `POST /auth/login` answered immediately for unknown emails (no bcrypt work), so response timing distinguished registered from unregistered addresses — and a registration endpoint answering "email taken" would confirm accounts on demand.
+
+**Mitigation:**
+- Unknown-email logins now perform a **dummy bcrypt compare** (same algorithm and cost 12 as every application password hash) before returning the same `AUTH_INVALID_CREDENTIALS` body as a wrong password — `apps/api/src/modules/auth/services/login-timing.ts`, wired in the login handler.
+- Failure responses are uniform: unknown email and wrong password both answer `AUTH_INVALID_CREDENTIALS` (401) with identical bodies.
+
+**Registration policy (decided trade-off):** There is currently **no registration handler in the NestJS API** (the Express `register` export was dropped during the migration). The policy that binds whoever adds it: registration must answer a **uniform accepted response plus a verification email for every address** — never an `AUTH_EMAIL_TAKEN`-style reply that confirms an account exists. Trade-off: someone re-registering an address that already has an account gets no instant "email taken" error (worse UX on that path); the verification email carries the "this address already has an account — sign in instead" message, so the flow still converges. The enumeration win is worth the UX cost. (`AUTH_EMAIL_TAKEN` stays in the error table for API-client use; the endpoint must not distinguish it in its response.)
+
+**Status:** Login timing equalization implemented (`performDummyPasswordCompare`, unit-tested in `apps/api/src/modules/auth/tests/login-timing.test.ts`). Registration handler absent — policy above is binding when it lands.
+
+---
+
+### T8 — Credential Stuffing via Known-Breached Passwords
+
+**Threat:** Users set passwords that already appear in breach corpora, so attackers replay them without any guessing.
+
+**Mitigation:**
+- Password validation is extended with a **k-anonymity range check** against the Have I Been Pwned range API: only the first 5 hex characters of the password's SHA-1 leave the process; the full digest never does (`checkPasswordBreached`, `password.validator.ts`).
+- **2 s timeout**; on outage or timeout the check degrades to a bundled **offline corpus** of the most common breached passwords, and otherwise **fails open** — a third-party outage must never block a legitimate password reset. Degradation increments `auth_password_breach_check_degraded_total` and logs `auth.password_breach.check_degraded`.
+- Rejections increment `auth_password_breach_rejected_total` and log `auth.password_breach.rejected`.
+- `POST /auth/password-reset/confirm` rejects breached candidates; the check runs **after** the reset token is validated so unauthenticated callers cannot make the API call out to the range API.
+
+**Status:** Implemented on password reset; register path pending the registration handler (T7) and must call `validatePasswordWithBreaches`, which combines policy and breach screening.
+
 ## Out of Scope (This Milestone)
 
 - Stellar keypair authentication
