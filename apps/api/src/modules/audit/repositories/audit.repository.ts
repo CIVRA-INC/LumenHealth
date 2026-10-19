@@ -14,6 +14,14 @@ export class AuditRepository {
     return this.store.get(auditId);
   }
 
+  findAll(): AuditEntry[] {
+    return [...this.store.values()];
+  }
+
+  delete(auditId: string): boolean {
+    return this.store.delete(auditId);
+  }
+
   findUnanchored(): AuditEntry[] {
     return [...this.store.values()].filter((entry) => !entry.stellarTxHash);
   }
