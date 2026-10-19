@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import type { Invitation, SendInvitationRequest, UserRole, InvitationStatus } from '@lumen/types';
 import { InvitationRepository } from '../repositories/invitation.repository.js';
 import { identityStore } from '../../auth/repositories/identity.repository.js';
+import { paginateByCursor } from '../../../shared/pagination/cursor.js';
 import { authLogger } from '../../../shared/logger/index.js';
 
 const EXPIRY_HOURS = 72;
@@ -112,6 +113,13 @@ export class InvitationService {
 
   listInvitations(clinicId: string, filter?: { status?: InvitationStatus }) {
     return this.invitationRepository.listByClinic(clinicId, filter);
+  }
+
+  listInvitationsPage(clinicId: string, opts: { cursor?: string; limit?: number; status?: InvitationStatus } = {}) {
+    const sorted = this.invitationRepository
+      .listByClinic(clinicId, opts.status ? { status: opts.status } : undefined)
+      .sort((a, b) => `${b.createdAt}|${b.invitationId}`.localeCompare(`${a.createdAt}|${a.invitationId}`));
+    return paginateByCursor(sorted, (i) => `${i.createdAt}|${i.invitationId}`, opts.cursor, opts.limit);
   }
 
   revokeInvitation(
