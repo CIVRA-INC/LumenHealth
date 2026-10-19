@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from "crypto";
 import type { StaffMember, UpdateStaffRoleRequest, UserRole } from "@lumen/types";
-import { StaffRepository } from "../repositories/staff.repository.js";
+import { LastOwnerError, StaffRepository } from "../repositories/staff.repository.js";
 import { AuditService } from "../../audit/services/audit.service.js";
 
 @Injectable()
@@ -39,7 +39,13 @@ export class StaffService {
       updatedAt: new Date().toISOString(),
     };
 
-    const saved = this.staffRepository.save(updated);
+    let saved: StaffMember;
+    try {
+      saved = this.staffRepository.save(updated);
+    } catch (err) {
+      if (err instanceof LastOwnerError) return { error: "STAFF_LAST_OWNER", message: err.message };
+      throw err;
+    }
 
     this.auditService.recordAudit({
       clinicId: callerClinicId,
