@@ -66,6 +66,7 @@ export class AuditService {
   ) {}
 
   recordAudit(params: RecordAuditParams): AuditEntry {
+    const chain = this.chainService.getStateForClinic(params.clinicId);
     const unhashed = {
       auditId: randomUUID(),
       clinicId: params.clinicId,
@@ -79,6 +80,8 @@ export class AuditService {
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,
       createdAt: new Date().toISOString(),
+      sequence: (chain.lastSequence ?? 0) + 1,
+      prevHash: chain.lastHash,
     };
     const entry: AuditEntry = {
       ...unhashed,
@@ -150,6 +153,8 @@ export class AuditService {
       return null;
     }
 
+    const chain = this.chainService.reportForClinic(clinicId);
+
     const { sha256Hash: storedHash, stellarTxHash, merkleRoot, anchoredAt, merkleProof, anchorMode, ...hashable } =
       entry;
     void anchoredAt;
@@ -166,11 +171,30 @@ export class AuditService {
         stellarTxHash,
         checkedAt,
         reason: "stored content no longer matches its recorded hash",
+        ...chain,
+      };
+    }
+
+    // #1326: the per-clinic hash chain must still link this entry to its
+    // predecessor — a deleted or reordered entry fails here even when its
+    // own content hash is intact.
+    const linkage = this.chainService.verifyLinkage(clinicId, entry);
+    if (!linkage.ok) {
+      return {
+        auditId,
+        status: "tampered",
+        recomputedHash,
+        storedHash,
+        merkleRoot,
+        stellarTxHash,
+        checkedAt,
+        reason: linkage.reason,
+        ...chain,
       };
     }
 
     if (!stellarTxHash || !merkleRoot || !merkleProof) {
-      return { auditId, status: "unanchored", recomputedHash, storedHash, checkedAt };
+      return { auditId, status: "unanchored", recomputedHash, storedHash, checkedAt, ...chain };
     }
 
     const chainRoot = await this.stellarVerifierClient.fetchAnchoredMerkleRoot(stellarTxHash);
@@ -185,6 +209,7 @@ export class AuditService {
         stellarTxHash,
         checkedAt,
         reason: "stored merkle root does not match the root anchored on Stellar",
+        ...chain,
       };
     }
 
@@ -198,6 +223,7 @@ export class AuditService {
         stellarTxHash,
         checkedAt,
         reason: "merkle proof does not resolve to the on-chain root",
+        ...chain,
       };
     }
 
@@ -210,6 +236,7 @@ export class AuditService {
       stellarTxHash,
       anchorMode,
       checkedAt,
+      ...chain,
     };
   }
 
@@ -236,7 +263,8 @@ export class AuditService {
     };
 
     const { signature, publicKey } = await this.stellarVerifierClient.signExportManifest(canonicalize(manifest));
+    const chain = this.chainService.reportForClinic(clinicId);
 
-    return { manifest, signature, signingPublicKey: publicKey, entries };
+    return { manifest, signature, signingPublicKey: publicKey, entries, ...chain };
   }
 }
