@@ -2,10 +2,10 @@ import { Controller, Get, Post, Body, Req, Res, HttpException, HttpStatus, UseGu
 import type { Request, Response } from 'express';
 import type { BatchAnchorResult } from '@lumen/types';
 import { AuditService } from '../services/audit.service.js';
-import { InternalServiceTokenGuard } from '../guards/internal-service-token.guard.js';
+import { InternalRequestAuthGuard } from '../guards/internal-request-auth.guard.js';
 
 @Controller('internal/audit')
-@UseGuards(InternalServiceTokenGuard)
+@UseGuards(InternalRequestAuthGuard)
 export class InternalAuditController {
   constructor(private readonly auditService: AuditService) {}
 

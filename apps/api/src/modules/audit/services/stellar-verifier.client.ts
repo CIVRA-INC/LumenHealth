@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { signInternalRequest } from "@lumen/types";
 import type {
   AnchoringHealthReport,
   AuditExportBundle,
@@ -26,20 +27,25 @@ export type ImmediateAnchorEntry = { auditId: string; sha256Hash: string; create
 export class StellarVerifierClient {
   constructor(private readonly config: ConfigService) {}
 
-  private getHeaders() {
+  private authHeaders(method: string, url: string, body?: unknown): Record<string, string> {
+    const primary = this.config.internalServiceSecrets[0];
+    if (!primary) {
+      throw new Error("[audit] no internal service secret configured");
+    }
+    const { pathname, search } = new URL(url);
     return {
       "Content-Type": "application/json",
-      "x-internal-service-token": this.config.internalServiceToken,
+      // #1345: short-lived HMAC signature over method + path + body hash +
+      // timestamp + nonce, replacing the static service token.
+      ...signInternalRequest({ method, path: `${pathname}${search}`, body }, primary),
     };
   }
 
   async fetchAnchoredMerkleRoot(txHash: string): Promise<string | null> {
-    const res = await fetch(
-      `${this.config.stellarServiceUrl}/internal/tx/${encodeURIComponent(txHash)}/merkle-root`,
-      {
-        headers: { "x-internal-service-token": this.config.internalServiceToken },
-      },
-    );
+    const url = `${this.config.stellarServiceUrl}/internal/tx/${encodeURIComponent(txHash)}/merkle-root`;
+    const res = await fetch(url, {
+      headers: this.authHeaders("GET", url),
+    });
 
     if (res.status === 404) {
       return null;
@@ -53,9 +59,10 @@ export class StellarVerifierClient {
   }
 
   async signExportManifest(payload: string): Promise<SignedPayload> {
-    const res = await fetch(`${this.config.stellarServiceUrl}/internal/sign`, {
+    const url = `${this.config.stellarServiceUrl}/internal/sign`;
+    const res = await fetch(url, {
       method: "POST",
-      headers: this.getHeaders(),
+      headers: this.authHeaders("POST", url, { payload }),
       body: JSON.stringify({ payload }),
     });
 
@@ -67,9 +74,10 @@ export class StellarVerifierClient {
   }
 
   async verifyExportBundleRemote(bundle: AuditExportBundle): Promise<AuditExportVerifyReport> {
-    const res = await fetch(`${this.config.stellarServiceUrl}/internal/verify-export`, {
+    const url = `${this.config.stellarServiceUrl}/internal/verify-export`;
+    const res = await fetch(url, {
       method: "POST",
-      headers: this.getHeaders(),
+      headers: this.authHeaders("POST", url, { bundle }),
       body: JSON.stringify({ bundle }),
     });
 
@@ -85,8 +93,9 @@ export class StellarVerifierClient {
   }
 
   async fetchAnchoringHealth(): Promise<AnchoringHealthReport> {
-    const res = await fetch(`${this.config.stellarServiceUrl}/internal/anchoring/health`, {
-      headers: { "x-internal-service-token": this.config.internalServiceToken },
+    const url = `${this.config.stellarServiceUrl}/internal/anchoring/health`;
+    const res = await fetch(url, {
+      headers: this.authHeaders("GET", url),
     });
 
     if (res.status === 501) {
@@ -100,9 +109,10 @@ export class StellarVerifierClient {
   }
 
   async anchorEntriesImmediately(entries: ImmediateAnchorEntry[]): Promise<BatchAnchorResult> {
-    const res = await fetch(`${this.config.stellarServiceUrl}/internal/anchor-immediate`, {
+    const url = `${this.config.stellarServiceUrl}/internal/anchor-immediate`;
+    const res = await fetch(url, {
       method: "POST",
-      headers: this.getHeaders(),
+      headers: this.authHeaders("POST", url, { entries }),
       body: JSON.stringify({ entries }),
     });
 
