@@ -39,6 +39,11 @@ export class ClinicService {
     return this.clinicRepository.save(clinic);
   }
 
+  /** Registration: persists the clinic with its submitted name so GET /clinics/:clinicId can return it. */
+  registerClinic(name: string, ownerId: string, clinicId: string): Clinic {
+    return this.createClinic({ name, address: '', phone: '', email: '' }, ownerId, clinicId);
+  }
+
   getClinic(clinicId: string, callerClinicId: string): Clinic | null {
     const clinic = this.clinicRepository.findById(clinicId);
     if (!clinic || clinic.clinicId !== callerClinicId) return null;
