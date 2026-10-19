@@ -82,7 +82,7 @@ export class AuthController {
     seenRefreshTokens.add(refreshToken);
     incrementMetric("auth_login_success_total");
     authLogger.info("auth.login.success", { requestId, userId: identity.userId, clinicId: identity.clinicId });
-    const payload: LoginResponse = { session: { userId: identity.userId, clinicId: identity.clinicId, role: identity.role, accessToken } };
+    const payload: LoginResponse = { session: { userId: identity.userId, clinicId: identity.clinicId, role: identity.role, accessToken, refreshToken } };
     return res.json(payload);
   }
 
@@ -142,7 +142,11 @@ export class AuthController {
     }
     sessionStore.revokeByRefreshToken(refreshToken);
     const identity = identityStore.findById(existing.userId);
-    const role = identity?.role ?? "owner";
+    if (!identity || accountStatusError(identity.status)) {
+      incrementMetric("auth_refresh_failure_total");
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid refresh token" }, authErrorStatus("AUTH_TOKEN_INVALID"));
+    }
+    const role = identity.role;
     const nextAccess = accessTokenSigner.sign({ sub: existing.userId, clinicId: existing.clinicId, role });
     const nextRefresh = randomUUID();
     seenRefreshTokens.add(nextRefresh);
