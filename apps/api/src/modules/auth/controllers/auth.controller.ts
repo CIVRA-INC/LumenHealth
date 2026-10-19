@@ -19,12 +19,10 @@ import { AuthGuard } from '../guards/auth.guard.js';
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
 
-const seenRefreshTokens = new Set<string>();
 const resetTokens = new Map<string, { userId: string; expiresAt: number }>();
 const verifyTokens = new Map<string, { userId: string; email: string; expiresAt: number }>();
 
 export function _resetAuthStateForTests() {
-  seenRefreshTokens.clear();
   resetTokens.clear();
   verifyTokens.clear();
 }
@@ -79,7 +77,6 @@ export class AuthController {
     const accessToken = accessTokenSigner.sign({ sub: identity.userId, clinicId: identity.clinicId, role: identity.role });
     const refreshToken = randomUUID();
     sessionStore.save(makeSession({ sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken }));
-    seenRefreshTokens.add(refreshToken);
     incrementMetric("auth_login_success_total");
     authLogger.info("auth.login.success", { requestId, userId: identity.userId, clinicId: identity.clinicId });
     const payload: LoginResponse = { session: { userId: identity.userId, clinicId: identity.clinicId, role: identity.role, accessToken } };
@@ -133,8 +130,10 @@ export class AuthController {
     }
     const existing = sessionStore.findByRefreshToken(refreshToken);
     if (!existing) {
-      if (seenRefreshTokens.has(refreshToken)) {
-        authLogger.warn("auth.token.expired", { meta: { reason: "refresh_reuse_detected" } });
+      const reusedFamily = sessionStore.wasRotated(refreshToken);
+      if (reusedFamily) {
+        sessionStore.revokeFamily(reusedFamily);
+        authLogger.warn("auth.token.expired", { meta: { reason: "refresh_reuse_detected", familyId: reusedFamily } });
         authLogger.warn("auth.login.failure", { meta: { reason: "suspicious_reuse" } });
       }
       incrementMetric("auth_refresh_failure_total");
@@ -145,8 +144,7 @@ export class AuthController {
     const role = identity?.role ?? "owner";
     const nextAccess = accessTokenSigner.sign({ sub: existing.userId, clinicId: existing.clinicId, role });
     const nextRefresh = randomUUID();
-    seenRefreshTokens.add(nextRefresh);
-    sessionStore.save(makeSession({ sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh }));
+    sessionStore.save(makeSession({ sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh, familyId: existing.familyId }));
     incrementMetric("auth_refresh_success_total");
     authLogger.info("auth.token.refreshed", { requestId, userId: existing.userId, clinicId: existing.clinicId });
     return res.json({ ok: true, accessToken: nextAccess, refreshToken: nextRefresh });
