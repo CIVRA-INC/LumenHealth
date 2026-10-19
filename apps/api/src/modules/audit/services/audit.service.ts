@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID, createHash } from 'crypto';
+import { isCriticalAuditAction } from "@lumen/types";
 import type {
   AuditAction,
   AuditEntry,
@@ -40,17 +41,6 @@ function verifyMerkleProof(hash: string, proof: { direction: 'left' | 'right', h
     currentHash = sha256Hash(pair);
   }
   return currentHash === root;
-}
-
-const CRITICAL_ACTIONS: AuditAction[] = [
-  "staff.invited",
-  "staff.invitation_revoked",
-  "staff.archived",
-  "clinic.archived",
-];
-
-function isCriticalAuditAction(action: AuditAction): boolean {
-  return CRITICAL_ACTIONS.includes(action);
 }
 
 export type RecordAuditParams = {
