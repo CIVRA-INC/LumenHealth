@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID, createHash } from 'crypto';
+import { isCriticalAuditAction } from "@lumen/types";
 import type {
   AuditAction,
   AuditEntry,
@@ -12,7 +13,7 @@ import type {
 } from "@lumen/types";
 import { AuditRepository } from "../repositories/audit.repository.js";
 import { StellarVerifierClient } from "./stellar-verifier.client.js";
-import { ChainService } from "./chain.service.js";
+import { RetentionService } from "./retention.service.js";
 
 function canonicalize(data: unknown): string {
   if (data === null || typeof data !== "object") return JSON.stringify(data);
@@ -43,17 +44,6 @@ function verifyMerkleProof(hash: string, proof: { direction: 'left' | 'right', h
   return currentHash === root;
 }
 
-const CRITICAL_ACTIONS: AuditAction[] = [
-  "staff.invited",
-  "staff.invitation_revoked",
-  "staff.archived",
-  "clinic.archived",
-];
-
-function isCriticalAuditAction(action: AuditAction): boolean {
-  return CRITICAL_ACTIONS.includes(action);
-}
-
 export type RecordAuditParams = {
   clinicId: string;
   action: AuditAction;
@@ -72,7 +62,7 @@ export class AuditService {
   constructor(
     private readonly auditRepository: AuditRepository,
     private readonly stellarVerifierClient: StellarVerifierClient,
-    private readonly chainService: ChainService
+    private readonly retentionService: RetentionService
   ) {}
 
   recordAudit(params: RecordAuditParams): AuditEntry {
@@ -156,7 +146,9 @@ export class AuditService {
     clinicId: string,
     auditId: string
   ): Promise<AuditVerifyResponse | null> {
-    const entry = this.auditRepository.findById(auditId);
+    // Hot store first, then the cold archive — archived entries verify
+    // exactly like hot ones (retention policy v1.0, #1330).
+    const entry = await this.retentionService.findEntryIncludingArchive(auditId);
     if (!entry || entry.clinicId !== clinicId) {
       return null;
     }
@@ -221,7 +213,7 @@ export class AuditService {
       };
     }
 
-    if (!verifyMerkleProof(recomputedHash, merkleProof, chainRoot)) {
+    if (!verifyMerkleProof(recomputedHash, merkleProof as unknown as { direction: 'left' | 'right'; hash: string }[], chainRoot)) {
       return {
         auditId,
         status: "tampered",

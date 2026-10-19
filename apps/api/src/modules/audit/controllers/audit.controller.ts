@@ -1,4 +1,4 @@
-import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param, Ip } from '@nestjs/common';
 import type { Response } from "express";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
@@ -12,6 +12,11 @@ import {
   InvalidExportBundleError,
   StellarVerifierClient,
 } from "../services/stellar-verifier.client.js";
+import {
+  VerificationBudgetExceededError,
+  verifyExportProtection,
+  withTimeBudget,
+} from "../services/verify-export.protection.js";
 
 @Controller('audit')
 export class AuditController {
@@ -122,7 +127,7 @@ export class AuditController {
   }
 
   @Post('verify-export')
-  async verifyExport(@Body('bundle') bundle: unknown, @Res() res: Response) {
+  async verifyExport(@Body('bundle') bundle: unknown, @Ip() ip: string, @Res() res: Response) {
     function isPlausibleExportBundle(value: unknown): value is AuditExportBundle {
       if (!value || typeof value !== "object") return false;
       const b = value as Partial<AuditExportBundle>;
@@ -137,6 +142,21 @@ export class AuditController {
       );
     }
 
+    // Abuse protection (#1336): rate limit first — the cheapest gate — then
+    // shape, then the per-request work plan (distinct-transaction cap bounds
+    // the Horizon lookups stellar-service can be asked for), then the global
+    // concurrency gate and the wall-clock budget.
+    const rate = verifyExportProtection.checkRate(ip ?? "unknown");
+    if (!rate.allowed) {
+      throw new HttpException(
+        {
+          error: "RATE_LIMITED",
+          message: `too many verify-export requests; retry in ${Math.max(Math.ceil(rate.retryAfterMs / 1000), 1)}s`,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     if (!isPlausibleExportBundle(bundle)) {
       throw new HttpException({
         error: "INVALID_BODY",
@@ -144,10 +164,40 @@ export class AuditController {
       }, HttpStatus.BAD_REQUEST);
     }
 
+    const plan = verifyExportProtection.plan(bundle);
+    if (!plan.allowed) {
+      throw new HttpException(
+        { error: "EXPORT_TOO_LARGE", message: plan.reason },
+        HttpStatus.PAYLOAD_TOO_LARGE,
+      );
+    }
+
+    if (!verifyExportProtection.concurrency.tryAcquire()) {
+      throw new HttpException(
+        {
+          error: "VERIFICATION_BUSY",
+          message: `too many concurrent verifications in flight (${verifyExportProtection.config.maxConcurrentVerifications}); retry shortly`,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     try {
-      const report = await this.stellarVerifierClient.verifyExportBundleRemote(bundle as AuditExportBundle);
+      const report = await withTimeBudget(
+        this.stellarVerifierClient.verifyExportBundleRemote(bundle),
+        verifyExportProtection.config.timeBudgetMs,
+      );
+      // Successful verification warms the root cache: repeat hashes across
+      // requests become zero-Horizon-lookup cache hits.
+      verifyExportProtection.remember(bundle);
       return res.json(report);
     } catch (error) {
+      if (error instanceof VerificationBudgetExceededError) {
+        throw new HttpException(
+          { error: "VERIFICATION_BUDGET_EXCEEDED", message: error.message },
+          HttpStatus.GATEWAY_TIMEOUT,
+        );
+      }
       if (error instanceof InvalidExportBundleError) {
         throw new HttpException({ error: "INVALID_BODY", message: error.message }, HttpStatus.BAD_REQUEST);
       }
@@ -155,6 +205,8 @@ export class AuditController {
         error: "STELLAR_SERVICE_UNAVAILABLE",
         message: error instanceof Error ? error.message : "failed to reach stellar-service",
       }, HttpStatus.BAD_GATEWAY);
+    } finally {
+      verifyExportProtection.concurrency.release();
     }
   }
 }
