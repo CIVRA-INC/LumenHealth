@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { paginateByCursor, type CursorPage } from '../../../shared/pagination/cursor.js';
 import type { AuditEntry, AuditQuery, BatchAnchorResult } from "@lumen/types";
 
 export class AuditImmutableError extends Error {
@@ -96,6 +97,14 @@ export class AuditRepository {
     results = results.slice(offset, offset + limit);
 
     return { entries: results, total };
+  }
+
+  /** Cursor-paginated variant of `query`: newest first, stable while entries are appended, no total. */
+  queryPage(q: AuditQuery & { cursor?: string }): CursorPage<AuditEntry> {
+    const matching = this.query({ ...q, page: 1, limit: Number.MAX_SAFE_INTEGER }).entries.sort((a, b) =>
+      `${b.createdAt}|${b.auditId}`.localeCompare(`${a.createdAt}|${a.auditId}`),
+    );
+    return paginateByCursor(matching, (e) => `${e.createdAt}|${e.auditId}`, q.cursor || undefined, q.limit ?? 50);
   }
 
   _reset(): void {

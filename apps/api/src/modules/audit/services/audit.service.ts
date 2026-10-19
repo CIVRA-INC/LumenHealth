@@ -111,6 +111,10 @@ export class AuditService {
     return this.auditRepository.query(q);
   }
 
+  queryAuditLogPage(q: AuditQuery & { cursor?: string }) {
+    return this.auditRepository.queryPage(q);
+  }
+
   getUnanchoredEntries(): { auditId: string; sha256Hash: string; createdAt: string }[] {
     return this.auditRepository.findUnanchored().map((entry) => ({
       auditId: entry.auditId,

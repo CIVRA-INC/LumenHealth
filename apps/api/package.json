@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
+    "migrate": "tsx src/shared/migrations/cli.ts",
     "test": "vitest run"
   },
   "dependencies": {

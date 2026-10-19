@@ -111,6 +111,8 @@ export type AuditQuery = {
   to?: string;
   page?: number;
   limit?: number;
+  /** Opaque cursor from a previous page's `nextCursor`; use instead of `page`. */
+  cursor?: string;
   /** Filter by anchor status: true = anchored entries only, false = unanchored only. */
   anchored?: boolean;
 };

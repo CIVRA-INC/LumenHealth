@@ -35,7 +35,22 @@ export class AuditController {
     }
 
     const clinicId = auth.clinicId;
-    const { action, actorId, targetId, from, to, page, limit } = query;
+    const { action, actorId, targetId, from, to, page, limit, cursor } = query;
+
+    // Cursor mode (`?cursor=` or `?cursor=<opaque>`): newest first, `nextCursor` instead of `total`.
+    if (cursor !== undefined) {
+      const { items, nextCursor } = this.auditService.queryAuditLogPage({
+        clinicId,
+        action: action as AuditAction | undefined,
+        actorId: actorId as string | undefined,
+        targetId: targetId as string | undefined,
+        from: from as string | undefined,
+        to: to as string | undefined,
+        limit: limit ? Number(limit) : undefined,
+        cursor: String(cursor),
+      });
+      return res.json({ entries: items, nextCursor });
+    }
 
     const result = this.auditService.queryAuditLog({
       clinicId,

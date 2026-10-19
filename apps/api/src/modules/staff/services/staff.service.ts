@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import type { StaffMember, UpdateStaffRoleRequest, UserRole } from "@lumen/types";
 import { LastOwnerError, StaffRepository } from "../repositories/staff.repository.js";
 import { AuditService } from "../../audit/services/audit.service.js";
+import { paginateByCursor } from "../../../shared/pagination/cursor.js";
 
 @Injectable()
 export class StaffService {
@@ -13,6 +14,13 @@ export class StaffService {
 
   listStaff(clinicId: string): StaffMember[] {
     return this.staffRepository.listByClinic(clinicId);
+  }
+
+  listStaffPage(clinicId: string, opts: { cursor?: string; limit?: number } = {}) {
+    const sorted = this.staffRepository
+      .listByClinic(clinicId)
+      .sort((a, b) => `${b.joinedAt}|${b.staffId}`.localeCompare(`${a.joinedAt}|${a.staffId}`));
+    return paginateByCursor(sorted, (m) => `${m.joinedAt}|${m.staffId}`, opts.cursor, opts.limit);
   }
 
   updateStaffRole(
