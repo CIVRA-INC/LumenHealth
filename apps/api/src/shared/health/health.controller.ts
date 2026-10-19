@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
+import { isDbReady, readDbConfig } from '../db/connection.js';
 
 /**
  * Liveness/readiness endpoint for external uptime checks.
@@ -16,5 +17,16 @@ export class HealthController {
   @Get()
   health() {
     return { service: 'api', status: 'ok', milestone: 'staff-invitations' };
+  }
+
+  /** Readiness: 503 when a database is configured but not reachable. */
+  @Get('ready')
+  async ready() {
+    const dbConfigured = readDbConfig() !== undefined;
+    const db = dbConfigured ? ((await isDbReady()) ? 'up' : 'down') : 'not_configured';
+    if (db === 'down') {
+      throw new HttpException({ service: 'api', status: 'unavailable', db }, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return { service: 'api', status: 'ready', db };
   }
 }

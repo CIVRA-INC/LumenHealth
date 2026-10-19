@@ -5,8 +5,13 @@ import { AppModule } from './app.module.js';
 import { serverConfig } from '@lumen/config';
 import { createGlobalValidationPipe } from './shared/validation/global-validation.pipe.js';
 import { app as expressApp } from './app.js';
+import { closeDb, connectDb, readDbConfig } from './shared/db/connection.js';
 
 async function bootstrap() {
+  // Refuse to start when a configured database is unreachable.
+  const dbConfig = readDbConfig();
+  if (dbConfig) await connectDb(dbConfig);
+
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(expressApp)
@@ -26,6 +31,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1', {
     exclude: [
       { path: 'health', method: RequestMethod.GET },
+      { path: 'health/ready', method: RequestMethod.GET },
       { path: 'internal/audit/(.*)', method: RequestMethod.ALL },
     ],
   });
@@ -36,6 +42,10 @@ async function bootstrap() {
   app.useGlobalPipes(createGlobalValidationPipe());
 
   await app.init();
+
+  app.enableShutdownHooks();
+  process.once('SIGTERM', () => void closeDb());
+  process.once('SIGINT', () => void closeDb());
 
   expressApp.listen(serverConfig.apiPort, () => {
     console.log(`LumenHealth API running on http://localhost:${serverConfig.apiPort}`);
