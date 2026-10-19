@@ -8,7 +8,7 @@ import { AuditArchiveRepository } from './repositories/audit-archive.repository.
 import { RetentionService } from './services/retention.service.js';
 import { IntegritySamplerService } from './services/integrity-sampler.service.js';
 import { StellarVerifierClient } from './services/stellar-verifier.client.js';
-import { InternalServiceTokenGuard } from './guards/internal-service-token.guard.js';
+import { InternalRequestAuthGuard } from './guards/internal-request-auth.guard.js';
 import { AuthModule } from '../auth/auth.module.js';
 
 @Module({

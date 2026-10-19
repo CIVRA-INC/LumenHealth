@@ -43,6 +43,11 @@ export class ConfigService {
   get internalServiceToken(): string {
     return this.server.internalServiceToken;
   }
+
+  /** Active HMAC secrets for signed service-to-service requests (#1345). */
+  get internalServiceSecrets(): { keyId: string; secret: string }[] {
+    return this.server.internalServiceSecrets;
+  }
   get stellarServiceUrl(): string {
     return this.server.stellarServiceUrl;
   }

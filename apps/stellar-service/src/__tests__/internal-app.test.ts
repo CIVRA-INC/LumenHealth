@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { serverConfig } from "@lumen/config";
+import { signInternalRequest } from "@lumen/types";
 import { createInternalApp } from "../internal-app.js";
 import type { SignPayload } from "../internal-app.js";
 import type { Express } from "express";
@@ -24,18 +25,30 @@ const fakeSignPayload: SignPayload = (payload) => ({
 async function req(
   app: Express,
   path: string,
-  options: { method?: "GET" | "POST"; token?: string; body?: unknown } = {},
+  options: { method?: "GET" | "POST"; auth?: "valid" | "missing" | "wrong"; body?: unknown } = {},
 ): Promise<{ status: number; body: unknown }> {
   const { createServer } = await import("http");
+  const method = options.method ?? "GET";
+  const auth = options.auth ?? "missing";
+  let authHeaders: Record<string, string> = {};
+  if (auth === "valid") {
+    const primary = serverConfig.internalServiceSecrets[0]!;
+    authHeaders = signInternalRequest({ method, path, body: options.body }, primary);
+  } else if (auth === "wrong") {
+    authHeaders = signInternalRequest(
+      { method, path, body: options.body },
+      { keyId: "unknown-key", secret: "wrong-secret" },
+    );
+  }
   return new Promise((resolve, reject) => {
     const server = createServer(app);
     server.listen(0, () => {
       const port = (server.address() as { port: number }).port;
       fetch(`http://localhost:${port}${path}`, {
-        method: options.method ?? "GET",
+        method,
         headers: {
           "Content-Type": "application/json",
-          ...(options.token ? { "x-internal-service-token": options.token } : {}),
+          ...authHeaders,
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
       })
@@ -53,15 +66,15 @@ async function req(
 }
 
 describe("GET /internal/tx/:txHash/merkle-root", () => {
-  it("rejects requests without a valid internal service token", async () => {
+  it("rejects requests without a valid internal auth signature", async () => {
     const app = createInternalApp(async () => "some-root", fakeSignPayload);
     const { status } = await req(app, "/internal/tx/tx-1/merkle-root");
     expect(status).toBe(401);
   });
 
-  it("rejects requests with the wrong token", async () => {
+  it("rejects requests signed with an unknown key", async () => {
     const app = createInternalApp(async () => "some-root", fakeSignPayload);
-    const { status } = await req(app, "/internal/tx/tx-1/merkle-root", { token: "wrong-token" });
+    const { status } = await req(app, "/internal/tx/tx-1/merkle-root", { auth: "wrong" });
     expect(status).toBe(401);
   });
 
@@ -70,7 +83,7 @@ describe("GET /internal/tx/:txHash/merkle-root", () => {
     const app = createInternalApp(getMerkleRootForTx, fakeSignPayload);
 
     const { status, body } = await req(app, "/internal/tx/tx-abc/merkle-root", {
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
     });
 
     expect(status).toBe(200);
@@ -81,7 +94,7 @@ describe("GET /internal/tx/:txHash/merkle-root", () => {
   it("returns 404 when the transaction has no merkle root data entry", async () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { status, body } = await req(app, "/internal/tx/tx-missing/merkle-root", {
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
     });
 
     expect(status).toBe(404);
@@ -93,7 +106,7 @@ describe("GET /internal/tx/:txHash/merkle-root", () => {
       throw new Error("horizon down");
     }, fakeSignPayload);
     const { status, body } = await req(app, "/internal/tx/tx-1/merkle-root", {
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
     });
 
     expect(status).toBe(502);
@@ -102,7 +115,7 @@ describe("GET /internal/tx/:txHash/merkle-root", () => {
 });
 
 describe("POST /internal/sign", () => {
-  it("rejects requests without a valid internal service token", async () => {
+  it("rejects requests without a valid internal auth signature", async () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { status } = await req(app, "/internal/sign", { method: "POST", body: { payload: "hello" } });
     expect(status).toBe(401);
@@ -112,7 +125,7 @@ describe("POST /internal/sign", () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { status, body } = await req(app, "/internal/sign", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { payload: "some-canonical-manifest" },
     });
 
@@ -124,7 +137,7 @@ describe("POST /internal/sign", () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { status } = await req(app, "/internal/sign", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: {},
     });
     expect(status).toBe(400);
@@ -136,7 +149,7 @@ describe("POST /internal/sign", () => {
     });
     const { status, body } = await req(app, "/internal/sign", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { payload: "x" },
     });
 
@@ -194,7 +207,7 @@ function makeGenuineBundle(): { bundle: AuditExportBundle; onChainRoot: string }
 }
 
 describe("POST /internal/verify-export", () => {
-  it("rejects requests without a valid internal service token", async () => {
+  it("rejects requests without a valid internal auth signature", async () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { bundle } = makeGenuineBundle();
     const { status } = await req(app, "/internal/verify-export", { method: "POST", body: { bundle } });
@@ -205,7 +218,7 @@ describe("POST /internal/verify-export", () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { status, body } = await req(app, "/internal/verify-export", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { bundle: { not: "a bundle" } },
     });
 
@@ -220,7 +233,7 @@ describe("POST /internal/verify-export", () => {
 
     const { status, body } = await req(app, "/internal/verify-export", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { bundle },
     });
 
@@ -239,7 +252,7 @@ describe("POST /internal/verify-export", () => {
 
     const { status, body } = await req(app, "/internal/verify-export", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { bundle },
     });
 
@@ -257,7 +270,7 @@ describe("POST /internal/verify-export", () => {
 
     const { status, body } = await req(app, "/internal/verify-export", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { bundle },
     });
 
@@ -275,7 +288,7 @@ describe("POST /internal/verify-export", () => {
 
     const { status, body } = await req(app, "/internal/verify-export", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { bundle },
     });
 
@@ -287,7 +300,7 @@ describe("POST /internal/verify-export", () => {
 describe("POST /internal/anchor-immediate", () => {
   const entries = [{ auditId: "a-1", sha256Hash: "h1", createdAt: "2026-01-01T00:00:00.000Z" }];
 
-  it("rejects requests without a valid internal service token", async () => {
+  it("rejects requests without a valid internal auth signature", async () => {
     const app = createInternalApp(async () => null, fakeSignPayload, vi.fn());
     const { status } = await req(app, "/internal/anchor-immediate", { method: "POST", body: { entries } });
     expect(status).toBe(401);
@@ -297,7 +310,7 @@ describe("POST /internal/anchor-immediate", () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { status, body } = await req(app, "/internal/anchor-immediate", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { entries },
     });
 
@@ -311,7 +324,7 @@ describe("POST /internal/anchor-immediate", () => {
 
     const { status, body } = await req(app, "/internal/anchor-immediate", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { entries: [] },
     });
 
@@ -333,7 +346,7 @@ describe("POST /internal/anchor-immediate", () => {
 
     const { status, body } = await req(app, "/internal/anchor-immediate", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { entries },
     });
 
@@ -350,7 +363,7 @@ describe("POST /internal/anchor-immediate", () => {
 
     const { status, body } = await req(app, "/internal/anchor-immediate", {
       method: "POST",
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
       body: { entries },
     });
 
@@ -360,7 +373,7 @@ describe("POST /internal/anchor-immediate", () => {
 });
 
 describe("GET /internal/anchoring/health", () => {
-  it("rejects requests without a valid internal service token", async () => {
+  it("rejects requests without a valid internal auth signature", async () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { status } = await req(app, "/internal/anchoring/health");
     expect(status).toBe(401);
@@ -369,7 +382,7 @@ describe("GET /internal/anchoring/health", () => {
   it("returns 501 when this process doesn't run the anchoring scheduler", async () => {
     const app = createInternalApp(async () => null, fakeSignPayload);
     const { status, body } = await req(app, "/internal/anchoring/health", {
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
     });
 
     expect(status).toBe(501);
@@ -390,7 +403,7 @@ describe("GET /internal/anchoring/health", () => {
     const app = createInternalApp(async () => null, fakeSignPayload, undefined, getAnchoringHealth);
 
     const { status, body } = await req(app, "/internal/anchoring/health", {
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
     });
 
     expect(status).toBe(200);
@@ -405,7 +418,7 @@ describe("GET /internal/anchoring/health", () => {
     const app = createInternalApp(async () => null, fakeSignPayload, undefined, getAnchoringHealth);
 
     const { status, body } = await req(app, "/internal/anchoring/health", {
-      token: serverConfig.internalServiceToken,
+      auth: "valid",
     });
 
     expect(status).toBe(502);

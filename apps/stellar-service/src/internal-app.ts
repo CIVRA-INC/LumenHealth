@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { serverConfig } from "@lumen/config";
+import { NonceReplayCache, verifyInternalRequest } from "@lumen/types";
 import type { AnchoringHealthReport, AuditExportBundle, BatchAnchorResult, SigningKeyRecord } from "@lumen/types";
 import type { SignedPayload } from "./signing.js";
 import { verifyExportBundle } from "./verify-export.js";
@@ -45,10 +46,26 @@ function isPlausibleExportBundle(value: unknown): value is AuditExportBundle {
   );
 }
 
-function requireInternalServiceToken(req: Request, res: Response, next: NextFunction): void {
-  const token = req.header("x-internal-service-token");
-  if (!token || token !== serverConfig.internalServiceToken) {
-    res.status(401).json({ error: "UNAUTHORIZED", message: "invalid or missing internal service token" });
+/** Process-wide nonce replay cache shared by every internal route (#1345). */
+const replayCache = new NonceReplayCache();
+
+function requireInternalRequestAuth(req: Request, res: Response, next: NextFunction): void {
+  // #1345: short-lived HMAC signature over method + path + body hash +
+  // timestamp + nonce, replacing the static service token. The shared
+  // replay cache rejects a nonce seen before.
+  const result = verifyInternalRequest(
+    {
+      method: req.method,
+      path: req.originalUrl,
+      body: req.body,
+      headers: req.headers as Record<string, string | string[] | undefined>,
+    },
+    serverConfig.internalServiceSecrets,
+    { replayCache },
+  );
+
+  if (!result.ok) {
+    res.status(401).json({ error: "UNAUTHORIZED", message: result.reason });
     return;
   }
   next();
@@ -72,7 +89,7 @@ export function createInternalApp(
 ): Express {
   const app = express();
   app.use(express.json());
-  app.use(requireInternalServiceToken);
+  app.use(requireInternalRequestAuth);
 
   app.post("/internal/anchor-immediate", async (req: Request, res: Response) => {
     if (!anchorImmediate) {
