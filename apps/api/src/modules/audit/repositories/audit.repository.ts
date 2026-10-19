@@ -1,13 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import type { AuditEntry, AuditQuery, BatchAnchorResult } from "@lumen/types";
 
+export class AuditImmutableError extends Error {
+  constructor(auditId: string) {
+    super(`audit entry ${auditId} is append-only and cannot be modified`);
+    this.name = "AuditImmutableError";
+  }
+}
+
 @Injectable()
 export class AuditRepository {
   private store = new Map<string, AuditEntry>();
 
+  /** Insert-only: an existing entry can never be overwritten. Anchor fields are set via applyAnchorResult. */
   save(entry: AuditEntry): AuditEntry {
-    this.store.set(entry.auditId, entry);
-    return entry;
+    if (this.store.has(entry.auditId)) throw new AuditImmutableError(entry.auditId);
+    const frozen = Object.freeze({ ...entry });
+    this.store.set(entry.auditId, frozen);
+    return frozen;
   }
 
   findById(auditId: string): AuditEntry | undefined {
@@ -31,16 +41,17 @@ export class AuditRepository {
 
     for (const { auditId, merkleProof } of result.entries) {
       const entry = this.store.get(auditId);
-      if (!entry) continue;
+      // Anchor fields are write-once: replayed or conflicting results leave stored proofs untouched.
+      if (!entry || entry.stellarTxHash) continue;
 
-      const anchored: AuditEntry = {
+      const anchored: AuditEntry = Object.freeze({
         ...entry,
         stellarTxHash: result.stellarTxHash,
         merkleRoot: result.merkleRoot,
         anchoredAt: result.anchoredAt,
         anchorMode: result.mode,
         merkleProof,
-      };
+      });
       this.store.set(auditId, anchored);
       updated.push(anchored);
     }

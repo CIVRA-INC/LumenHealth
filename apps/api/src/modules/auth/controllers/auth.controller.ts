@@ -6,6 +6,7 @@ import type { UserRole, LoginResponse, LogoutResponse, MeResponse } from '@lumen
 
 import { identityStore } from '../repositories/identity.repository.js';
 import { sessionStore } from '../repositories/session.repository.js';
+import { oneTimeTokens } from '../repositories/one-time-token.repository.js';
 import { accessTokenSigner } from '../services/token.service.js';
 import { accountStatusError, authErrorStatus, normalizeAuthError } from '../utils/errors.js';
 import { validatePassword } from '../utils/validators.js';
@@ -19,12 +20,11 @@ import { AuthGuard } from '../guards/auth.guard.js';
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
 
-const resetTokens = new Map<string, { userId: string; expiresAt: number }>();
-const verifyTokens = new Map<string, { userId: string; email: string; expiresAt: number }>();
+const seenRefreshTokens = new Set<string>();
 
 export function _resetAuthStateForTests() {
-  resetTokens.clear();
-  verifyTokens.clear();
+  seenRefreshTokens.clear();
+  oneTimeTokens._reset();
 }
 
 @Controller('auth')
@@ -79,7 +79,7 @@ export class AuthController {
     sessionStore.save(makeSession({ sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken }));
     incrementMetric("auth_login_success_total");
     authLogger.info("auth.login.success", { requestId, userId: identity.userId, clinicId: identity.clinicId });
-    const payload: LoginResponse = { session: { userId: identity.userId, clinicId: identity.clinicId, role: identity.role, accessToken } };
+    const payload: LoginResponse = { session: { userId: identity.userId, clinicId: identity.clinicId, role: identity.role, accessToken, refreshToken } };
     return res.json(payload);
   }
 
@@ -141,7 +141,11 @@ export class AuthController {
     }
     sessionStore.revokeByRefreshToken(refreshToken);
     const identity = identityStore.findById(existing.userId);
-    const role = identity?.role ?? "owner";
+    if (!identity || accountStatusError(identity.status)) {
+      incrementMetric("auth_refresh_failure_total");
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid refresh token" }, authErrorStatus("AUTH_TOKEN_INVALID"));
+    }
+    const role = identity.role;
     const nextAccess = accessTokenSigner.sign({ sub: existing.userId, clinicId: existing.clinicId, role });
     const nextRefresh = randomUUID();
     sessionStore.save(makeSession({ sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh, familyId: existing.familyId }));
@@ -159,11 +163,8 @@ export class AuthController {
     if (!email) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "email is required" }, HttpStatus.BAD_REQUEST);
     }
-    const token = randomUUID();
     const identity = identityStore.findByEmail(email);
-    if (identity) {
-      resetTokens.set(token, { userId: identity.userId, expiresAt: Date.now() + 15 * 60_000 });
-    }
+    const token = identity ? oneTimeTokens.issue(identity.userId, 'password_reset', 15 * 60_000) : randomUUID();
     authLogger.info("auth.recovery.requested", { meta: { tokenPreview: token.slice(0, 8) } });
     return res.json({ ok: true });
   }
@@ -178,9 +179,8 @@ export class AuthController {
     if (pwdErr) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: pwdErr }, HttpStatus.BAD_REQUEST);
     }
-    const reset = resetTokens.get(token);
-    if (!reset || Date.now() > reset.expiresAt) {
-      resetTokens.delete(token);
+    const reset = oneTimeTokens.find(token, 'password_reset');
+    if (!reset) {
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid or expired reset token" }, HttpStatus.UNAUTHORIZED);
     }
     // Known-breached passwords are rejected here. Deliberately *after* the
@@ -190,7 +190,7 @@ export class AuthController {
     if (breach.breached) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: BREACHED_PASSWORD_MESSAGE }, HttpStatus.BAD_REQUEST);
     }
-    resetTokens.delete(token);
+    oneTimeTokens.consume(token, 'password_reset');
     authLogger.info("auth.recovery.completed", { userId: reset.userId });
     return res.json({ ok: true });
   }
@@ -201,10 +201,9 @@ export class AuthController {
     if (!email) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "email is required" }, HttpStatus.BAD_REQUEST);
     }
-    const token = randomUUID();
     const identity = identityStore.findByEmail(email);
     if (identity) {
-      verifyTokens.set(token, { userId: identity.userId, email, expiresAt: Date.now() + 24 * 60 * 60_000 });
+      oneTimeTokens.issue(identity.userId, 'email_verify', 24 * 60 * 60_000, { email });
     }
     return res.json({ ok: true });
   }
@@ -215,13 +214,11 @@ export class AuthController {
     if (!token) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "token is required" }, HttpStatus.BAD_REQUEST);
     }
-    const verify = verifyTokens.get(token);
-    if (!verify || Date.now() > verify.expiresAt) {
-      verifyTokens.delete(token);
+    const verify = oneTimeTokens.consume(token, 'email_verify');
+    if (!verify) {
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid or expired verification token" }, HttpStatus.UNAUTHORIZED);
     }
-    verifyTokens.delete(token);
-    return res.json({ ok: true, email: verify.email, userId: verify.userId });
+    return res.json({ ok: true, email: verify.meta?.email, userId: verify.userId });
   }
 
   @Get('metrics')

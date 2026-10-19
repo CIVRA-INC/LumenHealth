@@ -29,6 +29,8 @@ export type AuthSession = {
   clinicId: string;
   role: UserRole;
   accessToken: string;
+  /** Returned on login so clients can call POST /auth/refresh. */
+  refreshToken?: string;
 };
 
 // ── Requests ─────────────────────────────────────────────────────────────────

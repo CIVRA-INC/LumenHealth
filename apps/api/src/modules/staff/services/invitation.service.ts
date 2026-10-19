@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 import type { Invitation, SendInvitationRequest, UserRole, InvitationStatus } from '@lumen/types';
 import { InvitationRepository } from '../repositories/invitation.repository.js';
+import { staffStore } from '../repositories/staff.repository.js';
 import { identityStore } from '../../auth/repositories/identity.repository.js';
 import { authLogger } from '../../../shared/logger/index.js';
 
@@ -17,8 +18,8 @@ export class InvitationService {
     clinicId: string,
     invitedBy: string,
   ): { invitation: Invitation } | { error: string; message: string } {
-    const existing = this.invitationRepository.findByEmail(clinicId, body.email);
-    if (existing?.status === 'pending') {
+    const existing = this.invitationRepository.findPendingByEmail(clinicId, body.email);
+    if (existing) {
       return {
         error: 'INVITATION_ALREADY_PENDING',
         message: 'a pending invitation already exists for this email',
@@ -50,7 +51,7 @@ export class InvitationService {
       createdAt: now.toISOString(),
     };
 
-    this.invitationRepository.save(invitation);
+    this.invitationRepository.create(invitation);
 
     authLogger.info('invitation.sent', {
       clinicId,
@@ -66,27 +67,18 @@ export class InvitationService {
     password: string,
     _name: string,
   ): Promise<{ ok: true; userId: string } | { error: string; message: string }> {
-    const invitation = this.invitationRepository.findByToken(token);
-
-    if (!invitation) {
-      return { error: 'INVITATION_NOT_FOUND', message: 'invitation not found' };
+    // Claim is synchronous, so concurrent accepts cannot both pass.
+    const claimed = this.invitationRepository.claim(token);
+    if ('error' in claimed) {
+      const errors = {
+        NOT_FOUND: { error: 'INVITATION_NOT_FOUND', message: 'invitation not found' },
+        ACCEPTED: { error: 'INVITATION_ALREADY_ACCEPTED', message: 'invitation has already been accepted' },
+        REVOKED: { error: 'INVITATION_REVOKED', message: 'invitation has been revoked' },
+        EXPIRED: { error: 'INVITATION_EXPIRED', message: 'invitation has expired' },
+      } as const;
+      return errors[claimed.error];
     }
-    if (invitation.status === 'accepted') {
-      return {
-        error: 'INVITATION_ALREADY_ACCEPTED',
-        message: 'invitation has already been accepted',
-      };
-    }
-    if (invitation.status === 'revoked') {
-      return {
-        error: 'INVITATION_REVOKED',
-        message: 'invitation has been revoked',
-      };
-    }
-
-    if (new Date() > new Date(invitation.expiresAt)) {
-      return { error: 'INVITATION_EXPIRED', message: 'invitation has expired' };
-    }
+    const invitation = claimed.invitation;
 
     const passwordHash = await bcrypt.hash(password, 12);
     const userId = randomUUID();
@@ -101,10 +93,17 @@ export class InvitationService {
       createdAt: new Date().toISOString(),
     });
 
-    this.invitationRepository.save({
-      ...invitation,
-      status: 'accepted',
-      acceptedAt: new Date().toISOString(),
+    const now = new Date().toISOString();
+    staffStore.save({
+      staffId: randomUUID(),
+      clinicId: invitation.clinicId,
+      userId,
+      name: _name,
+      email: invitation.email,
+      role: invitation.role,
+      status: 'active',
+      joinedAt: now,
+      updatedAt: now,
     });
 
     return { ok: true, userId };
