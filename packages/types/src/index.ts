@@ -6,7 +6,7 @@ export * from "./hashing.js";
 export * from "./merkle.js";
 export * from "./anchoring-health.js";
 export * from "./signing-keys.js";
-export * from "./internal-auth.js";
+export * from "./chain.js";
 
 export type PaymentIntent = {
   id: string;

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID, createHash } from 'crypto';
+import { isCriticalAuditAction } from "@lumen/types";
 import type {
   AuditAction,
   AuditEntry,
@@ -12,6 +13,7 @@ import type {
 } from "@lumen/types";
 import { AuditRepository } from "../repositories/audit.repository.js";
 import { StellarVerifierClient } from "./stellar-verifier.client.js";
+import { RetentionService } from "./retention.service.js";
 
 function canonicalize(data: unknown): string {
   if (data === null || typeof data !== "object") return JSON.stringify(data);
@@ -42,17 +44,6 @@ function verifyMerkleProof(hash: string, proof: { direction: 'left' | 'right', h
   return currentHash === root;
 }
 
-const CRITICAL_ACTIONS: AuditAction[] = [
-  "staff.invited",
-  "staff.invitation_revoked",
-  "staff.archived",
-  "clinic.archived",
-];
-
-function isCriticalAuditAction(action: AuditAction): boolean {
-  return CRITICAL_ACTIONS.includes(action);
-}
-
 export type RecordAuditParams = {
   clinicId: string;
   action: AuditAction;
@@ -70,10 +61,12 @@ export type RecordAuditParams = {
 export class AuditService {
   constructor(
     private readonly auditRepository: AuditRepository,
-    private readonly stellarVerifierClient: StellarVerifierClient
+    private readonly stellarVerifierClient: StellarVerifierClient,
+    private readonly retentionService: RetentionService
   ) {}
 
   recordAudit(params: RecordAuditParams): AuditEntry {
+    const chain = this.chainService.getStateForClinic(params.clinicId);
     const unhashed = {
       auditId: randomUUID(),
       clinicId: params.clinicId,
@@ -87,6 +80,8 @@ export class AuditService {
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,
       createdAt: new Date().toISOString(),
+      sequence: (chain.lastSequence ?? 0) + 1,
+      prevHash: chain.lastHash,
     };
     const entry: AuditEntry = {
       ...unhashed,
@@ -151,10 +146,14 @@ export class AuditService {
     clinicId: string,
     auditId: string
   ): Promise<AuditVerifyResponse | null> {
-    const entry = this.auditRepository.findById(auditId);
+    // Hot store first, then the cold archive — archived entries verify
+    // exactly like hot ones (retention policy v1.0, #1330).
+    const entry = await this.retentionService.findEntryIncludingArchive(auditId);
     if (!entry || entry.clinicId !== clinicId) {
       return null;
     }
+
+    const chain = this.chainService.reportForClinic(clinicId);
 
     const { sha256Hash: storedHash, stellarTxHash, merkleRoot, anchoredAt, merkleProof, anchorMode, ...hashable } =
       entry;
@@ -172,11 +171,30 @@ export class AuditService {
         stellarTxHash,
         checkedAt,
         reason: "stored content no longer matches its recorded hash",
+        ...chain,
+      };
+    }
+
+    // #1326: the per-clinic hash chain must still link this entry to its
+    // predecessor — a deleted or reordered entry fails here even when its
+    // own content hash is intact.
+    const linkage = this.chainService.verifyLinkage(clinicId, entry);
+    if (!linkage.ok) {
+      return {
+        auditId,
+        status: "tampered",
+        recomputedHash,
+        storedHash,
+        merkleRoot,
+        stellarTxHash,
+        checkedAt,
+        reason: linkage.reason,
+        ...chain,
       };
     }
 
     if (!stellarTxHash || !merkleRoot || !merkleProof) {
-      return { auditId, status: "unanchored", recomputedHash, storedHash, checkedAt };
+      return { auditId, status: "unanchored", recomputedHash, storedHash, checkedAt, ...chain };
     }
 
     const chainRoot = await this.stellarVerifierClient.fetchAnchoredMerkleRoot(stellarTxHash);
@@ -191,10 +209,11 @@ export class AuditService {
         stellarTxHash,
         checkedAt,
         reason: "stored merkle root does not match the root anchored on Stellar",
+        ...chain,
       };
     }
 
-    if (!verifyMerkleProof(recomputedHash, merkleProof, chainRoot)) {
+    if (!verifyMerkleProof(recomputedHash, merkleProof as unknown as { direction: 'left' | 'right'; hash: string }[], chainRoot)) {
       return {
         auditId,
         status: "tampered",
@@ -204,6 +223,7 @@ export class AuditService {
         stellarTxHash,
         checkedAt,
         reason: "merkle proof does not resolve to the on-chain root",
+        ...chain,
       };
     }
 
@@ -216,6 +236,7 @@ export class AuditService {
       stellarTxHash,
       anchorMode,
       checkedAt,
+      ...chain,
     };
   }
 
@@ -242,7 +263,8 @@ export class AuditService {
     };
 
     const { signature, publicKey } = await this.stellarVerifierClient.signExportManifest(canonicalize(manifest));
+    const chain = this.chainService.reportForClinic(clinicId);
 
-    return { manifest, signature, signingPublicKey: publicKey, entries };
+    return { manifest, signature, signingPublicKey: publicKey, entries, ...chain };
   }
 }

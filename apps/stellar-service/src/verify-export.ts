@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs";
 import { Horizon } from "@stellar/stellar-sdk";
 import {
   canonicalize,
+  detectSequenceGaps,
   hashAuditEntry,
   isAuthorizedSigningKey,
   sha256Hash,
@@ -90,6 +91,14 @@ export async function verifyExportBundle(
 
   const entriesDigestValid = recomputeEntriesDigest(bundle.entries) === bundle.manifest.entriesDigest;
 
+  // Per-clinic hash chain (#1326): verify every entry still links to its
+  // predecessor, and report the completeness of the sequenced range (#1327).
+  const sequenced = bundle.entries
+    .filter((e): e is AuditEntry & { sequence: number } => typeof e.sequence === "number")
+    .sort((a, b) => a.sequence - b.sequence);
+  const bySequence = new Map(sequenced.map((e) => [e.sequence, e]));
+  const sequenceGaps = detectSequenceGaps(sequenced.map((e) => e.sequence));
+
   const rootCache = new Map<string, string | null>();
   const results: ExportEntryResult[] = [];
 
@@ -104,6 +113,41 @@ export async function verifyExportBundle(
         reason: "stored content no longer matches its recorded hash",
       });
       continue;
+    }
+
+    // Chain-link check: a deleted predecessor shows up as a gap, a reordered
+    // entry as a prevHash that no longer matches its predecessor.
+    if (typeof entry.sequence === "number") {
+      if (entry.sequence === 1 && entry.prevHash !== undefined) {
+        results.push({
+          auditId: entry.auditId,
+          action: entry.action,
+          status: "tampered",
+          reason: "first entry in clinic chain must have no prevHash",
+        });
+        continue;
+      }
+      if (entry.sequence > 1) {
+        const predecessor = bySequence.get(entry.sequence - 1);
+        if (!predecessor) {
+          results.push({
+            auditId: entry.auditId,
+            action: entry.action,
+            status: "tampered",
+            reason: `predecessor with sequence ${entry.sequence - 1} is missing — entry deleted from the chain`,
+          });
+          continue;
+        }
+        if (entry.prevHash !== predecessor.sha256Hash) {
+          results.push({
+            auditId: entry.auditId,
+            action: entry.action,
+            status: "tampered",
+            reason: "prevHash does not match its predecessor — entries were reordered or relinked",
+          });
+          continue;
+        }
+      }
     }
 
     if (!entry.stellarTxHash || !entry.merkleRoot || !entry.merkleProof) {
@@ -148,6 +192,11 @@ export async function verifyExportBundle(
   const unanchoredCount = results.filter((r) => r.status === "unanchored").length;
   const tamperedCount = results.filter((r) => r.status === "tampered").length;
 
+  // Gap/completeness reporting (#1327): auditors can see the exact sequenced
+  // range covered and whether anything inside it is missing.
+  const firstSequence = sequenced.length ? sequenced[0].sequence : undefined;
+  const lastSequence = sequenced.length ? sequenced[sequenced.length - 1].sequence : undefined;
+
   return {
     clinicId: bundle.manifest.clinicId,
     signatureValid,
@@ -159,6 +208,10 @@ export async function verifyExportBundle(
     signingKeyAuthorized,
     // signingKeyAuthorized !== false: passes when unchecked (undefined) or explicitly authorized (true).
     ok: signatureValid && entriesDigestValid && tamperedCount === 0 && signingKeyAuthorized !== false,
+    sequenceGaps,
+    firstSequence,
+    lastSequence,
+    completeRange: sequenceGaps.length === 0,
   };
 }
 
