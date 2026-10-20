@@ -28,7 +28,6 @@ endpoint cannot ship without an explicit audit decision.
 | apps/api/src/modules/auth/controllers/auth.controller.ts | /auth | POST | password-reset/confirm | passwordResetConfirm | auth.password_reset_completed | gap | Action declared in the union; no `recordAudit` call yet. |
 | apps/api/src/modules/auth/controllers/auth.controller.ts | /auth | POST | verify/request | verifyRequest | none | exempt | Email-verification token issue; low sensitivity, no AuditAction. |
 | apps/api/src/modules/auth/controllers/auth.controller.ts | /auth | POST | verify/confirm | verifyComplete | none | exempt | Consumes the verification token; no AuditAction. |
-| apps/api/src/modules/auth/me.controller.ts | /auth | POST | logout | logout | none | exempt | Duplicate mount of `POST /auth/logout` alongside the auth controller (pre-existing); no AuditAction. |
 | apps/api/src/modules/clinic/controllers/clinic.controller.ts | /clinics | POST | <root> | create | none | gap | Tenant creation is unaudited and no `clinic.created` AuditAction exists — follow-up. |
 | apps/api/src/modules/clinic/controllers/clinic.controller.ts | /clinics | PATCH | :clinicId | update | clinic.updated | gap | Action declared in the union; no `recordAudit` call yet. |
 | apps/api/src/modules/clinic/controllers/clinic.controller.ts | /clinics | DELETE | :clinicId | archive | clinic.archived | covered | `clinic.service.ts` records before/after status (that module has a pre-existing broken import — call present in source). |
