@@ -1,21 +1,20 @@
 import { Controller, Post, Get, Body, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
 import type { Response } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
-import type { UserRole, LoginResponse, LogoutResponse, MeResponse } from '@lumen/types';
+import type { LoginRequest, LoginResponse, MeResponse, PasswordResetConfirmBody, PasswordResetRequestBody, RefreshRequest, VerifyConfirmBody, VerifyRequestBody } from '@lumen/types';
 
 import { identityStore } from '../repositories/identity.repository.js';
-import { sessionStore } from '../repositories/session.repository.js';
+import { makeSession, sessionStore } from '../repositories/session.repository.js';
 import { oneTimeTokens } from '../repositories/one-time-token.repository.js';
 import { accessTokenSigner } from '../services/token.service.js';
-import { accountStatusError, authErrorStatus, normalizeAuthError } from '../utils/errors.js';
-import { validatePassword } from '../utils/validators.js';
-import { BREACHED_PASSWORD_MESSAGE, checkPasswordBreached } from '../validators/password.validator.js';
+import { accountStatusError } from '../services/account-status.service.js';
+import { incrementMetric, getAuthMetricsSnapshot } from '../services/metrics.service.js';
+import { authErrorStatus } from '../../../shared/errors/index.js';
+import { authLogger } from '../../../shared/logger/index.js';
+import { validatePassword, BREACHED_PASSWORD_MESSAGE, checkPasswordBreached } from '../validators/password.validator.js';
 import { performDummyPasswordCompare } from '../services/login-timing.js';
-import { makeSession } from '../utils/session.factory.js';
-import { authLogger } from '../utils/logger.js';
-import { incrementMetric, getAuthMetricsSnapshot } from '../utils/metrics.js';
-import { limited } from '../utils/rate-limiter.js';
+import { limited, _resetRateLimiter } from '../rate-limit/rate-limiter.js';
 import { AuthGuard } from '../guards/auth.guard.js';
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
@@ -25,6 +24,7 @@ const seenRefreshTokens = new Set<string>();
 export function _resetAuthStateForTests() {
   seenRefreshTokens.clear();
   oneTimeTokens._reset();
+  _resetRateLimiter();
 }
 
 @Controller('auth')
@@ -32,7 +32,7 @@ export class AuthController {
   
   @Post('login')
   async login(
-    @Body() body: any,
+    @Body() body: Partial<LoginRequest>,
     @Headers('x-request-id') reqId: string,
     @Ip() ip: string,
     @Res() res: Response
@@ -117,7 +117,7 @@ export class AuthController {
   }
 
   @Post('refresh')
-  refresh(@Body() body: any, @Headers('x-request-id') reqId: string, @Ip() ip: string, @Res() res: Response) {
+  refresh(@Body() body: Partial<RefreshRequest>, @Headers('x-request-id') reqId: string, @Ip() ip: string, @Res() res: Response) {
     const requestId = reqId ?? randomUUID();
     if (limited(`refresh:${ip ?? "unknown"}`, 20)) {
       incrementMetric("auth_refresh_failure_total");
@@ -155,7 +155,7 @@ export class AuthController {
   }
 
   @Post('password-reset/request')
-  passwordResetRequest(@Body() body: any, @Ip() ip: string, @Res() res: Response) {
+  passwordResetRequest(@Body() body: Partial<PasswordResetRequestBody>, @Ip() ip: string, @Res() res: Response) {
     if (limited(`recovery:${ip ?? "unknown"}`, 10)) {
       throw new HttpException({ error: "AUTH_RATE_LIMITED", message: "too many recovery requests" }, HttpStatus.TOO_MANY_REQUESTS);
     }
@@ -170,7 +170,7 @@ export class AuthController {
   }
 
   @Post('password-reset/confirm')
-  async passwordResetConfirm(@Body() body: any, @Res() res: Response) {
+  async passwordResetConfirm(@Body() body: Partial<PasswordResetConfirmBody>, @Res() res: Response) {
     const { token, password } = body;
     if (!token || !password) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "token and password are required" }, HttpStatus.BAD_REQUEST);
@@ -196,7 +196,7 @@ export class AuthController {
   }
 
   @Post('verify/request')
-  verifyRequest(@Body() body: any, @Res() res: Response) {
+  verifyRequest(@Body() body: Partial<VerifyRequestBody>, @Res() res: Response) {
     const email = body?.email;
     if (!email) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "email is required" }, HttpStatus.BAD_REQUEST);
@@ -209,7 +209,7 @@ export class AuthController {
   }
 
   @Post('verify/confirm')
-  verifyComplete(@Body() body: any, @Res() res: Response) {
+  verifyComplete(@Body() body: Partial<VerifyConfirmBody>, @Res() res: Response) {
     const token = body?.token;
     if (!token) {
       throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "token is required" }, HttpStatus.BAD_REQUEST);

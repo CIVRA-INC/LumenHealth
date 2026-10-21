@@ -58,6 +58,23 @@ export type RefreshRequest = {
   refreshToken: string;
 };
 
+export type PasswordResetRequestBody = {
+  email: string;
+};
+
+export type PasswordResetConfirmBody = {
+  token: string;
+  password: string;
+};
+
+export type VerifyRequestBody = {
+  email: string;
+};
+
+export type VerifyConfirmBody = {
+  token: string;
+};
+
 // ── Responses ────────────────────────────────────────────────────────────────
 
 export type LoginResponse = {
