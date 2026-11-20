@@ -15,11 +15,33 @@
     "check:boundaries": "node packages/config/check-workspace-boundaries.cjs",
     "check:architecture": "node packages/config/architecture-check.cjs",
     "issues:preview": "node scripts/issues/render-batch.mjs",
-    "issues:publish": "node scripts/issues/publish-batch.mjs"
+    "issues:publish": "node scripts/issues/publish-batch.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky",
+    "commitlint": "commitlint --edit"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "@types/node": "^24.10.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.0",
+    "prettier": "^3.6.2",
     "turbo": "^2.6.1",
     "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=10"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
   }
 }

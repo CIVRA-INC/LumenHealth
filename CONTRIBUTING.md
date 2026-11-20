@@ -28,7 +28,7 @@ docs/           Architecture and domain documentation
 
 ## Local setup
 
-**Requirements:** Node.js 20+, npm 10+
+**Requirements:** Node.js 24 (see `.nvmrc`; `nvm use`), npm 10+. `engine-strict` is on, so `npm install` fails on an unsupported Node.
 
 ```bash
 git clone <repo>
@@ -64,6 +64,13 @@ npm run test -w apps/web
 ```
 
 ---
+
+## Formatting, hooks and commit messages
+
+- Formatting: Prettier (`.prettierrc.json`, `.editorconfig`). `npm run format` rewrites files, `npm run format:check` is what CI runs.
+- Git hooks (husky, installed by `npm install` through the `prepare` script): `pre-commit` runs `lint-staged` (eslint --fix and prettier on staged files) and `npm run check:boundaries`; `commit-msg` runs commitlint; `pre-push` runs the typecheck. To skip them for one command use `HUSKY=0`, for example `HUSKY=0 git commit -m "..."`; CI still enforces everything.
+- Commit messages and PR titles follow Conventional Commits, `type(scope): subject`, with scopes `api`, `web`, `mobile`, `stellar`, `types`, `config`, `ci`, `docs` (for example `feat(api): add staff migration`). Mark breaking changes with `!` or a `BREAKING CHANGE:` footer. CI checks the PR title and every commit.
+- Node version: `.nvmrc` is the single source of truth and every workflow reads it.
 
 ## Architecture constraints
 
