@@ -29,6 +29,9 @@ export async function fetchAuditLog(
   const { apiBaseUrl } = getPublicRuntimeConfig();
 
   const params = new URLSearchParams();
+  // The audit table's detail panel reads snapshots and Merkle proofs, so ask for full entries
+  // until it switches to GET /audit/:auditId (the list endpoint defaults to a slim projection).
+  params.set("include", "full");
   if (filters.action) params.set("action", filters.action);
   if (filters.actorId) params.set("actorId", filters.actorId);
   if (filters.from) params.set("from", filters.from);

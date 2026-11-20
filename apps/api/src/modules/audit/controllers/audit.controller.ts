@@ -1,5 +1,6 @@
 import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param, Ip } from '@nestjs/common';
 import type { Response } from "express";
+import { toAuditListItem } from "@lumen/types";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
 import { PermissionsGuard } from '../../../shared/guards/permissions.guard.js';
@@ -25,6 +26,11 @@ export class AuditController {
     private readonly stellarVerifierClient: StellarVerifierClient
   ) {}
 
+  /**
+   * Returns a list-friendly projection (`AuditListItem`: no `before`/`after`, `merkleProof`,
+   * `userAgent` or `ipAddress`). Pass `include=full` for the complete entries (kept for clients
+   * that have not moved to `GET /audit/:auditId` yet); any other `include` value is a 400.
+   */
   @Get()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
@@ -35,7 +41,12 @@ export class AuditController {
     }
 
     const clinicId = auth.clinicId;
-    const { action, actorId, targetId, from, to, page, limit, cursor } = query;
+    const { action, actorId, targetId, from, to, page, limit, cursor, include } = query;
+    if (include !== undefined && include !== "full") {
+      throw new HttpException({ error: "INVALID_QUERY", message: "include must be 'full' when provided" }, HttpStatus.BAD_REQUEST);
+    }
+    const project = <T extends Parameters<typeof toAuditListItem>[0]>(entries: T[]) =>
+      include === "full" ? entries : entries.map(toAuditListItem);
 
     // Cursor mode (`?cursor=` or `?cursor=<opaque>`): newest first, `nextCursor` instead of `total`.
     if (cursor !== undefined) {
@@ -49,7 +60,7 @@ export class AuditController {
         limit: limit ? Number(limit) : undefined,
         cursor: String(cursor),
       });
-      return res.json({ entries: items, nextCursor });
+      return res.json({ entries: project(items), nextCursor });
     }
 
     const result = this.auditService.queryAuditLog({
@@ -63,7 +74,7 @@ export class AuditController {
       limit: limit ? Number(limit) : undefined,
     });
 
-    return res.json(result);
+    return res.json({ ...result, entries: project(result.entries) });
   }
 
   @Get('export')
@@ -114,6 +125,23 @@ export class AuditController {
         message: error instanceof Error ? error.message : "failed to reach stellar-service",
       }, HttpStatus.BAD_GATEWAY);
     }
+  }
+
+  /** Full entry for one audit id; owner/admin only, clinic scoped (another clinic's id is a 404). Declared after the static routes so it cannot shadow them. */
+  @Get(':auditId')
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @RequirePermissions('staff:write')
+  async detail(@Param('auditId') auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const role = auth.role;
+    if (role !== "owner" && role !== "admin") {
+      throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can view audit logs" }, HttpStatus.FORBIDDEN);
+    }
+
+    const entry = await this.auditService.getAuditEntry(auth.clinicId, auditId);
+    if (!entry) {
+      throw new HttpException({ error: "NOT_FOUND", message: "audit entry not found" }, HttpStatus.NOT_FOUND);
+    }
+    return res.json({ entry });
   }
 
   @Get(':auditId/verify')
