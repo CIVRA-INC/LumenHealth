@@ -11,10 +11,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint src"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^4.1.7"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
   }
 }
