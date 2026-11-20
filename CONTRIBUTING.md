@@ -127,6 +127,13 @@ All data in LumenHealth is scoped to a clinic. When implementing a new module fo
 
 ---
 
+## Branching model and required checks
+
+- `develop` is the integration branch: feature and fix branches (`feat/**`, `fix/**`) are merged into it by pull request. `main` receives promotions from `develop` and `release/**` branches.
+- CI (`.github/workflows/ci.yml`) and the security scan run on pull requests into `main`, `develop` and `release/**`, and on pushes to those branches and to `feat/**` and `fix/**`.
+- Branch protection (documented here; configured by a maintainer) on `develop` and `main` should require the checks `lint`, `typecheck`, `test`, `build`, `Architecture checks` and `Security Checks`, and a review before merging.
+- CI runs everything through `turbo run`. To enable the Turborepo remote cache, set the repository secret `TURBO_TOKEN` and variable `TURBO_TEAM`; otherwise the local `.turbo` cache is restored with `actions/cache`.
+
 ## Pull requests
 
 - One PR per milestone scope
