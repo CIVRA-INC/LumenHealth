@@ -10,7 +10,7 @@ export default function LogoutPage() {
   }, []);
 
   return (
-    <main className="authPage">
+    <main id="main-content" tabIndex={-1} className="authPage">
       <section className="authCard">
         <p className="eyebrow">Session cleared</p>
         <h1>You are signed out.</h1>

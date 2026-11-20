@@ -27,6 +27,9 @@ jobs:
       - name: Build shared packages
         run: npm run build -w packages/config && npm run build -w packages/types
 
+      - name: Check markdown links
+        run: npm run check:links
+
       - name: Lint
         run: npm run lint
 

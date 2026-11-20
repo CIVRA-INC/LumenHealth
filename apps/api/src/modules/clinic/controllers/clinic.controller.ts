@@ -1,3 +1,4 @@
+import { ClinicIdParamPipe } from '../../../shared/validation/id-params.js';
 import { Controller, Post, Get, Patch, Delete, Body, Res, Param, HttpException, HttpStatus, UseGuards, UsePipes } from '@nestjs/common';
 import type { Response } from 'express';
 import { CreateClinicDto, UpdateClinicDto } from '../dto/clinic.dto.js';
@@ -24,7 +25,7 @@ export class ClinicController {
   @Get(':clinicId')
   @UseGuards(ClinicScopeGuard)
   @RequireClinicScope('clinicId')
-  get(@Param('clinicId') clinicId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+  get(@Param('clinicId', new ClinicIdParamPipe()) clinicId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
     const clinic = this.clinicService.getClinic(clinicId, auth.clinicId);
     if (!clinic) {
       throw new HttpException({ error: "CLINIC_NOT_FOUND", message: "clinic not found" }, HttpStatus.NOT_FOUND);
@@ -36,7 +37,7 @@ export class ClinicController {
   @UseGuards(ClinicScopeGuard)
   @RequireClinicScope('clinicId')
   @UsePipes(clinicValidationPipe)
-  update(@Param('clinicId') clinicId: string, @Body() body: UpdateClinicDto, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+  update(@Param('clinicId', new ClinicIdParamPipe()) clinicId: string, @Body() body: UpdateClinicDto, @AuthContext() auth: AuthContextType, @Res() res: Response) {
     const role = auth.role;
     if (role !== "owner" && role !== "admin") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "insufficient role" }, HttpStatus.FORBIDDEN);
@@ -52,7 +53,7 @@ export class ClinicController {
   @Delete(':clinicId')
   @UseGuards(ClinicScopeGuard)
   @RequireClinicScope('clinicId')
-  archive(@Param('clinicId') clinicId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+  archive(@Param('clinicId', new ClinicIdParamPipe()) clinicId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
     if (auth.role !== "owner") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only the owner may archive a clinic" }, HttpStatus.FORBIDDEN);
     }

@@ -15,7 +15,8 @@
     "check:boundaries": "node packages/config/check-workspace-boundaries.cjs",
     "check:architecture": "node packages/config/architecture-check.cjs",
     "issues:preview": "node scripts/issues/render-batch.mjs",
-    "issues:publish": "node scripts/issues/publish-batch.mjs"
+    "issues:publish": "node scripts/issues/publish-batch.mjs",
+    "check:links": "node scripts/check-markdown-links.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

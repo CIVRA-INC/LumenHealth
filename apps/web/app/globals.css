@@ -612,3 +612,23 @@ a {
     flex-direction: column;
   }
 }
+
+/* Skip link: hidden until focused (WCAG 2.4.1). */
+.skipLink {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 1000;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: #111;
+  color: #fff;
+}
+
+.skipLink:focus {
+  top: 8px;
+}
+
+main:focus {
+  outline: none;
+}

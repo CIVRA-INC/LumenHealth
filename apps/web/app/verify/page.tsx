@@ -3,7 +3,7 @@ import { VerifyExportPortal } from "./_components/verify-export-portal";
 
 export default function VerifyExportPage() {
   return (
-    <main className="authPage">
+    <main id="main-content" tabIndex={-1} className="authPage">
       <AuthCard
         eyebrow="Public verification"
         title="Verify a compliance export"
