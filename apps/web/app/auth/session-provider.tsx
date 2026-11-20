@@ -13,7 +13,8 @@ import {
 
 type AuthSessionContextValue = {
   session: AuthSession | null;
-  setSession: (session: AuthSession) => void;
+  /** Resolves to `false` when the session could not be persisted and only lives in memory for this tab. */
+  setSession: (session: AuthSession) => boolean;
   clearSession: () => void;
 };
 

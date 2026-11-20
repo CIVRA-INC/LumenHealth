@@ -1,24 +1,41 @@
 name: CI
 
+# One workflow owns the build, lint, typecheck and test gates. Every task is run
+# through turbo (task graph + cache); a new workspace needs no edit here.
+
 on:
   push:
     branches:
       - main
+      - develop
+      - "release/**"
       - "feat/**"
       - "fix/**"
   pull_request:
     branches:
       - main
+      - develop
+      - "release/**"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Remote cache: set TURBO_TOKEN (secret) and TURBO_TEAM (variable) to enable.
+  # Without them turbo falls back to the local .turbo cache restored below.
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
 jobs:
-  api:
-    name: API — lint / test / build
+  install:
+    name: Install
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +47,8 @@ jobs:
         run: npm run build -w packages/config && npm run build -w packages/types
       - name: Architecture checks
         run: npm run check:architecture
+      - name: Environment variable docs
+        run: npm run check:env-docs
       - name: Lint
         run: npm run lint -w apps/api
       - name: Test
@@ -37,30 +56,43 @@ jobs:
       - name: Build
         run: npm run build -w apps/api
 
-  web:
-    name: Web — lint / test / build
+  checks:
+    name: ${{ matrix.task }}
+    needs: install
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      NEXT_TELEMETRY_DISABLED: "1"
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [lint, typecheck, test, build]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Build shared packages
-        run: npm run build -w packages/config && npm run build -w packages/types
-      - name: Test
-        run: npm run test -w apps/web
-      - name: Lint
-        run: npm run lint -w apps/web
-      - name: Build
-        run: npm run build -w apps/web
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Restore turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ matrix.task }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ matrix.task }}-
+      - name: Run ${{ matrix.task }}
+        run: npx turbo run ${{ matrix.task }} --cache-dir=.turbo
 
-  packages:
-    name: Packages — build / lint
+  architecture:
+    name: Architecture checks
+    needs: install
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -68,9 +100,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Build config
-        run: npm run build -w packages/config
-      - name: Build types
-        run: npm run build -w packages/types
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm run check:boundaries
+      - run: npm run check:architecture

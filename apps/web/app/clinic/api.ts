@@ -1,17 +1,12 @@
 import { getPublicRuntimeConfig } from "@lumen/config/public";
 import type { Clinic, UpdateClinicRequest } from "@lumen/types";
+import { authHeaders, jsonHeaders, pathSegment, type RequestOptions } from "../../lib/http";
 
-function headers(token: string): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-}
-
-export async function fetchClinic(clinicId: string, token: string): Promise<Clinic> {
+export async function fetchClinic(clinicId: string, token: string, options: RequestOptions = {}): Promise<Clinic> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
-  const res = await fetch(`${apiBaseUrl}/api/v1/clinics/${clinicId}`, {
-    headers: headers(token),
+  const res = await fetch(`${apiBaseUrl}/api/v1/clinics/${pathSegment(clinicId)}`, {
+    headers: authHeaders(token),
+    signal: options.signal,
   });
 
   if (!res.ok) {
@@ -27,12 +22,14 @@ export async function updateClinic(
   clinicId: string,
   data: UpdateClinicRequest,
   token: string,
+  options: RequestOptions = {},
 ): Promise<Clinic> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
-  const res = await fetch(`${apiBaseUrl}/api/v1/clinics/${clinicId}`, {
+  const res = await fetch(`${apiBaseUrl}/api/v1/clinics/${pathSegment(clinicId)}`, {
     method: "PATCH",
-    headers: headers(token),
+    headers: jsonHeaders(token),
     body: JSON.stringify(data),
+    signal: options.signal,
   });
 
   if (!res.ok) {

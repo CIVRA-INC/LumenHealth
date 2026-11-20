@@ -1,17 +1,12 @@
 import { getPublicRuntimeConfig } from "@lumen/config/public";
 import type { StaffMember, UpdateStaffRoleRequest } from "@lumen/types";
+import { authHeaders, jsonHeaders, pathSegment, type RequestOptions } from "../../lib/http";
 
-function headers(token: string): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-}
-
-export async function fetchStaff(token: string): Promise<StaffMember[]> {
+export async function fetchStaff(token: string, options: RequestOptions = {}): Promise<StaffMember[]> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
   const res = await fetch(`${apiBaseUrl}/api/v1/staff`, {
-    headers: headers(token),
+    headers: authHeaders(token),
+    signal: options.signal,
   });
 
   if (!res.ok) {
@@ -30,12 +25,14 @@ export async function updateStaffRole(
   staffId: string,
   data: UpdateStaffRoleRequest,
   token: string,
+  options: RequestOptions = {},
 ): Promise<StaffMember> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
-  const res = await fetch(`${apiBaseUrl}/api/v1/staff/${staffId}/role`, {
+  const res = await fetch(`${apiBaseUrl}/api/v1/staff/${pathSegment(staffId)}/role`, {
     method: "PATCH",
-    headers: headers(token),
+    headers: jsonHeaders(token),
     body: JSON.stringify(data),
+    signal: options.signal,
   });
 
   if (!res.ok) {

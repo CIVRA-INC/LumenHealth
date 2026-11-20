@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Clinic, UpdateClinicRequest } from "@lumen/types";
+import { UpdateClinicRequestSchema, type Clinic, type UpdateClinicRequest } from "@lumen/types";
 import { useAuthSession } from "../../auth/session-provider";
+import { isAbortError } from "../../../lib/http";
 import { fetchClinic, updateClinic } from "../api";
 
 type Status = "idle" | "loading" | "saving" | "success" | "error";
@@ -20,10 +21,10 @@ export function ClinicSettingsForm() {
 
   useEffect(() => {
     if (!session) return;
-    let cancelled = false;
-    fetchClinic(session.clinicId, session.accessToken)
+    const controller = new AbortController();
+    setStatus("loading");
+    fetchClinic(session.clinicId, session.accessToken, { signal: controller.signal })
       .then((c) => {
-        if (cancelled) return;
         setClinic(c);
         setName(c.name);
         setAddress(c.address);
@@ -32,11 +33,11 @@ export function ClinicSettingsForm() {
         setStatus("idle");
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (isAbortError(err)) return;
         setErrorMessage(err instanceof Error ? err.message : "Failed to load clinic");
         setStatus("error");
       });
-    return () => { cancelled = true; };
+    return () => controller.abort();
   }, [session]);
 
   const handleSubmit = useCallback(
@@ -51,6 +52,14 @@ export function ClinicSettingsForm() {
       if (email !== clinic.email) updates.email = email;
 
       if (Object.keys(updates).length === 0) return;
+
+      // Same schema the API enforces, so the user sees the server's message.
+      const parsed = UpdateClinicRequestSchema.safeParse(updates);
+      if (!parsed.success) {
+        setErrorMessage(parsed.error.issues[0]?.message ?? "Invalid input");
+        setStatus("error");
+        return;
+      }
 
       setStatus("saving");
       setErrorMessage("");
@@ -75,7 +84,8 @@ export function ClinicSettingsForm() {
     return <p className="authLead">Sign in to manage clinic settings.</p>;
   }
 
-  if (status === "loading") {
+  // `clinic` is null until the first response arrives; never show an empty editable form for that.
+  if (status === "loading" || (status === "idle" && !clinic)) {
     return <p className="authLead">Loading clinic settings...</p>;
   }
 
@@ -87,6 +97,8 @@ export function ClinicSettingsForm() {
         Clinic name
         <input
           type="text"
+          name="name"
+          autoComplete="organization"
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={!canEdit}
@@ -99,6 +111,8 @@ export function ClinicSettingsForm() {
         Address
         <input
           type="text"
+          name="address"
+          autoComplete="street-address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           disabled={!canEdit}
@@ -110,6 +124,9 @@ export function ClinicSettingsForm() {
         Phone
         <input
           type="tel"
+          name="phone"
+          autoComplete="tel"
+          inputMode="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           disabled={!canEdit}
@@ -121,6 +138,9 @@ export function ClinicSettingsForm() {
         Email
         <input
           type="email"
+          name="email"
+          autoComplete="email"
+          inputMode="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={!canEdit}

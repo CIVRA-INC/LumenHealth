@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getPublicRuntimeConfig } from "@lumen/config/public";
 import type { ChangeEvent, FormEvent } from "react";
 import type {
@@ -113,6 +113,10 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   const [notice, setNotice] = useState<string>(copy.description);
   const [details, setDetails] = useState<string | null>(null);
   const [lastSubmission, setLastSubmission] = useState<Submission | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Unmounting mid-submit must not call setState afterwards.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const updateField =
     (field: keyof AuthValues) =>
@@ -129,11 +133,16 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     setDetails(null);
     setLastSubmission(submission);
 
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const response = await fetch(`${apiBaseUrl}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submission.payload),
+        signal: controller.signal,
       });
       const payload = await readJson<LoginResponse | RegisterResponse | AuthError>(response);
 
@@ -155,6 +164,8 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
           : `${verb} successfully.`
       );
     } catch {
+      // An aborted request means the screen went away or a newer submit replaced this one.
+      if (controller.signal.aborted) return;
       setStatus("error");
       setNotice("The auth service could not be reached.");
       setDetails("Check your API base URL and try again.");
