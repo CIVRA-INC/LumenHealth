@@ -21,5 +21,9 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "tsx": "^4.21.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
   }
 }
