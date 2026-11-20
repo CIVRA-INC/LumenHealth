@@ -4,14 +4,23 @@ on:
   push:
     branches:
       - main
+      - develop
+      - "release/**"
   pull_request:
     branches:
       - main
+      - develop
+      - "release/**"
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   security:
     name: Security Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
