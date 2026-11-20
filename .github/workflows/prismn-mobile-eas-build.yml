@@ -30,13 +30,13 @@ jobs:
           - platform: android
             profile: preview
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
       - name: Setup Expo
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -46,7 +46,7 @@ jobs:
         run: eas build --platform ${{ matrix.platform }} --profile ${{ matrix.profile }} --non-interactive --no-wait
       - name: Comment preview placeholder
         if: github.event_name == 'pull_request' && matrix.profile == 'preview' && matrix.platform == 'android'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             core.info('Preview build submitted; attach EAS build link via eas build:list or expo action output when integrated.')
