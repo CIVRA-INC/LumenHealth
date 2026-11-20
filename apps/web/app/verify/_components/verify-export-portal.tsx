@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { AuditExportBundle, AuditExportVerifyReport } from "@lumen/types";
+import { CopyButton } from "../../components/copy-button";
 import { verifyExportBundle } from "../api";
 
 type Status = "idle" | "reading" | "verifying" | "done" | "error";
@@ -185,7 +186,9 @@ function VerificationReportView({
         <tbody>
           {report.results.map((result) => (
             <tr key={result.auditId} className={result.status === "tampered" ? "auditRow--tampered" : undefined}>
-              <td>{result.auditId}</td>
+              <td>
+                {result.auditId} <CopyButton value={result.auditId} label={`Copy audit ID ${result.auditId}`} />
+              </td>
               <td>{result.action}</td>
               <td>
                 <span className={`verifyBadge verifyBadge--${badgeVariant(result.status)}`}>
