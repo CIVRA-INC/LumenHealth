@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID, createHash } from 'crypto';
-import { isCriticalAuditAction } from "@lumen/types";
+import { computeEntriesDigest, isCriticalAuditAction } from "@lumen/types";
 import type {
   AuditAction,
   AuditEntry,
@@ -250,13 +250,6 @@ export class AuditService {
     to?: string
   ): Promise<AuditExportBundle> {
     const entries = this.auditRepository.findAllInRange(clinicId, from, to);
-
-    const computeEntriesDigest = (entries: AuditEntry[]): string => {
-      const sorted = entries
-        .map((entry) => ({ auditId: entry.auditId, sha256Hash: entry.sha256Hash }))
-        .sort((a, b) => a.auditId.localeCompare(b.auditId));
-      return sha256Hash(sorted);
-    };
 
     const manifest: AuditExportManifest = {
       clinicId,

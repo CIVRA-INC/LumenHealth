@@ -1,4 +1,5 @@
 import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param, Ip } from '@nestjs/common';
+import { NoStore } from '../../../common/interceptors/no-store.interceptor.js';
 import type { Response } from "express";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
@@ -7,6 +8,7 @@ import { RequirePermissions } from '../../../shared/decorators/permissions.decor
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
 import { AuditService } from "../services/audit.service.js";
+import { auditEntriesToCsv, exportFilename, parseExportFormat } from "../services/audit-csv.js";
 import {
   AnchoringNotConfiguredError,
   InvalidExportBundleError,
@@ -26,6 +28,7 @@ export class AuditController {
   ) {}
 
   @Get()
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   list(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -66,7 +69,14 @@ export class AuditController {
     return res.json(result);
   }
 
+  /**
+   * `format=json` (default) returns the signed bundle as a download; `format=csv` returns an
+   * unsigned, spreadsheet-friendly extract (owner/admin only, like the JSON export). The CSV is
+   * explicitly unsigned: its manifest digest is sent in the `X-Audit-Entries-Digest` header so it
+   * can be compared with a signed JSON export of the same range.
+   */
   @Get('export')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async exportAuditLog(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -77,6 +87,10 @@ export class AuditController {
 
     const clinicId = auth.clinicId;
     const { from, to } = query;
+    const format = parseExportFormat(query.format);
+    if (!format) {
+      throw new HttpException({ error: "INVALID_QUERY", message: "format must be 'json' or 'csv'" }, HttpStatus.BAD_REQUEST);
+    }
 
     try {
       const bundle = await this.auditService.buildAuditExport(
@@ -84,6 +98,15 @@ export class AuditController {
         from as string | undefined,
         to as string | undefined,
       );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${exportFilename(clinicId, bundle.manifest.range, bundle.manifest.generatedAt, format)}"`,
+      );
+      if (format === "csv") {
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("X-Audit-Entries-Digest", bundle.manifest.entriesDigest);
+        return res.send(auditEntriesToCsv(bundle.entries));
+      }
       return res.json(bundle);
     } catch (error) {
       throw new HttpException({
@@ -94,6 +117,7 @@ export class AuditController {
   }
 
   @Get('anchoring-health')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async anchoringHealth(@AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -117,6 +141,7 @@ export class AuditController {
   }
 
   @Get(':auditId/verify')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async verify(@Param('auditId') auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
