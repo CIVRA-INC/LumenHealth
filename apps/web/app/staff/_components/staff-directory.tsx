@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { StaffMember, UserRole } from "@lumen/types";
 import { useAuthSession } from "../../auth/session-provider";
+import { isAbortError } from "../../../lib/http";
 import { fetchStaff, updateStaffRole } from "../api";
 
 type Status = "loading" | "idle" | "error";
@@ -19,26 +20,29 @@ export function StaffDirectory() {
   const [status, setStatus] = useState<Status>(session ? "loading" : "idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  // The server render and first hydration render always see `session === null`, so the status
+  // seeded above can read "idle" before any request started. Track whether data has actually
+  // arrived instead of trusting "idle" to mean "loaded" (#1498).
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
     if (!session) return;
-    let cancelled = false;
-    fetchStaff(session.accessToken)
+    const controller = new AbortController();
+    setStatus("loading");
+    fetchStaff(session.accessToken, { signal: controller.signal })
       .then((members) => {
-        if (cancelled) return;
         setStaff(members);
+        setHasLoaded(true);
         setStatus("idle");
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (isAbortError(err)) return;
         setErrorMessage(
           err instanceof Error ? err.message : "Failed to load staff",
         );
         setStatus("error");
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [session]);
 
   const canManageRoles =
@@ -72,7 +76,7 @@ export function StaffDirectory() {
     return <p className="authLead">Sign in to view the staff directory.</p>;
   }
 
-  if (status === "loading") {
+  if (status === "loading" || (status === "idle" && !hasLoaded)) {
     return <p className="authLead">Loading staff directory...</p>;
   }
 

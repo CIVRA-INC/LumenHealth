@@ -23,10 +23,10 @@ import { readFileSync } from "node:fs";
 import { Horizon } from "@stellar/stellar-sdk";
 import {
   canonicalize,
+  computeEntriesDigest,
   detectSequenceGaps,
   hashAuditEntry,
   isAuthorizedSigningKey,
-  sha256Hash,
   verifyMerkleProof,
   type AuditEntry,
   type AuditExportBundle,
@@ -51,10 +51,7 @@ function recomputeEntryHash(entry: AuditEntry): string {
 }
 
 function recomputeEntriesDigest(entries: AuditEntry[]): string {
-  const sorted = entries
-    .map((entry) => ({ auditId: entry.auditId, sha256Hash: entry.sha256Hash }))
-    .sort((a, b) => a.auditId.localeCompare(b.auditId));
-  return sha256Hash(sorted);
+  return computeEntriesDigest(entries);
 }
 
 /**

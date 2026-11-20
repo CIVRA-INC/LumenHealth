@@ -1,5 +1,6 @@
 import { getPublicRuntimeConfig } from "@lumen/config/public";
 import type { AuditExportBundle, AuditExportVerifyReport } from "@lumen/types";
+import type { RequestOptions } from "../../lib/http";
 
 /**
  * Independently re-verifies a compliance export bundle against live Stellar
@@ -8,12 +9,16 @@ import type { AuditExportBundle, AuditExportVerifyReport } from "@lumen/types";
  * `verify-export` CLI performs, exposed as a page anyone holding an export
  * file can use.
  */
-export async function verifyExportBundle(bundle: AuditExportBundle): Promise<AuditExportVerifyReport> {
+export async function verifyExportBundle(
+  bundle: AuditExportBundle,
+  options: RequestOptions = {},
+): Promise<AuditExportVerifyReport> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
   const res = await fetch(`${apiBaseUrl}/api/v1/audit/verify-export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ bundle }),
+    signal: options.signal,
   });
 
   if (!res.ok) {

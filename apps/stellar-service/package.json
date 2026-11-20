@@ -10,7 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "lint": "node -e \"console.log('stellar lint: add stronger checks in milestone work')\""
+    "lint": "eslint src"
   },
   "dependencies": {
     "@lumen/config": "^0.1.0",
@@ -20,13 +20,10 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^24.10.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.7"
+    "tsx": "^4.21.0"
   },
   "engines": {
-    "node": ">=24 <25",
+    "node": ">=20",
     "npm": ">=10"
   }
 }

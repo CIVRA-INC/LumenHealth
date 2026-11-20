@@ -16,9 +16,7 @@ export type StaffMember = {
   updatedAt: string;
 };
 
-export type UpdateStaffRoleRequest = {
-  role: Exclude<UserRole, "owner">;
-};
+// UpdateStaffRoleRequest is derived from ./schemas/staff.ts.
 
 // ── Invitations ───────────────────────────────────────────────────────────────
 
@@ -37,34 +35,5 @@ export type Invitation = {
   acceptedAt?: string;
 };
 
-export type SendInvitationRequest = {
-  email: string;
-  role: Exclude<UserRole, "owner">;
-};
-
-export type AcceptInvitationRequest = {
-  token: string;
-  password: string;
-  name: string;
-};
-
-// ── Errors ────────────────────────────────────────────────────────────────────
-
-export type StaffErrorCode =
-  | "STAFF_NOT_FOUND"
-  | "STAFF_ALREADY_EXISTS"
-  | "STAFF_ACCESS_DENIED"
-  | "STAFF_CANNOT_DEACTIVATE_SELF"
-  | "STAFF_ROLE_INVALID";
-
-export type InvitationErrorCode =
-  | "INVITATION_NOT_FOUND"
-  | "INVITATION_EXPIRED"
-  | "INVITATION_ALREADY_ACCEPTED"
-  | "INVITATION_ALREADY_PENDING"
-  | "INVITATION_REVOKED";
-
-export type StaffError = {
-  error: StaffErrorCode | InvitationErrorCode;
-  message: string;
-};
+// SendInvitationRequest and AcceptInvitationRequest are derived from
+// ./schemas/invitation.ts.

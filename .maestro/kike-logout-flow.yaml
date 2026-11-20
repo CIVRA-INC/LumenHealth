@@ -1,0 +1,9 @@
+appId: com.lumenhealth.mobile
+---
+- launchApp
+- tapOn:
+    id: "settings-open"
+- tapOn:
+    id: "sign-out-button"
+- assertVisible:
+    id: "login-email-input"

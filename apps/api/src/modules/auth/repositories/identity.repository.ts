@@ -1,5 +1,7 @@
 import type { AuthIdentity } from "../types/index.js";
 
+const copy = <T>(value: T): T => structuredClone(value);
+
 const store = new Map<string, AuthIdentity>();
 /** Normalized (lower-cased) email -> userId. Unique, O(1) lookup. */
 const emailIndex = new Map<string, string>();
@@ -14,11 +16,13 @@ export class DuplicateEmailError extends Error {
 export const identityStore = {
   findByEmail(email: string): AuthIdentity | undefined {
     const userId = emailIndex.get(email.toLowerCase());
-    return userId ? store.get(userId) : undefined;
+    const found = userId ? store.get(userId) : undefined;
+    return found ? copy(found) : undefined;
   },
 
   findById(userId: string): AuthIdentity | undefined {
-    return store.get(userId);
+    const found = store.get(userId);
+    return found ? copy(found) : undefined;
   },
 
   /** Throws DuplicateEmailError when another identity already owns the email (synchronous, so race-free). */
@@ -28,7 +32,7 @@ export const identityStore = {
     if (owner && owner !== identity.userId) throw new DuplicateEmailError(emailLower);
     const previous = store.get(identity.userId);
     if (previous) emailIndex.delete(previous.email.toLowerCase());
-    store.set(identity.userId, { ...identity, email: emailLower });
+    store.set(identity.userId, { ...copy(identity), email: emailLower });
     emailIndex.set(emailLower, identity.userId);
   },
 

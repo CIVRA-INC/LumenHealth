@@ -96,6 +96,38 @@ export type AuditEntry = {
   anchorMode?: AnchorMode;
 };
 
+/**
+ * What the audit table needs per row. The list endpoint returns this instead of the full
+ * `AuditEntry`, which also carries `before`/`after` snapshots, `userAgent`, `ipAddress`,
+ * `merkleProof` and every anchoring field. Fetch `GET /audit/:auditId` for the full entry.
+ */
+export type AuditListItem = {
+  auditId: string;
+  createdAt: string;
+  action: AuditAction;
+  actorId: string;
+  actorRole: UserRole;
+  targetType?: AuditEntry["targetType"];
+  targetId?: string;
+  /** True once the entry has been anchored on Stellar. */
+  anchored: boolean;
+  anchorMode?: AnchorMode;
+};
+
+export function toAuditListItem(entry: AuditEntry): AuditListItem {
+  return {
+    auditId: entry.auditId,
+    createdAt: entry.createdAt,
+    action: entry.action,
+    actorId: entry.actorId,
+    actorRole: entry.actorRole,
+    targetType: entry.targetType,
+    targetId: entry.targetId,
+    anchored: Boolean(entry.stellarTxHash),
+    anchorMode: entry.anchorMode,
+  };
+}
+
 /** Fields hashed to derive `AuditEntry.sha256Hash`. */
 export type HashableAuditEntry = Omit<
   AuditEntry,
@@ -113,7 +145,11 @@ export type AuditQuery = {
   limit?: number;
   /** Opaque cursor from a previous page's `nextCursor`; use instead of `page`. */
   cursor?: string;
-  /** Filter by anchor status: true = anchored entries only, false = unanchored only. */
+  /**
+   * Filter by anchor status: true = anchored entries only, false = unanchored only. Exposed over
+   * HTTP as `GET /audit?anchored=true|false` (anything else is a 400). `total` reflects the filter.
+   * Results are ordered newest first, ties broken by `auditId` (code-unit order).
+   */
   anchored?: boolean;
 };
 

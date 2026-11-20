@@ -27,6 +27,18 @@ export function _resetAuthStateForTests() {
   _resetRateLimiter();
 }
 
+/** Audit/log reason for a login refused because of the account state. */
+function loginBlockReason(status: string): string {
+  switch (status) {
+    case "locked":
+      return "ACCOUNT_LOCKED";
+    case "suspended":
+      return "ACCOUNT_SUSPENDED";
+    default:
+      return "ACCOUNT_PENDING";
+  }
+}
+
 @Controller('auth')
 export class AuthController {
   
@@ -61,10 +73,21 @@ export class AuthController {
       throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid email or password" }, authErrorStatus("AUTH_INVALID_CREDENTIALS"));
     }
     
+    // A locked, pending or suspended account answers exactly like an unknown
+    // email or a wrong password (same 401 body, same timing), so the response
+    // cannot be used to enumerate accounts or learn their state. The specific
+    // reason is recorded only in the log (docs/auth-lockout-policy.md).
     const statusErr = accountStatusError(identity.status);
     if (statusErr) {
+      await performDummyPasswordCompare(body.password);
       incrementMetric("auth_login_failure_total");
-      throw new HttpException(statusErr, authErrorStatus(statusErr.error));
+      authLogger.warn("auth.login.failure", {
+        requestId,
+        userId: identity.userId,
+        clinicId: identity.clinicId,
+        meta: { reason: loginBlockReason(identity.status) },
+      });
+      throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid email or password" }, authErrorStatus("AUTH_INVALID_CREDENTIALS"));
     }
     
     const passwordMatch = await bcrypt.compare(body.password, identity.passwordHash);
