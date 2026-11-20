@@ -87,6 +87,8 @@ export function ClinicSettingsForm() {
         Clinic name
         <input
           type="text"
+          name="name"
+          autoComplete="organization"
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={!canEdit}
@@ -99,6 +101,8 @@ export function ClinicSettingsForm() {
         Address
         <input
           type="text"
+          name="address"
+          autoComplete="street-address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           disabled={!canEdit}
@@ -110,6 +114,9 @@ export function ClinicSettingsForm() {
         Phone
         <input
           type="tel"
+          name="phone"
+          autoComplete="tel"
+          inputMode="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           disabled={!canEdit}
@@ -121,6 +128,9 @@ export function ClinicSettingsForm() {
         Email
         <input
           type="email"
+          name="email"
+          autoComplete="email"
+          inputMode="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={!canEdit}
