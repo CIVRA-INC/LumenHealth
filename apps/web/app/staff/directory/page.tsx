@@ -3,7 +3,7 @@ import { StaffDirectory } from "../_components/staff-directory";
 
 export default function StaffDirectoryPage() {
   return (
-    <main className="authPage">
+    <main id="main-content" tabIndex={-1} className="authPage">
       <AuthCard
         eyebrow="Staff"
         title="Directory"

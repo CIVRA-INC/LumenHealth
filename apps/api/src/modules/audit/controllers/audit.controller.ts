@@ -1,3 +1,4 @@
+import { uuidParamPipe } from '../../../shared/validation/id-params.js';
 import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param, Ip } from '@nestjs/common';
 import { NoStore } from '../../../common/interceptors/no-store.interceptor.js';
 import type { Response } from "express";
@@ -171,7 +172,7 @@ export class AuditController {
   @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
-  async verify(@Param('auditId') auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+  async verify(@Param('auditId', uuidParamPipe()) auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
     const role = auth.role;
     if (role !== "owner" && role !== "admin") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can verify audit logs" }, HttpStatus.FORBIDDEN);

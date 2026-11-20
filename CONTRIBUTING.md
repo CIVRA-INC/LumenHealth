@@ -21,7 +21,7 @@ packages/
   types/        Shared TypeScript contracts (@lumen/types)
   config/       Shared runtime configuration (@lumen/config)
 
-docs/           Architecture and domain documentation
+docs/           Architecture and domain documentation (index: docs/README.md)
 ```
 
 ---
@@ -49,6 +49,10 @@ npm run dev
 ```
 
 ---
+
+## Generated files
+
+`apps/web/next-env.d.ts` and `*.tsbuildinfo` are generated and not tracked. The web `typecheck` script runs `next typegen` first, so route types exist on a fresh clone without a prior `next dev` or `next build`.
 
 ## Running tests
 

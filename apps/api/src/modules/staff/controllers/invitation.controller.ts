@@ -1,3 +1,4 @@
+import { uuidParamPipe } from '../../../shared/validation/id-params.js';
 import { Controller, Post, Get, Delete, Body, Res, Param, HttpException, HttpStatus, UseGuards, Query, UsePipes } from '@nestjs/common';
 import type { Response } from 'express';
 import type { InvitationStatus } from '@lumen/types';
@@ -56,7 +57,7 @@ export class InvitationController {
   @Delete(':invitationId')
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
-  revoke(@Param('invitationId') invitationId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+  revoke(@Param('invitationId', uuidParamPipe()) invitationId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
     const result = this.invitationService.revokeInvitation(invitationId, auth.clinicId);
 
     if ("error" in result) {

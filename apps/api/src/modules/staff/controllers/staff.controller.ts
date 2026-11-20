@@ -1,3 +1,4 @@
+import { uuidParamPipe } from '../../../shared/validation/id-params.js';
 import { Controller, Get, Patch, Body, Param, Res, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import type { UpdateStaffRoleRequest } from '@lumen/types';
@@ -25,7 +26,7 @@ export class StaffController {
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   updateRole(
-    @Param('staffId') staffId: string,
+    @Param('staffId', uuidParamPipe()) staffId: string,
     @Body() body: UpdateStaffRoleRequest,
     @AuthContext() auth: AuthContextType,
     @Res() res: Response

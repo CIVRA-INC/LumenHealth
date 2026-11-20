@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function AuthLandingPage() {
   return (
-    <main className="authPage">
+    <main id="main-content" tabIndex={-1} className="authPage">
       <section className="authLanding">
         <div className="authLandingCopy">
           <p className="eyebrow">Authentication hub</p>

@@ -4,7 +4,7 @@ import { AnchoringHealthPanel } from "./_components/anchoring-health-panel";
 
 export default function AuditLogPage() {
   return (
-    <main className="authPage">
+    <main id="main-content" tabIndex={-1} className="authPage">
       <AuthCard
         eyebrow="Audit"
         title="Audit log"

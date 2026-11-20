@@ -9,7 +9,7 @@ const tracks = [
 
 export default function HomePage() {
   return (
-    <main className="shell">
+    <main id="main-content" tabIndex={-1} className="shell">
       <section className="hero">
         <p className="eyebrow">LumenHealth Reset</p>
         <h1>Fresh starter repo for an open source healthcare hackathon.</h1>

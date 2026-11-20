@@ -241,11 +241,12 @@ apps/stellar-service/.env.example
 
 ## Documentation
 
-* Architecture: `docs/architecture.md`
-* MVP Scope: `docs/mvp-scope.md`
-* API reference (endpoints, environment variables, scripts): `apps/api/README.md`
-* Contributor Guide: `CONTRIBUTING.md`
-* Reset Roadmap: `docs/reset-roadmap.md`
+* Documentation index (by audience): [`docs/README.md`](docs/README.md)
+* API reference (endpoints, environment variables, scripts): [`apps/api/README.md`](apps/api/README.md)
+* Contributor Guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+* Contract versioning: [`CONTRACT_VERSIONING.md`](CONTRACT_VERSIONING.md)
+* Architecture decisions: [`docs/adr/`](docs/adr/)
+* Security and key rotation: [`docs/auth-threat-model.md`](docs/auth-threat-model.md), [`docs/stellar-key-rotation.md`](docs/stellar-key-rotation.md)
 
 ---
 

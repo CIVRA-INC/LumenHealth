@@ -112,3 +112,5 @@ jobs:
       - run: npm run check:architecture
       - name: Dependency versions
         run: npm run check:versions
+      - name: Markdown links
+        run: npm run check:links
