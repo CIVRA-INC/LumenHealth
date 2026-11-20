@@ -30,7 +30,7 @@
     "eslint-config-next": "16.1.4",
     "jsdom": "^29.1.1",
     "typescript": "^5.9.3",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitest/coverage-v8": "^5.1.0",
     "vitest": "^4.1.9"
   }
 }
