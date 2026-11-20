@@ -1,14 +1,22 @@
 import dotenv from "dotenv";
-import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertNoViolations, checkHttpUrl, parseIntSetting } from "./numeric.js";
+import { missingEnvWarning, resolveEnvFile } from "./env-file.js";
 import { getPublicRuntimeConfig } from "./public.js";
 import { enforceSecret } from "./secrets.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+// Resolve the repo-root .env by walking up from this file, so it loads the same
+// from source (`packages/config`) and from the compiled `dist` output (#1482).
+const resolvedEnvFile = resolveEnvFile(__dirname);
+if (resolvedEnvFile.path) {
+  dotenv.config({ path: resolvedEnvFile.path });
+}
+const envWarning = missingEnvWarning(resolvedEnvFile);
+if (envWarning) {
+  console.warn(envWarning);
+}
 
 const read = (name: string, fallback?: string) => {
   const value = process.env[name]?.trim();
