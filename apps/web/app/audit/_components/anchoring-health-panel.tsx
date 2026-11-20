@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AnchoringHealthReport } from "@lumen/types";
+import { ApiError } from "../../../lib/api-error";
 import { useAuthSession } from "../../auth/session-provider";
 import { fetchAnchoringHealth } from "../api";
 
@@ -61,12 +62,12 @@ export function AnchoringHealthPanel() {
         setStatus("idle");
       })
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : "Failed to load anchoring health";
-        if (message.includes("501") || message.includes("NOT_CONFIGURED")) {
+        // Classify by status/code only: message text can contain any digits (ids, ports, timestamps).
+        if (err instanceof ApiError && (err.status === 501 || err.code === "NOT_CONFIGURED")) {
           setStatus("not-configured");
           return;
         }
-        setErrorMessage(message);
+        setErrorMessage(err instanceof Error ? err.message : "Failed to load anchoring health");
         setStatus("error");
       });
   }, [session, canView]);

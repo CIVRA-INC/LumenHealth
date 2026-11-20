@@ -1,4 +1,5 @@
 import { getPublicRuntimeConfig } from "@lumen/config/public";
+import { apiErrorFromResponse } from "../../lib/api-error";
 import type { AnchoringHealthReport, AuditAction, AuditEntry, AuditExportBundle, AuditVerifyResponse } from "@lumen/types";
 import { authHeaders, pathSegment, type RequestOptions } from "../../lib/http";
 
@@ -126,10 +127,8 @@ export async function fetchAnchoringHealth(
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(
-      (body as { message?: string }).message ?? `Failed to fetch anchoring health (${res.status})`,
-    );
+    // Typed so callers can branch on `status`/`code` instead of matching message text.
+    throw await apiErrorFromResponse(res, "Failed to fetch anchoring health");
   }
 
   return (await res.json()) as AnchoringHealthReport;

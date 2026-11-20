@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { AuditEntry, AuditExportBundle, AuditVerifyResponse, AuthSession } from "@lumen/types";
 
@@ -283,7 +283,8 @@ describe("AuditLog", () => {
     expect(await screen.findByText(/downloaded 1 entries/i)).toBeInTheDocument();
     expect(mockExportAuditLog).toHaveBeenCalledWith(expect.objectContaining({}), "tok");
     expect(createObjectURL).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
+    // The object URL is revoked shortly after the click, not synchronously (#1503).
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-url"), { timeout: 3000 });
 
     vi.unstubAllGlobals();
   });
