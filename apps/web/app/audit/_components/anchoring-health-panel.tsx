@@ -5,36 +5,17 @@ import type { AnchoringHealthReport } from "@lumen/types";
 import { ApiError } from "../../../lib/api-error";
 import { useAuthSession } from "../../auth/session-provider";
 import { fetchAnchoringHealth } from "../api";
+import { formatDuration, formatRelativeTime } from "./format-time";
 
 type Status = "loading" | "idle" | "error" | "not-configured";
+
+/** Relative times ("5m ago") are recomputed this often so a long-lived dashboard does not go stale. */
+const RELATIVE_TIME_TICK_MS = 60_000;
 
 /** Above this, the pipeline reads as degraded even without an explicit alert — mirrors the scheduler's own default stale threshold. */
 const LAG_WARNING_THRESHOLD_MS = 15 * 60_000;
 /** Mirrors the scheduler's default `maxConsecutiveFailures`. */
 const FAILURE_WARNING_THRESHOLD = 3;
-
-function formatRelativeTime(iso: string | null): string {
-  if (!iso) return "never";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 0) return "just now";
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
-
-function formatDuration(ms: number | null): string {
-  if (ms === null) return "—";
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round(minutes / 60);
-  return `${hours}h`;
-}
 
 function isDegraded(health: AnchoringHealthReport): boolean {
   return (
@@ -48,6 +29,12 @@ export function AnchoringHealthPanel() {
   const [health, setHealth] = useState<AnchoringHealthReport | null>(null);
   const [status, setStatus] = useState<Status>(session ? "loading" : "idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), RELATIVE_TIME_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   const canView = session?.role === "owner" || session?.role === "admin";
 
@@ -128,11 +115,11 @@ export function AnchoringHealthPanel() {
       <dl className="healthSummary">
         <div>
           <dt>Last successful check</dt>
-          <dd>{formatRelativeTime(health.lastSuccessfulTickAt)}</dd>
+          <dd>{formatRelativeTime(health.lastSuccessfulTickAt, now)}</dd>
         </div>
         <div>
           <dt>Last anchor</dt>
-          <dd>{formatRelativeTime(health.lastAnchorAt)}</dd>
+          <dd>{formatRelativeTime(health.lastAnchorAt, now)}</dd>
         </div>
         <div>
           <dt>Consecutive failures</dt>
