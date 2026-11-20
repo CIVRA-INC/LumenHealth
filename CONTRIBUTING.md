@@ -4,7 +4,7 @@
 
 LumenHealth is a monorepo. Development is organized around clinical milestones — each milestone adds a discrete set of functionality on top of a stable foundation.
 
-The current foundation scope is **authentication only**. All other modules (clinic management, patient records, encounters, billing) are described in the README as future milestones and must not be partially implemented in advance.
+Shipped today: authentication and sessions, clinic and staff management (including invitations), the audit trail, and the Stellar anchoring service. Patient records, encounters and billing are still future milestones (see the status table in the README) and must not be partially implemented in advance.
 
 ---
 
@@ -12,10 +12,10 @@ The current foundation scope is **authentication only**. All other modules (clin
 
 ```
 apps/
-  api/          Express backend — modular monolith
+  api/          NestJS backend (native ESM) — modular monolith
   web/          Next.js web application
   mobile/       React Native workspace (scaffold)
-  stellar-service/  Stellar integration (scaffold)
+  stellar-service/  Stellar anchoring, signing and key rotation (Express)
 
 packages/
   types/        Shared TypeScript contracts (@lumen/types)
@@ -28,7 +28,7 @@ docs/           Architecture and domain documentation
 
 ## Local setup
 
-**Requirements:** Node.js 20+, npm 10+
+**Requirements:** Node.js 20, 22 or 24 (the versions CI tests), npm 10+
 
 ```bash
 git clone <repo>
@@ -65,6 +65,10 @@ npm run test -w apps/web
 
 ---
 
+## Coverage
+
+`npm run test:coverage -w apps/api` (and `apps/web`, `packages/types`) runs vitest with the v8 provider and fails below the `coverage.thresholds` in that workspace's `vitest.config.ts`. CI uploads the reports as `coverage-*` artifacts. The current floors are placeholders; raise them to a few points below the numbers CI reports.
+
 ## Architecture constraints
 
 Two automated checks enforce boundaries. Run them before opening a PR:
@@ -85,7 +89,7 @@ npm run check:boundaries
 - No `any` without a comment explaining why
 - Business logic lives inside a module (`src/modules/<name>/`)
 - Shared infrastructure lives in `src/shared/` — no business logic there
-- Tests live inside the module: `src/modules/<name>/__tests__/`
+- Tests live inside the module (`src/modules/<name>/tests/`)
 
 ---
 
@@ -96,7 +100,7 @@ When a new milestone is scoped:
 1. Create `apps/api/src/modules/<name>/` with: `router.ts`, `service.ts`, `repository.ts`, `validators.ts`, `types.ts`, `__tests__/`
 2. Register the router in `apps/api/src/app.ts`
 3. Add shared types to `packages/types/src/`
-4. Write tests before opening a PR — CI will reject untested modules
+4. Write tests before opening a PR — CI fails when test coverage drops below the thresholds in each workspace's `vitest.config.ts` (see "Coverage" below)
 
 Do not create partial implementations or placeholder endpoints for future modules. Incomplete code in `main` confuses contributors and breaks CI.
 
@@ -122,6 +126,13 @@ All data in LumenHealth is scoped to a clinic. When implementing a new module fo
 6. **Use `buildTwoClinicFixture()` in your integration tests** to verify your module enforces isolation. Import it from `src/modules/auth/tests/fixtures.ts`.
 
 ---
+
+## Branching model and required checks
+
+- `develop` is the integration branch: feature and fix branches (`feat/**`, `fix/**`) are merged into it by pull request. `main` receives promotions from `develop` and `release/**` branches.
+- CI (`.github/workflows/ci.yml`) and the security scan run on pull requests into `main`, `develop` and `release/**`, and on pushes to those branches and to `feat/**` and `fix/**`.
+- Branch protection (documented here; configured by a maintainer) on `develop` and `main` should require the checks `lint`, `typecheck`, `test`, `build`, `Architecture checks` and `Security Checks`, and a review before merging.
+- CI runs everything through `turbo run`. To enable the Turborepo remote cache, set the repository secret `TURBO_TOKEN` and variable `TURBO_TEAM`; otherwise the local `.turbo` cache is restored with `actions/cache`.
 
 ## Pull requests
 
