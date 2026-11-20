@@ -34,3 +34,23 @@ labels:
   - name: good-first-issue
     color: "7057ff"
     description: Good for newcomers and first-time contributors
+
+  - name: enhancement
+    color: "a2eeef"
+    description: Improvement to existing behaviour (used by issue templates)
+
+  - name: backend
+    color: "5319e7"
+    description: Backend or API work
+
+  - name: frontend
+    color: "1d76db"
+    description: Web or mobile UI work
+
+  - name: api
+    color: "0052cc"
+    description: HTTP API surface
+
+  - name: data-model
+    color: "fbca04"
+    description: Persistence or schema change

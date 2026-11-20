@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/server.js",
+    "start": "node --enable-source-maps dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
     "migrate": "tsx src/shared/migrations/cli.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@lumen/config": "^0.1.0",
@@ -25,10 +26,10 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^6.12.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^12.0.7",
     "@nestjs/schematics": "^12.0.0",
     "@nestjs/testing": "^12.1.0",
@@ -37,11 +38,11 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.10.1",
     "@types/supertest": "^7.2.1",
-    "eslint": "^10.5.0",
     "supertest": "^7.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.61.1",
+    "@vitest/coverage-v8": "^4.1.7",
     "vitest": "^4.1.7"
   }
 }

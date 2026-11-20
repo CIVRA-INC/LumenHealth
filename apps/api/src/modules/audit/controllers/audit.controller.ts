@@ -1,4 +1,5 @@
 import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param, Ip } from '@nestjs/common';
+import { NoStore } from '../../../common/interceptors/no-store.interceptor.js';
 import type { Response } from "express";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
@@ -7,6 +8,7 @@ import { RequirePermissions } from '../../../shared/decorators/permissions.decor
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
 import { AuditService } from "../services/audit.service.js";
+import { auditEntriesToCsv, exportFilename, parseExportFormat } from "../services/audit-csv.js";
 import {
   AnchoringNotConfiguredError,
   InvalidExportBundleError,
@@ -45,6 +47,7 @@ export class AuditController {
    * Results are ordered newest first, ties broken by `auditId`.
    */
   @Get()
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   list(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -89,7 +92,14 @@ export class AuditController {
     return res.json(result);
   }
 
+  /**
+   * `format=json` (default) returns the signed bundle as a download; `format=csv` returns an
+   * unsigned, spreadsheet-friendly extract (owner/admin only, like the JSON export). The CSV is
+   * explicitly unsigned: its manifest digest is sent in the `X-Audit-Entries-Digest` header so it
+   * can be compared with a signed JSON export of the same range.
+   */
   @Get('export')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async exportAuditLog(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -114,6 +124,7 @@ export class AuditController {
   }
 
   @Get('anchoring-health')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async anchoringHealth(@AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -137,6 +148,7 @@ export class AuditController {
   }
 
   @Get(':auditId/verify')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async verify(@Param('auditId') auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {

@@ -7,11 +7,4 @@ export * from "./merkle.js";
 export * from "./anchoring-health.js";
 export * from "./signing-keys.js";
 export * from "./chain.js";
-
-export type PaymentIntent = {
-  id: string;
-  amount: number;
-  assetCode: string;
-  memo: string;
-  status: "pending" | "confirmed" | "failed";
-};
+export * from "./schemas/index.js";
