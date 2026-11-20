@@ -243,6 +243,7 @@ apps/stellar-service/.env.example
 
 * Architecture: `docs/architecture.md`
 * MVP Scope: `docs/mvp-scope.md`
+* API reference (endpoints, environment variables, scripts): `apps/api/README.md`
 * Contributor Guide: `CONTRIBUTING.md`
 * Reset Roadmap: `docs/reset-roadmap.md`
 

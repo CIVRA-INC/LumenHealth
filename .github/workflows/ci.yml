@@ -42,17 +42,19 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Cache node_modules
-        id: modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.modules.outputs.cache-hit != 'true'
-        run: npm ci
+      - run: npm ci
+      - name: Build shared packages
+        run: npm run build -w packages/config && npm run build -w packages/types
+      - name: Architecture checks
+        run: npm run check:architecture
+      - name: Environment variable docs
+        run: npm run check:env-docs
+      - name: Lint
+        run: npm run lint -w apps/api
+      - name: Test
+        run: npm run test -w apps/api
+      - name: Build
+        run: npm run build -w apps/api
 
   checks:
     name: ${{ matrix.task }}
