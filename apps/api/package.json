@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
     "migrate": "tsx src/shared/migrations/cli.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@lumen/config": "^0.1.0",
@@ -42,6 +43,7 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.61.1",
+    "@vitest/coverage-v8": "^4.1.7",
     "vitest": "^4.1.7"
   }
 }

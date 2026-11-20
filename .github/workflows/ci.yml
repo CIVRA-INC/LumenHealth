@@ -14,10 +14,13 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   api:
     name: API — lint / test / build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -32,14 +35,20 @@ jobs:
         run: npm run check:architecture
       - name: Lint
         run: npm run lint -w apps/api
-      - name: Test
-        run: npm run test -w apps/api
+      - name: Test with coverage
+        run: npm run test:coverage -w apps/api
       - name: Build
         run: npm run build -w apps/api
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-api
+          path: apps/api/coverage
+          if-no-files-found: ignore
 
   web:
     name: Web — lint / test / build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       NEXT_TELEMETRY_DISABLED: "1"
@@ -52,16 +61,22 @@ jobs:
       - run: npm ci
       - name: Build shared packages
         run: npm run build -w packages/config && npm run build -w packages/types
-      - name: Test
-        run: npm run test -w apps/web
+      - name: Test with coverage
+        run: npm run test:coverage -w apps/web
       - name: Lint
         run: npm run lint -w apps/web
       - name: Build
         run: npm run build -w apps/web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-web
+          path: apps/web/coverage
+          if-no-files-found: ignore
 
   packages:
-    name: Packages — build / lint
-    runs-on: ubuntu-latest
+    name: Packages — build / test
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -74,3 +89,85 @@ jobs:
         run: npm run build -w packages/config
       - name: Build types
         run: npm run build -w packages/types
+      - name: Test @lumen/types with coverage
+        run: npm run test:coverage -w packages/types
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-types
+          path: packages/types/coverage
+          if-no-files-found: ignore
+
+  stellar:
+    name: Stellar service — typecheck / lint / test / build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build shared packages
+        run: npm run build -w packages/config && npm run build -w packages/types
+      - name: Typecheck
+        run: npm run typecheck -w apps/stellar-service
+      - name: Lint
+        run: npm run lint -w apps/stellar-service
+      - name: Test
+        run: npm run test -w apps/stellar-service
+      - name: Build
+        run: npm run build -w apps/stellar-service
+
+  mobile:
+    name: Mobile — typecheck / lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build shared packages
+        run: npm run build -w packages/config && npm run build -w packages/types
+      - name: Typecheck
+        run: npm run typecheck -w apps/mobile
+      - name: Lint
+        run: npm run lint -w apps/mobile
+
+  node-matrix:
+    name: Tests — Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Build shared packages
+        run: npm run build -w packages/config && npm run build -w packages/types
+      - name: Test api, stellar service and types
+        run: npm run test -w apps/api -w apps/stellar-service -w packages/types
+
+  boundaries-macos:
+    name: Boundary scripts — macOS
+    runs-on: macos-14
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run check:boundaries
+      - run: npm run check:architecture
