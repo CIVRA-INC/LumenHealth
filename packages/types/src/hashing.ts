@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { HashableAuditEntry } from "./audit.js";
+import type { AuditEntry, HashableAuditEntry } from "./audit.js";
 
 /**
  * Canonicalizes a value into a stable JSON string: object keys are sorted
@@ -50,4 +50,20 @@ export function sha256Hash(value: unknown): string {
  */
 export function hashAuditEntry(entry: HashableAuditEntry): string {
   return sha256Hash(entry);
+}
+
+/**
+ * Computes the manifest `entriesDigest` for an export: SHA-256 over the canonical list of
+ * `{ auditId, sha256Hash }` pairs, sorted by `auditId` with plain code-unit comparison.
+ *
+ * Deliberately not `localeCompare`: ICU collation differs between hosts, Node builds and `LANG`
+ * settings, which would make an export signed on one machine fail digest validation on another.
+ * For lowercase ASCII UUIDs the order (and therefore the digest) is unchanged, so existing
+ * bundles still verify.
+ */
+export function computeEntriesDigest(entries: readonly Pick<AuditEntry, "auditId" | "sha256Hash">[]): string {
+  const sorted = entries
+    .map((entry) => ({ auditId: entry.auditId, sha256Hash: entry.sha256Hash }))
+    .sort((a, b) => (a.auditId < b.auditId ? -1 : a.auditId > b.auditId ? 1 : 0));
+  return sha256Hash(sorted);
 }
