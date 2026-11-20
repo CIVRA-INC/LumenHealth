@@ -9,6 +9,15 @@ export class AuditImmutableError extends Error {
   }
 }
 
+/** Deep-freezes a plain value (nested objects and arrays such as `merkleProof`). */
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
+
 @Injectable()
 export class AuditRepository {
   private store = new Map<string, AuditEntry>();
@@ -16,7 +25,8 @@ export class AuditRepository {
   /** Insert-only: an existing entry can never be overwritten. Anchor fields are set via applyAnchorResult. */
   save(entry: AuditEntry): AuditEntry {
     if (this.store.has(entry.auditId)) throw new AuditImmutableError(entry.auditId);
-    const frozen = Object.freeze({ ...entry });
+    // Clone first so the caller's object stays independent of the stored one.
+    const frozen = deepFreeze(structuredClone(entry));
     this.store.set(entry.auditId, frozen);
     return frozen;
   }
@@ -45,14 +55,16 @@ export class AuditRepository {
       // Anchor fields are write-once: replayed or conflicting results leave stored proofs untouched.
       if (!entry || entry.stellarTxHash) continue;
 
-      const anchored: AuditEntry = Object.freeze({
-        ...entry,
-        stellarTxHash: result.stellarTxHash,
-        merkleRoot: result.merkleRoot,
-        anchoredAt: result.anchoredAt,
-        anchorMode: result.mode,
-        merkleProof,
-      });
+      const anchored: AuditEntry = deepFreeze(
+        structuredClone({
+          ...entry,
+          stellarTxHash: result.stellarTxHash,
+          merkleRoot: result.merkleRoot,
+          anchoredAt: result.anchoredAt,
+          anchorMode: result.mode,
+          merkleProof,
+        }),
+      );
       this.store.set(auditId, anchored);
       updated.push(anchored);
     }
