@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/syncpack@13/dist/schema.json",
+  "versionGroups": [
+    {
+      "label": "one version per dependency across workspaces",
+      "packages": ["**"],
+      "dependencies": ["**"]
+    }
+  ],
+  "semverGroups": [
+    {
+      "label": "caret ranges everywhere",
+      "range": "^",
+      "dependencies": ["**"],
+      "packages": ["**"],
+      "dependencyTypes": ["prod", "dev"]
+    }
+  ]
+}

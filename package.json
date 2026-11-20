@@ -14,13 +14,23 @@
     "test": "turbo run test",
     "check:boundaries": "node packages/config/check-workspace-boundaries.cjs",
     "check:architecture": "node packages/config/architecture-check.cjs",
+    "check:env-docs": "node packages/config/check-env-docs.cjs",
     "issues:preview": "node scripts/issues/render-batch.mjs",
     "issues:publish": "node scripts/issues/publish-batch.mjs",
+    "check:versions": "syncpack lint",
+    "check:contracts": "node scripts/check-contract-changelog.mjs",
+    "changeset": "changeset",
     "check:links": "node scripts/check-markdown-links.mjs"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.0",
+    "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "syncpack": "^13.0.4",
     "turbo": "^2.6.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^4.1.9"
   }
 }

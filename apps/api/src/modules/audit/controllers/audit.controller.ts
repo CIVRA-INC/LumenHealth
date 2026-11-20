@@ -1,6 +1,8 @@
 import { uuidParamPipe } from '../../../shared/validation/id-params.js';
 import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param, Ip } from '@nestjs/common';
+import { NoStore } from '../../../common/interceptors/no-store.interceptor.js';
 import type { Response } from "express";
+import { toAuditListItem } from "@lumen/types";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
 import { PermissionsGuard } from '../../../shared/guards/permissions.guard.js';
@@ -8,16 +10,30 @@ import { RequirePermissions } from '../../../shared/decorators/permissions.decor
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
 import { AuditService } from "../services/audit.service.js";
+import { auditEntriesToCsv, exportFilename, parseExportFormat } from "../services/audit-csv.js";
 import {
   AnchoringNotConfiguredError,
   InvalidExportBundleError,
   StellarVerifierClient,
 } from "../services/stellar-verifier.client.js";
+import { InvalidAuditQueryError, parseAnchoredFilter, parseAuditRange } from "../services/audit-query.js";
 import {
   VerificationBudgetExceededError,
   verifyExportProtection,
   withTimeBudget,
 } from "../services/verify-export.protection.js";
+
+/** Maps malformed query parameters to 400 `INVALID_QUERY`; anything else is rethrown. */
+function parseQuery<T>(parse: () => T): T {
+  try {
+    return parse();
+  } catch (error) {
+    if (error instanceof InvalidAuditQueryError) {
+      throw new HttpException({ error: "INVALID_QUERY", message: error.message }, HttpStatus.BAD_REQUEST);
+    }
+    throw error;
+  }
+}
 
 @Controller('audit')
 export class AuditController {
@@ -26,7 +42,13 @@ export class AuditController {
     private readonly stellarVerifierClient: StellarVerifierClient
   ) {}
 
+  /**
+   * Returns a list-friendly projection (`AuditListItem`: no `before`/`after`, `merkleProof`,
+   * `userAgent` or `ipAddress`). Pass `include=full` for the complete entries (kept for clients
+   * that have not moved to `GET /audit/:auditId` yet); any other `include` value is a 400.
+   */
   @Get()
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   list(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -36,7 +58,12 @@ export class AuditController {
     }
 
     const clinicId = auth.clinicId;
-    const { action, actorId, targetId, from, to, page, limit, cursor } = query;
+    const { action, actorId, targetId, from, to, page, limit, cursor, include } = query;
+    if (include !== undefined && include !== "full") {
+      throw new HttpException({ error: "INVALID_QUERY", message: "include must be 'full' when provided" }, HttpStatus.BAD_REQUEST);
+    }
+    const project = <T extends Parameters<typeof toAuditListItem>[0]>(entries: T[]) =>
+      include === "full" ? entries : entries.map(toAuditListItem);
 
     // Cursor mode (`?cursor=` or `?cursor=<opaque>`): newest first, `nextCursor` instead of `total`.
     if (cursor !== undefined) {
@@ -45,12 +72,13 @@ export class AuditController {
         action: action as AuditAction | undefined,
         actorId: actorId as string | undefined,
         targetId: targetId as string | undefined,
-        from: from as string | undefined,
-        to: to as string | undefined,
+        from: range.from,
+        to: range.to,
+        anchored,
         limit: limit ? Number(limit) : undefined,
         cursor: String(cursor),
       });
-      return res.json({ entries: items, nextCursor });
+      return res.json({ entries: project(items), nextCursor });
     }
 
     const result = this.auditService.queryAuditLog({
@@ -58,16 +86,24 @@ export class AuditController {
       action: action as AuditAction | undefined,
       actorId: actorId as string | undefined,
       targetId: targetId as string | undefined,
-      from: from as string | undefined,
-      to: to as string | undefined,
+      from: range.from,
+      to: range.to,
+      anchored,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
 
-    return res.json(result);
+    return res.json({ ...result, entries: project(result.entries) });
   }
 
+  /**
+   * `format=json` (default) returns the signed bundle as a download; `format=csv` returns an
+   * unsigned, spreadsheet-friendly extract (owner/admin only, like the JSON export). The CSV is
+   * explicitly unsigned: its manifest digest is sent in the `X-Audit-Entries-Digest` header so it
+   * can be compared with a signed JSON export of the same range.
+   */
   @Get('export')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async exportAuditLog(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -77,14 +113,11 @@ export class AuditController {
     }
 
     const clinicId = auth.clinicId;
-    const { from, to } = query;
+    const { from, to } = parseQuery(() => parseAuditRange(query.from, query.to));
 
     try {
-      const bundle = await this.auditService.buildAuditExport(
-        clinicId,
-        from as string | undefined,
-        to as string | undefined,
-      );
+      // The manifest `range` records the normalized ISO bounds, not the raw query strings.
+      const bundle = await this.auditService.buildAuditExport(clinicId, from, to);
       return res.json(bundle);
     } catch (error) {
       throw new HttpException({
@@ -95,6 +128,7 @@ export class AuditController {
   }
 
   @Get('anchoring-health')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async anchoringHealth(@AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -117,7 +151,25 @@ export class AuditController {
     }
   }
 
+  /** Full entry for one audit id; owner/admin only, clinic scoped (another clinic's id is a 404). Declared after the static routes so it cannot shadow them. */
+  @Get(':auditId')
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @RequirePermissions('staff:write')
+  async detail(@Param('auditId') auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const role = auth.role;
+    if (role !== "owner" && role !== "admin") {
+      throw new HttpException({ error: "AUTH_FORBIDDEN", message: "only owner or admin can view audit logs" }, HttpStatus.FORBIDDEN);
+    }
+
+    const entry = await this.auditService.getAuditEntry(auth.clinicId, auditId);
+    if (!entry) {
+      throw new HttpException({ error: "NOT_FOUND", message: "audit entry not found" }, HttpStatus.NOT_FOUND);
+    }
+    return res.json({ entry });
+  }
+
   @Get(':auditId/verify')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async verify(@Param('auditId', uuidParamPipe()) auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {

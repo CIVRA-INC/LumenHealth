@@ -37,6 +37,7 @@ Every document in `docs/`, grouped by audience. Architecture decisions are in [`
 
 - [`auth-mobile-architecture.md`](auth-mobile-architecture.md) — Mobile Auth Architecture Decision
 - [`auth-mobile-visibility-rules.md`](auth-mobile-visibility-rules.md) — Auth Mobile Visibility Rules
+- [`kike-mobile-release-signing-runbook.md`](kike-mobile-release-signing-runbook.md) — LumenHealth Mobile Release Signing and Release Runbook (iOS & Android)
 
 ## Stellar operations
 
@@ -48,3 +49,5 @@ Every document in `docs/`, grouped by audience. Architecture decisions are in [`
 - [`adr/0001-nestjs-module-boundaries.md`](adr/0001-nestjs-module-boundaries.md) — ADR 0001: NestJS Module Boundaries for apps/api
 - [`adr/0002-critical-audit-actions.md`](adr/0002-critical-audit-actions.md) — ADR 0002: Which audit actions are governance-critical (immediate anchoring)
 - [`adr/0003-persistence-strategy.md`](adr/0003-persistence-strategy.md) — ADR 0003: Persistence strategy for the API
+- [`adr/0002-mxllv-expo-managed-vs-bare-react-native.md`](adr/0002-mxllv-expo-managed-vs-bare-react-native.md) — ADR 0002: Choose Expo Managed Workflow Versus Bare React Native (mxllv)
+- [`adr/template.md`](adr/template.md) — ADR NNNN: <title>

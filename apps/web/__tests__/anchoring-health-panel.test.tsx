@@ -22,6 +22,7 @@ vi.mock("../app/auth/session-provider", () => ({
   }),
 }));
 
+import { ApiError } from "../lib/api-error";
 import { AnchoringHealthPanel } from "../app/audit/_components/anchoring-health-panel";
 
 const ownerSession: AuthSession = {
@@ -104,7 +105,27 @@ describe("AnchoringHealthPanel", () => {
 
   it("shows a not-configured message when the endpoint reports 501", async () => {
     mockSessionValue = ownerSession;
-    mockFetchAnchoringHealth.mockRejectedValue(new Error("Failed to fetch anchoring health (501)"));
+    mockFetchAnchoringHealth.mockRejectedValue(new ApiError("Failed to fetch anchoring health (501)", 501, "NOT_CONFIGURED"));
+
+    render(<AnchoringHealthPanel />);
+
+    expect(await screen.findByText(/doesn.t run the anchoring scheduler/i)).toBeInTheDocument();
+  });
+
+  it("does not treat a message containing '501' as not-configured when the status is 500 (#1505)", async () => {
+    mockSessionValue = ownerSession;
+    mockFetchAnchoringHealth.mockRejectedValue(new ApiError("request req-501-abc failed at 12:50:01", 500));
+
+    render(<AnchoringHealthPanel />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/req-501-abc/);
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(screen.queryByText(/doesn.t run the anchoring scheduler/i)).not.toBeInTheDocument();
+  });
+
+  it("classifies a NOT_CONFIGURED code as not configured even without a 501 status", async () => {
+    mockSessionValue = ownerSession;
+    mockFetchAnchoringHealth.mockRejectedValue(new ApiError("anything", 400, "NOT_CONFIGURED"));
 
     render(<AnchoringHealthPanel />);
 

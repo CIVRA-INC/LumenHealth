@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [".env", "tsconfig*.json", "package-lock.json"],
   "tasks": {
     "dev": {
       "cache": false,
@@ -9,27 +10,44 @@
       "dependsOn": [
         "^build"
       ],
+      "env": [
+        "NEXT_PUBLIC_*"
+      ],
       "outputs": [
         "dist/**",
-        ".next/**"
+        ".next/**",
+        "!.next/cache/**"
       ]
     },
     "lint": {
       "dependsOn": [
         "^build",
         "^lint"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.md",
+        "!coverage/**"
       ]
     },
     "typecheck": {
       "dependsOn": [
         "^build",
         "^typecheck"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.md",
+        "!coverage/**"
       ]
     },
     "test": {
       "dependsOn": [
         "^build",
         "^test"
+      ],
+      "outputs": [
+        "coverage/**"
       ]
     }
   }

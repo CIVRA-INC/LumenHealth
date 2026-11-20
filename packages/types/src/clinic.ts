@@ -13,14 +13,8 @@ export type Clinic = {
   updatedAt: string;
 };
 
-export type CreateClinicRequest = {
-  name: string;
-  address: string;
-  phone: string;
-  email: string;
-};
-
-export type UpdateClinicRequest = Partial<Pick<Clinic, "name" | "address" | "phone" | "email">>;
+// CreateClinicRequest and UpdateClinicRequest are derived from the zod schemas
+// in ./schemas/clinic.ts and exported from the package barrel.
 
 export type ClinicErrorCode =
   | "CLINIC_NOT_FOUND"
