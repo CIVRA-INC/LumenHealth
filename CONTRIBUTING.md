@@ -4,7 +4,7 @@
 
 LumenHealth is a monorepo. Development is organized around clinical milestones — each milestone adds a discrete set of functionality on top of a stable foundation.
 
-The current foundation scope is **authentication only**. All other modules (clinic management, patient records, encounters, billing) are described in the README as future milestones and must not be partially implemented in advance.
+Shipped today: authentication and sessions, clinic and staff management (including invitations), the audit trail, and the Stellar anchoring service. Patient records, encounters and billing are still future milestones (see the status table in the README) and must not be partially implemented in advance.
 
 ---
 
@@ -12,10 +12,10 @@ The current foundation scope is **authentication only**. All other modules (clin
 
 ```
 apps/
-  api/          Express backend — modular monolith
+  api/          NestJS backend (native ESM) — modular monolith
   web/          Next.js web application
   mobile/       React Native workspace (scaffold)
-  stellar-service/  Stellar integration (scaffold)
+  stellar-service/  Stellar anchoring, signing and key rotation (Express)
 
 packages/
   types/        Shared TypeScript contracts (@lumen/types)
@@ -89,7 +89,7 @@ npm run check:boundaries
 - No `any` without a comment explaining why
 - Business logic lives inside a module (`src/modules/<name>/`)
 - Shared infrastructure lives in `src/shared/` — no business logic there
-- Tests live inside the module: `src/modules/<name>/__tests__/`
+- Tests live inside the module (`src/modules/<name>/tests/`)
 
 ---
 

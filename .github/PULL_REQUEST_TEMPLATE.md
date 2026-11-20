@@ -26,6 +26,13 @@ If any contract changed, include:
 - [ ] Logging remains redacted
 - [ ] Test fixtures remain synthetic and privacy-safe
 
+## UI Changes (web or mobile)
+
+- [ ] Not a UI change
+- [ ] Screenshots or a short recording are attached (before and after)
+- [ ] Checked keyboard navigation and screen reader labels
+- [ ] Checked a narrow (mobile) viewport
+
 ## Validation
 
 - [ ] Architecture checks
