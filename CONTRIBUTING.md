@@ -4,7 +4,7 @@
 
 LumenHealth is a monorepo. Development is organized around clinical milestones — each milestone adds a discrete set of functionality on top of a stable foundation.
 
-The current foundation scope is **authentication only**. All other modules (clinic management, patient records, encounters, billing) are described in the README as future milestones and must not be partially implemented in advance.
+Shipped today: authentication and sessions, clinic and staff management (including invitations), the audit trail, and the Stellar anchoring service. Patient records, encounters and billing are still future milestones (see the status table in the README) and must not be partially implemented in advance.
 
 ---
 
@@ -12,10 +12,10 @@ The current foundation scope is **authentication only**. All other modules (clin
 
 ```
 apps/
-  api/          Express backend — modular monolith
+  api/          NestJS backend (native ESM) — modular monolith
   web/          Next.js web application
   mobile/       React Native workspace (scaffold)
-  stellar-service/  Stellar integration (scaffold)
+  stellar-service/  Stellar anchoring, signing and key rotation (Express)
 
 packages/
   types/        Shared TypeScript contracts (@lumen/types)
@@ -85,7 +85,7 @@ npm run check:boundaries
 - No `any` without a comment explaining why
 - Business logic lives inside a module (`src/modules/<name>/`)
 - Shared infrastructure lives in `src/shared/` — no business logic there
-- Tests live inside the module: `src/modules/<name>/__tests__/`
+- Tests live inside the module (`src/modules/<name>/tests/`)
 
 ---
 
@@ -93,10 +93,11 @@ npm run check:boundaries
 
 When a new milestone is scoped:
 
-1. Create `apps/api/src/modules/<name>/` with: `router.ts`, `service.ts`, `repository.ts`, `validators.ts`, `types.ts`, `__tests__/`
-2. Register the router in `apps/api/src/app.ts`
-3. Add shared types to `packages/types/src/`
-4. Write tests before opening a PR — CI will reject untested modules
+1. Create `apps/api/src/modules/<name>/` following the NestJS layout used by `clinic`, `staff` and `audit`:
+   `<name>.module.ts`, `controllers/`, `services/`, `repositories/`, `dto/` (request DTOs), `guards/` and `pipes/` where needed, `types/`, and `tests/` (colocated tests)
+2. Register the module in `apps/api/src/app.module.ts`
+3. Add shared types to `packages/types/src/` (see `CONTRACT_VERSIONING.md`)
+4. Write tests before opening a PR, and run `npm run check:architecture` and `npm run check:boundaries`
 
 Do not create partial implementations or placeholder endpoints for future modules. Incomplete code in `main` confuses contributors and breaks CI.
 

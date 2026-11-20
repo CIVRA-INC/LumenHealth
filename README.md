@@ -25,6 +25,19 @@ The system is designed to support both administrative and frontline clinical use
 
 ---
 
+## Implementation Status
+
+| Area | Status |
+|---|---|
+| Authentication, sessions, roles | Shipped |
+| Clinic and staff management, invitations | Shipped |
+| Audit trail and anchoring (Stellar service) | Shipped |
+| Web app | In progress (auth, clinic settings, staff, audit, verify screens) |
+| Patient records | Planned |
+| Encounters and clinical workflows | Planned |
+| Billing | Planned |
+| Mobile app and offline support | Planned (workspace scaffold only) |
+
 ## Core Modules
 
 ## Authentication & Access Control
@@ -130,7 +143,7 @@ LumenHealth is built as a strict monorepo with clear boundaries between services
 
 | Layer              | Technology             |
 | ------------------ | ---------------------- |
-| API                | Express + TypeScript   |
+| API                | NestJS + TypeScript    |
 | Web                | Next.js App Router     |
 | Mobile             | React Native workspace |
 | Blockchain/Billing | Stellar service        |
@@ -253,14 +266,9 @@ To maintain clarity and safety:
 
 This repository is a foundational reset designed for structured MVP development.
 
-Current scaffolding includes:
-
-* API authentication placeholders
-* Web admin shell
-* Mobile workspace baseline
-* Stellar service starter
-* shared config and types packages
-* architecture and contributor documentation
+Shipped: authentication and sessions, clinic and staff management, the audit trail and the
+Stellar anchoring service, on top of the shared config and types packages. See the Implementation
+Status table above for what is still planned.
 
 ---
 
