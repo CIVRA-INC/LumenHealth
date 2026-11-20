@@ -1,0 +1,13 @@
+appId: com.lumenhealth.mobile
+---
+- launchApp
+- assertVisible:
+    id: "clinic-switcher-open"
+- tapOn:
+    id: "clinic-switcher-open"
+- assertVisible:
+    id: "clinic-switcher-list"
+- tapOn:
+    id: "clinic-row-0"
+- assertVisible:
+    id: "clinic-switch-confirmed"
