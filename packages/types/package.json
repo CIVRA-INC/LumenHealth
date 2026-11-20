@@ -11,7 +11,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.7"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  }
 }

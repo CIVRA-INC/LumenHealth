@@ -1,7 +1,12 @@
-import { Controller, Post, Get, Patch, Delete, Body, Res, Param, HttpException, HttpStatus, UseGuards, UsePipes } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Res, Param, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { CreateClinicDto, UpdateClinicDto } from '../dto/clinic.dto.js';
-import { clinicValidationPipe } from '../pipes/clinic-validation.pipe.js';
+import {
+  CreateClinicRequestSchema,
+  UpdateClinicRequestSchema,
+  type CreateClinicRequest,
+  type UpdateClinicRequest,
+} from '@lumen/types';
+import { ZodValidationPipe } from '../../../shared/validation/zod.pipe.js';
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
 import { ClinicScopeGuard } from '../guards/clinic-scope.guard.js';
 import { RequireClinicScope } from '../decorators/require-clinic-scope.decorator.js';
@@ -15,8 +20,7 @@ export class ClinicController {
   constructor(private readonly clinicService: ClinicService) {}
 
   @Post()
-  @UsePipes(clinicValidationPipe)
-  create(@Body() body: CreateClinicDto, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+  create(@Body(new ZodValidationPipe(CreateClinicRequestSchema, 'CLINIC_INVALID_INPUT')) body: CreateClinicRequest, @AuthContext() auth: AuthContextType, @Res() res: Response) {
     const clinic = this.clinicService.createClinic(body as any, auth.userId, auth.clinicId);
     return res.status(HttpStatus.CREATED).json({ clinic });
   }
@@ -35,8 +39,7 @@ export class ClinicController {
   @Patch(':clinicId')
   @UseGuards(ClinicScopeGuard)
   @RequireClinicScope('clinicId')
-  @UsePipes(clinicValidationPipe)
-  update(@Param('clinicId') clinicId: string, @Body() body: UpdateClinicDto, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+  update(@Param('clinicId') clinicId: string, @Body(new ZodValidationPipe(UpdateClinicRequestSchema, 'CLINIC_INVALID_INPUT')) body: UpdateClinicRequest, @AuthContext() auth: AuthContextType, @Res() res: Response) {
     const role = auth.role;
     if (role !== "owner" && role !== "admin") {
       throw new HttpException({ error: "AUTH_FORBIDDEN", message: "insufficient role" }, HttpStatus.FORBIDDEN);

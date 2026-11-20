@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AuditAction, AuditEntry, AuditVerifyResponse } from "@lumen/types";
 import { useAuthSession } from "../../auth/session-provider";
-import { exportAuditLog, fetchAuditLog, verifyAuditEntry } from "../api";
+import { CopyButton } from "../../components/copy-button";
+import { fetchAuditLog, verifyAuditEntry } from "../api";
+import { useAuditExport } from "../use-audit-export";
 
 type Status = "loading" | "idle" | "error";
 type VerifyState = AuditVerifyResponse | "loading" | "error";
-type ExportStatus = "idle" | "exporting" | "success" | "error";
+
+/** Filter inputs. `draft` follows the form; `applied` is what the table shows and what Export uses. */
+type AuditFilters = { action: AuditAction | ""; actor: string; from: string; to: string };
+const NO_FILTERS: AuditFilters = { action: "", actor: "", from: "", to: "" };
 
 const AUDIT_ACTIONS: AuditAction[] = [
   "staff.invited",
@@ -53,18 +58,19 @@ export function AuditLog() {
   const [errorMessage, setErrorMessage] = useState("");
   const [verifyResults, setVerifyResults] = useState<Record<string, VerifyState>>({});
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
+  // "idle" alone cannot mean "loaded": the first hydration render has no session, so the empty
+  // state would flash before the first request even starts (#1498).
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  const [actionFilter, setActionFilter] = useState<AuditAction | "">("");
-  const [actorFilter, setActorFilter] = useState("");
-  const [fromFilter, setFromFilter] = useState("");
-  const [toFilter, setToFilter] = useState("");
+  const [draftFilters, setDraftFilters] = useState<AuditFilters>(NO_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(NO_FILTERS);
 
-  const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
-  const [exportMessage, setExportMessage] = useState("");
+  const { status: exportStatus, message: exportMessage, exportLog } = useAuditExport(session);
 
   const canView = session?.role === "owner" || session?.role === "admin";
 
-  const loadEntries = useCallback(() => {
+  const loadEntries = useCallback(
+    (filters: AuditFilters) => {
     if (!session || !canView) return;
     setStatus("loading");
     setErrorMessage("");
@@ -73,81 +79,58 @@ export function AuditLog() {
 
     fetchAuditLog(
       {
-        action: actionFilter || undefined,
-        actorId: actorFilter || undefined,
-        from: fromFilter || undefined,
-        to: toFilter || undefined,
+        action: filters.action || undefined,
+        actorId: filters.actor || undefined,
+        from: filters.from || undefined,
+        to: filters.to || undefined,
       },
       session.accessToken,
     )
       .then((result) => {
         setEntries(result.entries);
         setTotal(result.total);
+        setHasLoaded(true);
         setStatus("idle");
       })
       .catch((err) => {
         setErrorMessage(err instanceof Error ? err.message : "Failed to load audit log");
         setStatus("error");
       });
-  }, [session, canView, actionFilter, actorFilter, fromFilter, toFilter]);
+    },
+    [session, canView],
+  );
 
   useEffect(() => {
-    loadEntries();
+    loadEntries(appliedFilters);
     // Filters are applied explicitly via the form's submit button, not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, canView]);
 
   useEffect(() => {
     if (!session || entries.length === 0) return;
-    let cancelled = false;
+    // One controller per batch: replacing the table or unmounting aborts every outstanding verify request.
+    const controller = new AbortController();
 
     entries.forEach((entry) => {
       setVerifyResults((prev) => ({ ...prev, [entry.auditId]: "loading" }));
 
-      verifyAuditEntry(entry.auditId, session.accessToken)
+      verifyAuditEntry(entry.auditId, session.accessToken, { signal: controller.signal })
         .then((result) => {
-          if (cancelled) return;
           setVerifyResults((prev) => ({ ...prev, [entry.auditId]: result }));
         })
-        .catch(() => {
-          if (cancelled) return;
+        .catch((err: unknown) => {
+          if (isAbortError(err)) return;
           setVerifyResults((prev) => ({ ...prev, [entry.auditId]: "error" }));
         });
     });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [entries, session]);
 
-  const handleExport = useCallback(async () => {
-    if (!session) return;
-    setExportStatus("exporting");
-    setExportMessage("");
-
-    try {
-      const bundle = await exportAuditLog(
-        { from: fromFilter || undefined, to: toFilter || undefined },
-        session.accessToken,
-      );
-
-      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `audit-export-${session.clinicId}-${bundle.manifest.generatedAt.slice(0, 10)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      setExportStatus("success");
-      setExportMessage(`Downloaded ${bundle.manifest.entryCount} entries, signed and ready for independent verification.`);
-    } catch (err) {
-      setExportMessage(err instanceof Error ? err.message : "Failed to export audit log");
-      setExportStatus("error");
-    }
-  }, [session, fromFilter, toFilter]);
+  // Export uses the *applied* range, so it always matches the table the user is looking at.
+  const handleExport = useCallback(() => {
+    void exportLog({ from: appliedFilters.from || undefined, to: appliedFilters.to || undefined });
+  }, [exportLog, appliedFilters]);
 
   if (!session) {
     return <p className="authLead">Sign in to view the audit log.</p>;
@@ -167,14 +150,15 @@ export function AuditLog() {
         className="auditFilters"
         onSubmit={(e) => {
           e.preventDefault();
-          loadEntries();
+          setAppliedFilters(draftFilters);
+          loadEntries(draftFilters);
         }}
       >
         <label>
           Action
           <select
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value as AuditAction | "")}
+            value={draftFilters.action}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, action: e.target.value as AuditAction | "" }))}
           >
             <option value="">All actions</option>
             {AUDIT_ACTIONS.map((action) => (
@@ -189,20 +173,28 @@ export function AuditLog() {
           Actor ID
           <input
             type="text"
-            value={actorFilter}
-            onChange={(e) => setActorFilter(e.target.value)}
+            value={draftFilters.actor}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, actor: e.target.value }))}
             placeholder="user-id"
           />
         </label>
 
         <label>
           From
-          <input type="date" value={fromFilter} onChange={(e) => setFromFilter(e.target.value)} />
+          <input
+            type="date"
+            value={draftFilters.from}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, from: e.target.value }))}
+          />
         </label>
 
         <label>
           To
-          <input type="date" value={toFilter} onChange={(e) => setToFilter(e.target.value)} />
+          <input
+            type="date"
+            value={draftFilters.to}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, to: e.target.value }))}
+          />
         </label>
 
         <button type="submit">Apply filters</button>
@@ -214,9 +206,16 @@ export function AuditLog() {
         </button>
         {exportStatus === "success" && <span className="muted">{exportMessage}</span>}
         {exportStatus === "error" && <span className="muted">{exportMessage}</span>}
+        <p className="muted" data-testid="export-scope">
+          Export covers: {appliedFilters.from ? `from ${appliedFilters.from}` : "from the beginning"}{" "}
+          {appliedFilters.to ? `to ${appliedFilters.to}` : "to now"}. Action and actor filters are not part of
+          exports.
+        </p>
       </div>
 
-      {status === "loading" && <p className="authLead">Loading audit log&hellip;</p>}
+      {(status === "loading" || (status === "idle" && !hasLoaded)) && (
+        <p className="authLead">Loading audit log&hellip;</p>
+      )}
 
       {status === "error" && (
         <div className="authStatus">
@@ -224,11 +223,11 @@ export function AuditLog() {
         </div>
       )}
 
-      {status === "idle" && entries.length === 0 && (
+      {status === "idle" && hasLoaded && entries.length === 0 && (
         <p className="authLead">No audit entries match these filters.</p>
       )}
 
-      {status === "idle" && entries.length > 0 && (
+      {status === "idle" && hasLoaded && entries.length > 0 && (
         <>
           <table className="auditTable">
             <thead>
@@ -276,13 +275,15 @@ export function AuditLog() {
           </div>
 
           <p>
-            <strong>Audit ID:</strong> {selectedEntry.auditId}
+            <strong>Audit ID:</strong> {selectedEntry.auditId}{" "}
+            <CopyButton value={selectedEntry.auditId} label="Copy audit ID" />
           </p>
           <p>
             <strong>Action:</strong> {selectedEntry.action}
           </p>
           <p>
-            <strong>Recorded hash:</strong> <code>{selectedEntry.sha256Hash}</code>
+            <strong>Recorded hash:</strong> <code>{selectedEntry.sha256Hash}</code>{" "}
+            <CopyButton value={selectedEntry.sha256Hash} label="Copy recorded hash" />
           </p>
 
           {!selectedVerify || selectedVerify === "loading" ? (
@@ -317,19 +318,28 @@ export function AuditLog() {
                   <p>
                     <strong>Stellar transaction:</strong>{" "}
                     {selectedVerify.stellarTxHash ? (
-                      <a
-                        href={`${STELLAR_TESTNET_EXPLORER}/${selectedVerify.stellarTxHash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {selectedVerify.stellarTxHash}
-                      </a>
+                      <>
+                        <a
+                          href={`${STELLAR_TESTNET_EXPLORER}/${selectedVerify.stellarTxHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {selectedVerify.stellarTxHash}
+                        </a>{" "}
+                        <CopyButton value={selectedVerify.stellarTxHash} label="Copy Stellar transaction hash" />
+                      </>
                     ) : (
                       <span className="muted">&mdash;</span>
                     )}
                   </p>
                   <p>
                     <strong>Merkle root:</strong> <code>{selectedVerify.merkleRoot}</code>
+                    {selectedVerify.merkleRoot ? (
+                      <>
+                        {" "}
+                        <CopyButton value={selectedVerify.merkleRoot} label="Copy Merkle root" />
+                      </>
+                    ) : null}
                   </p>
                   <div>
                     <strong>Merkle proof</strong>
@@ -338,7 +348,8 @@ export function AuditLog() {
                         {selectedEntry.merkleProof.map((step, index) => (
                           <li key={index}>
                             <span className="merkleProofPosition">{step.position}</span>
-                            <code>{step.hash}</code>
+                            <code>{step.hash}</code>{" "}
+                            <CopyButton value={step.hash} label={`Copy proof step ${index + 1} hash`} />
                           </li>
                         ))}
                       </ol>

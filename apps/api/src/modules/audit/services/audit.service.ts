@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID, createHash } from 'crypto';
-import { isCriticalAuditAction } from "@lumen/types";
+import { computeEntriesDigest, isCriticalAuditAction } from "@lumen/types";
 import type {
   AuditAction,
   AuditEntry,
@@ -146,6 +146,12 @@ export class AuditService {
     return updated;
   }
 
+  /** The full entry, or `null` when it does not exist or belongs to another clinic. Includes archived entries. */
+  async getAuditEntry(clinicId: string, auditId: string): Promise<AuditEntry | null> {
+    const entry = await this.retentionService.findEntryIncludingArchive(auditId);
+    return entry && entry.clinicId === clinicId ? entry : null;
+  }
+
   async verifyAuditEntry(
     clinicId: string,
     auditId: string
@@ -250,13 +256,6 @@ export class AuditService {
     to?: string
   ): Promise<AuditExportBundle> {
     const entries = this.auditRepository.findAllInRange(clinicId, from, to);
-
-    const computeEntriesDigest = (entries: AuditEntry[]): string => {
-      const sorted = entries
-        .map((entry) => ({ auditId: entry.auditId, sha256Hash: entry.sha256Hash }))
-        .sort((a, b) => a.auditId.localeCompare(b.auditId));
-      return sha256Hash(sorted);
-    };
 
     const manifest: AuditExportManifest = {
       clinicId,

@@ -50,7 +50,7 @@ export function assertStrongSecret(secret: string | undefined, envVar: string): 
       `${envVar} is required — refusing to start without an access-token signing secret`
     );
   }
-  if (FORBIDDEN_SECRETS.has(secret)) {
+  if (FORBIDDEN_SECRETS.has(secret) || /^REPLACE_ME/i.test(secret)) {
     throw new Error(
       `${envVar} is set to a known default secret — refusing to start (see docs/auth-secret-rotation.md)`
     );

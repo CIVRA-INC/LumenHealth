@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -24,8 +25,8 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^6.0.2",
-    "eslint": "^9.39.1",
     "eslint-config-next": "16.1.4",
-    "jsdom": "^29.1.1"
+    "jsdom": "^29.1.1",
+    "@vitest/coverage-v8": "^4.1.9"
   }
 }
