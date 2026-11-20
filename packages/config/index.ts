@@ -11,6 +11,10 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const read = (name: string, fallback?: string) => {
   const value = process.env[name]?.trim();
+  // `.env.example` ships REPLACE_ME placeholders; never accept one as a real value.
+  if (value && /^REPLACE_ME/i.test(value)) {
+    throw new Error(`[config] ${name} still has the REPLACE_ME placeholder from .env.example`);
+  }
   if (value) {
     return value;
   }
