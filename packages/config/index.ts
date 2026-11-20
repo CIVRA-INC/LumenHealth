@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPublicRuntimeConfig } from "./public.js";
+import { enforceSecret } from "./secrets.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,7 +58,8 @@ export const serverConfig = {
   // requests configured via `internalServiceSecrets` below (#1345). No
   // longer consulted for authentication anywhere; kept only as a config
   // surface so environments that still set INTERNAL_SERVICE_TOKEN load.
-  internalServiceToken: read("INTERNAL_SERVICE_TOKEN", "dev-internal-token"),
+  // Placeholder values copied from .env.example are rejected in production (#1490).
+  internalServiceToken: enforceSecret("INTERNAL_SERVICE_TOKEN", read("INTERNAL_SERVICE_TOKEN", "dev-internal-token")),
   // Active HMAC secrets for signed service-to-service requests (#1345).
   // `INTERNAL_SERVICE_SECRETS` is a comma-separated list of `keyId:secret`
   // pairs; the first entry signs outgoing requests, and all entries are
@@ -82,7 +84,8 @@ export const serverConfig = {
 
 // Auth-specific config — Closes #441
 export const authConfig = {
-  jwtSecret: read("JWT_SECRET"),
+  // Production requires >= 32 characters and no placeholder text; elsewhere it warns once (#1490).
+  jwtSecret: enforceSecret("JWT_SECRET", read("JWT_SECRET"), { minLength: 32 }),
   accessTokenTtl: Number(read("JWT_ACCESS_TTL", "900")),
   refreshTokenTtl: Number(read("JWT_REFRESH_TTL", "604800")),
   bcryptRounds: Number(read("BCRYPT_ROUNDS", "12")),

@@ -30,6 +30,8 @@ jobs:
         run: npm run build -w packages/config && npm run build -w packages/types
       - name: Architecture checks
         run: npm run check:architecture
+      - name: Environment variable docs
+        run: npm run check:env-docs
       - name: Lint
         run: npm run lint -w apps/api
       - name: Test
