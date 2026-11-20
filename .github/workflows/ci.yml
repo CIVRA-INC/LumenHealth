@@ -110,3 +110,5 @@ jobs:
           key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npm run check:boundaries
       - run: npm run check:architecture
+      - name: Dependency versions
+        run: npm run check:versions

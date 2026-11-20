@@ -18,7 +18,5 @@
   "dependencies": {
     "dotenv": "^17.2.3"
   },
-  "devDependencies": {
-    "typescript": "^5.9.3"
-  }
+  "devDependencies": {}
 }

@@ -1,15 +1,15 @@
 {
+  "extends": "../../tsconfig.react.json",
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["ESNext"],
+    "lib": [
+      "ESNext"
+    ],
     "allowJs": true,
-    "jsx": "react-native",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "noEmit": true
+    "jsx": "react-native"
   },
-  "include": ["src/**/*", "*.ts"]
+  "include": [
+    "src/**/*",
+    "*.ts"
+  ]
 }
