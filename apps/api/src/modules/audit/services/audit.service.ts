@@ -146,6 +146,12 @@ export class AuditService {
     return updated;
   }
 
+  /** The full entry, or `null` when it does not exist or belongs to another clinic. Includes archived entries. */
+  async getAuditEntry(clinicId: string, auditId: string): Promise<AuditEntry | null> {
+    const entry = await this.retentionService.findEntryIncludingArchive(auditId);
+    return entry && entry.clinicId === clinicId ? entry : null;
+  }
+
   async verifyAuditEntry(
     clinicId: string,
     auditId: string
