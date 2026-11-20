@@ -12,11 +12,24 @@ import {
   InvalidExportBundleError,
   StellarVerifierClient,
 } from "../services/stellar-verifier.client.js";
+import { InvalidAuditQueryError, parseAnchoredFilter, parseAuditRange } from "../services/audit-query.js";
 import {
   VerificationBudgetExceededError,
   verifyExportProtection,
   withTimeBudget,
 } from "../services/verify-export.protection.js";
+
+/** Maps malformed query parameters to 400 `INVALID_QUERY`; anything else is rethrown. */
+function parseQuery<T>(parse: () => T): T {
+  try {
+    return parse();
+  } catch (error) {
+    if (error instanceof InvalidAuditQueryError) {
+      throw new HttpException({ error: "INVALID_QUERY", message: error.message }, HttpStatus.BAD_REQUEST);
+    }
+    throw error;
+  }
+}
 
 @Controller('audit')
 export class AuditController {
@@ -25,6 +38,12 @@ export class AuditController {
     private readonly stellarVerifierClient: StellarVerifierClient
   ) {}
 
+  /**
+   * Query parameters: `action`, `actorId`, `targetId`, `from`, `to` (ISO date or datetime; a
+   * date-only `to` includes that whole UTC day), `anchored` (`true` = only anchored entries,
+   * `false` = only entries still waiting for anchoring), and `page`/`limit` or `cursor`.
+   * Results are ordered newest first, ties broken by `auditId`.
+   */
   @Get()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
@@ -35,7 +54,9 @@ export class AuditController {
     }
 
     const clinicId = auth.clinicId;
-    const { action, actorId, targetId, from, to, page, limit, cursor } = query;
+    const { action, actorId, targetId, page, limit, cursor } = query;
+    const range = parseQuery(() => parseAuditRange(query.from, query.to));
+    const anchored = parseQuery(() => parseAnchoredFilter(query.anchored));
 
     // Cursor mode (`?cursor=` or `?cursor=<opaque>`): newest first, `nextCursor` instead of `total`.
     if (cursor !== undefined) {
@@ -44,8 +65,9 @@ export class AuditController {
         action: action as AuditAction | undefined,
         actorId: actorId as string | undefined,
         targetId: targetId as string | undefined,
-        from: from as string | undefined,
-        to: to as string | undefined,
+        from: range.from,
+        to: range.to,
+        anchored,
         limit: limit ? Number(limit) : undefined,
         cursor: String(cursor),
       });
@@ -57,8 +79,9 @@ export class AuditController {
       action: action as AuditAction | undefined,
       actorId: actorId as string | undefined,
       targetId: targetId as string | undefined,
-      from: from as string | undefined,
-      to: to as string | undefined,
+      from: range.from,
+      to: range.to,
+      anchored,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
@@ -76,14 +99,11 @@ export class AuditController {
     }
 
     const clinicId = auth.clinicId;
-    const { from, to } = query;
+    const { from, to } = parseQuery(() => parseAuditRange(query.from, query.to));
 
     try {
-      const bundle = await this.auditService.buildAuditExport(
-        clinicId,
-        from as string | undefined,
-        to as string | undefined,
-      );
+      // The manifest `range` records the normalized ISO bounds, not the raw query strings.
+      const bundle = await this.auditService.buildAuditExport(clinicId, from, to);
       return res.json(bundle);
     } catch (error) {
       throw new HttpException({

@@ -9,6 +9,20 @@ export class AuditImmutableError extends Error {
   }
 }
 
+/** Plain code-unit comparison; unlike `localeCompare` it never depends on the host's ICU/locale. */
+function compareStrings(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * The one ordering used for audit lists and exports: `createdAt` ascending, then `auditId`
+ * ascending as a deterministic tiebreaker (entries recorded in the same millisecond compare
+ * equal on time alone). Descending lists reverse this comparator.
+ */
+export function compareAuditEntries(a: AuditEntry, b: AuditEntry): number {
+  return compareStrings(a.createdAt, b.createdAt) || compareStrings(a.auditId, b.auditId);
+}
+
 @Injectable()
 export class AuditRepository {
   private store = new Map<string, AuditEntry>();
@@ -70,7 +84,7 @@ export class AuditRepository {
       results.push(entry);
     }
 
-    results.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    results.sort(compareAuditEntries);
     return results;
   }
 
@@ -88,7 +102,8 @@ export class AuditRepository {
       results.push(entry);
     }
 
-    results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // Newest first; ties on createdAt fall back to auditId (descending) so pages are stable.
+    results.sort((a, b) => compareAuditEntries(b, a));
 
     const total = results.length;
     const page = q.page ?? 1;
@@ -102,7 +117,7 @@ export class AuditRepository {
   /** Cursor-paginated variant of `query`: newest first, stable while entries are appended, no total. */
   queryPage(q: AuditQuery & { cursor?: string }): CursorPage<AuditEntry> {
     const matching = this.query({ ...q, page: 1, limit: Number.MAX_SAFE_INTEGER }).entries.sort((a, b) =>
-      `${b.createdAt}|${b.auditId}`.localeCompare(`${a.createdAt}|${a.auditId}`),
+      compareStrings(`${b.createdAt}|${b.auditId}`, `${a.createdAt}|${a.auditId}`),
     );
     return paginateByCursor(matching, (e) => `${e.createdAt}|${e.auditId}`, q.cursor || undefined, q.limit ?? 50);
   }
