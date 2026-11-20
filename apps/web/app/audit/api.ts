@@ -1,12 +1,6 @@
 import { getPublicRuntimeConfig } from "@lumen/config/public";
 import type { AnchoringHealthReport, AuditAction, AuditEntry, AuditExportBundle, AuditVerifyResponse } from "@lumen/types";
-
-function headers(token: string): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-}
+import { authHeaders, pathSegment, type RequestOptions } from "../../lib/http";
 
 export type AuditLogFilters = {
   action?: AuditAction;
@@ -25,6 +19,7 @@ export type AuditLogResult = {
 export async function fetchAuditLog(
   filters: AuditLogFilters,
   token: string,
+  options: RequestOptions = {},
 ): Promise<AuditLogResult> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
 
@@ -41,7 +36,8 @@ export async function fetchAuditLog(
 
   const query = params.toString();
   const res = await fetch(`${apiBaseUrl}/api/v1/audit${query ? `?${query}` : ""}`, {
-    headers: headers(token),
+    headers: authHeaders(token),
+    signal: options.signal,
   });
 
   if (!res.ok) {
@@ -57,10 +53,12 @@ export async function fetchAuditLog(
 export async function verifyAuditEntry(
   auditId: string,
   token: string,
+  options: RequestOptions = {},
 ): Promise<AuditVerifyResponse> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
-  const res = await fetch(`${apiBaseUrl}/api/v1/audit/${auditId}/verify`, {
-    headers: headers(token),
+  const res = await fetch(`${apiBaseUrl}/api/v1/audit/${pathSegment(auditId)}/verify`, {
+    headers: authHeaders(token),
+    signal: options.signal,
   });
 
   if (!res.ok) {
@@ -88,6 +86,7 @@ export type AuditExportFilters = {
 export async function exportAuditLog(
   filters: AuditExportFilters,
   token: string,
+  options: RequestOptions = {},
 ): Promise<AuditExportBundle> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
 
@@ -97,7 +96,8 @@ export async function exportAuditLog(
 
   const query = params.toString();
   const res = await fetch(`${apiBaseUrl}/api/v1/audit/export${query ? `?${query}` : ""}`, {
-    headers: headers(token),
+    headers: authHeaders(token),
+    signal: options.signal,
   });
 
   if (!res.ok) {
@@ -115,10 +115,14 @@ export async function exportAuditLog(
  * scheduled batch job is actually keeping up — as opposed to any single
  * entry's verification status.
  */
-export async function fetchAnchoringHealth(token: string): Promise<AnchoringHealthReport> {
+export async function fetchAnchoringHealth(
+  token: string,
+  options: RequestOptions = {},
+): Promise<AnchoringHealthReport> {
   const { apiBaseUrl } = getPublicRuntimeConfig();
   const res = await fetch(`${apiBaseUrl}/api/v1/audit/anchoring-health`, {
-    headers: headers(token),
+    headers: authHeaders(token),
+    signal: options.signal,
   });
 
   if (!res.ok) {

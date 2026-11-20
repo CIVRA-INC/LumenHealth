@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AuditAction, AuditEntry, AuditVerifyResponse } from "@lumen/types";
 import { useAuthSession } from "../../auth/session-provider";
+import { isAbortError } from "../../../lib/http";
 import { exportAuditLog, fetchAuditLog, verifyAuditEntry } from "../api";
 
 type Status = "loading" | "idle" | "error";
@@ -53,6 +54,9 @@ export function AuditLog() {
   const [errorMessage, setErrorMessage] = useState("");
   const [verifyResults, setVerifyResults] = useState<Record<string, VerifyState>>({});
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
+  // "idle" alone cannot mean "loaded": the first hydration render has no session, so the empty
+  // state would flash before the first request even starts (#1498).
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const [actionFilter, setActionFilter] = useState<AuditAction | "">("");
   const [actorFilter, setActorFilter] = useState("");
@@ -83,6 +87,7 @@ export function AuditLog() {
       .then((result) => {
         setEntries(result.entries);
         setTotal(result.total);
+        setHasLoaded(true);
         setStatus("idle");
       })
       .catch((err) => {
@@ -99,25 +104,23 @@ export function AuditLog() {
 
   useEffect(() => {
     if (!session || entries.length === 0) return;
-    let cancelled = false;
+    // One controller per batch: replacing the table or unmounting aborts every outstanding verify request.
+    const controller = new AbortController();
 
     entries.forEach((entry) => {
       setVerifyResults((prev) => ({ ...prev, [entry.auditId]: "loading" }));
 
-      verifyAuditEntry(entry.auditId, session.accessToken)
+      verifyAuditEntry(entry.auditId, session.accessToken, { signal: controller.signal })
         .then((result) => {
-          if (cancelled) return;
           setVerifyResults((prev) => ({ ...prev, [entry.auditId]: result }));
         })
-        .catch(() => {
-          if (cancelled) return;
+        .catch((err: unknown) => {
+          if (isAbortError(err)) return;
           setVerifyResults((prev) => ({ ...prev, [entry.auditId]: "error" }));
         });
     });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [entries, session]);
 
   const handleExport = useCallback(async () => {
@@ -216,7 +219,9 @@ export function AuditLog() {
         {exportStatus === "error" && <span className="muted">{exportMessage}</span>}
       </div>
 
-      {status === "loading" && <p className="authLead">Loading audit log&hellip;</p>}
+      {(status === "loading" || (status === "idle" && !hasLoaded)) && (
+        <p className="authLead">Loading audit log&hellip;</p>
+      )}
 
       {status === "error" && (
         <div className="authStatus">
@@ -224,11 +229,11 @@ export function AuditLog() {
         </div>
       )}
 
-      {status === "idle" && entries.length === 0 && (
+      {status === "idle" && hasLoaded && entries.length === 0 && (
         <p className="authLead">No audit entries match these filters.</p>
       )}
 
-      {status === "idle" && entries.length > 0 && (
+      {status === "idle" && hasLoaded && entries.length > 0 && (
         <>
           <table className="auditTable">
             <thead>

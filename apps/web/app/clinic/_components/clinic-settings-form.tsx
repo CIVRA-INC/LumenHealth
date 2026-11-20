@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { UpdateClinicRequestSchema, type Clinic, type UpdateClinicRequest } from "@lumen/types";
 import { useAuthSession } from "../../auth/session-provider";
+import { isAbortError } from "../../../lib/http";
 import { fetchClinic, updateClinic } from "../api";
 
 type Status = "idle" | "loading" | "saving" | "success" | "error";
@@ -20,10 +21,10 @@ export function ClinicSettingsForm() {
 
   useEffect(() => {
     if (!session) return;
-    let cancelled = false;
-    fetchClinic(session.clinicId, session.accessToken)
+    const controller = new AbortController();
+    setStatus("loading");
+    fetchClinic(session.clinicId, session.accessToken, { signal: controller.signal })
       .then((c) => {
-        if (cancelled) return;
         setClinic(c);
         setName(c.name);
         setAddress(c.address);
@@ -32,11 +33,11 @@ export function ClinicSettingsForm() {
         setStatus("idle");
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (isAbortError(err)) return;
         setErrorMessage(err instanceof Error ? err.message : "Failed to load clinic");
         setStatus("error");
       });
-    return () => { cancelled = true; };
+    return () => controller.abort();
   }, [session]);
 
   const handleSubmit = useCallback(
@@ -83,7 +84,8 @@ export function ClinicSettingsForm() {
     return <p className="authLead">Sign in to manage clinic settings.</p>;
   }
 
-  if (status === "loading") {
+  // `clinic` is null until the first response arrives; never show an empty editable form for that.
+  if (status === "loading" || (status === "idle" && !clinic)) {
     return <p className="authLead">Loading clinic settings...</p>;
   }
 
