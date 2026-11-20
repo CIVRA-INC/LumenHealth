@@ -1,4 +1,5 @@
 import { Controller, Get, Res, UseGuards, Query, HttpException, HttpStatus, Post, Body, Param, Ip } from '@nestjs/common';
+import { NoStore } from '../../../common/interceptors/no-store.interceptor.js';
 import type { Response } from "express";
 import { toAuditListItem } from "@lumen/types";
 import type { AuditAction, AuditExportBundle } from "@lumen/types";
@@ -8,16 +9,30 @@ import { RequirePermissions } from '../../../shared/decorators/permissions.decor
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
 import { AuditService } from "../services/audit.service.js";
+import { auditEntriesToCsv, exportFilename, parseExportFormat } from "../services/audit-csv.js";
 import {
   AnchoringNotConfiguredError,
   InvalidExportBundleError,
   StellarVerifierClient,
 } from "../services/stellar-verifier.client.js";
+import { InvalidAuditQueryError, parseAnchoredFilter, parseAuditRange } from "../services/audit-query.js";
 import {
   VerificationBudgetExceededError,
   verifyExportProtection,
   withTimeBudget,
 } from "../services/verify-export.protection.js";
+
+/** Maps malformed query parameters to 400 `INVALID_QUERY`; anything else is rethrown. */
+function parseQuery<T>(parse: () => T): T {
+  try {
+    return parse();
+  } catch (error) {
+    if (error instanceof InvalidAuditQueryError) {
+      throw new HttpException({ error: "INVALID_QUERY", message: error.message }, HttpStatus.BAD_REQUEST);
+    }
+    throw error;
+  }
+}
 
 @Controller('audit')
 export class AuditController {
@@ -32,6 +47,7 @@ export class AuditController {
    * that have not moved to `GET /audit/:auditId` yet); any other `include` value is a 400.
    */
   @Get()
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   list(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -55,8 +71,9 @@ export class AuditController {
         action: action as AuditAction | undefined,
         actorId: actorId as string | undefined,
         targetId: targetId as string | undefined,
-        from: from as string | undefined,
-        to: to as string | undefined,
+        from: range.from,
+        to: range.to,
+        anchored,
         limit: limit ? Number(limit) : undefined,
         cursor: String(cursor),
       });
@@ -68,8 +85,9 @@ export class AuditController {
       action: action as AuditAction | undefined,
       actorId: actorId as string | undefined,
       targetId: targetId as string | undefined,
-      from: from as string | undefined,
-      to: to as string | undefined,
+      from: range.from,
+      to: range.to,
+      anchored,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
@@ -77,7 +95,14 @@ export class AuditController {
     return res.json({ ...result, entries: project(result.entries) });
   }
 
+  /**
+   * `format=json` (default) returns the signed bundle as a download; `format=csv` returns an
+   * unsigned, spreadsheet-friendly extract (owner/admin only, like the JSON export). The CSV is
+   * explicitly unsigned: its manifest digest is sent in the `X-Audit-Entries-Digest` header so it
+   * can be compared with a signed JSON export of the same range.
+   */
   @Get('export')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async exportAuditLog(@Query() query: Record<string, unknown>, @AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -87,14 +112,11 @@ export class AuditController {
     }
 
     const clinicId = auth.clinicId;
-    const { from, to } = query;
+    const { from, to } = parseQuery(() => parseAuditRange(query.from, query.to));
 
     try {
-      const bundle = await this.auditService.buildAuditExport(
-        clinicId,
-        from as string | undefined,
-        to as string | undefined,
-      );
+      // The manifest `range` records the normalized ISO bounds, not the raw query strings.
+      const bundle = await this.auditService.buildAuditExport(clinicId, from, to);
       return res.json(bundle);
     } catch (error) {
       throw new HttpException({
@@ -105,6 +127,7 @@ export class AuditController {
   }
 
   @Get('anchoring-health')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async anchoringHealth(@AuthContext() auth: AuthContextType, @Res() res: Response) {
@@ -145,6 +168,7 @@ export class AuditController {
   }
 
   @Get(':auditId/verify')
+  @NoStore()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   async verify(@Param('auditId') auditId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {

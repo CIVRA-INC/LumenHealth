@@ -7,6 +7,25 @@ import type {
   BatchAnchorResult,
 } from "@lumen/types";
 import { ConfigService } from "../../../shared/config/config.service.js";
+import {
+  InvalidStellarResponseError,
+  parseAnchoringHealth,
+  parseBatchAnchorResult,
+  parseExportVerifyReport,
+  parseMerkleRootResponse,
+  parseSignedPayload,
+} from "./stellar-response.validators.js";
+
+export { InvalidStellarResponseError } from "./stellar-response.validators.js";
+
+/** Reads a JSON body; a non-JSON body becomes a typed error that does not echo the parser message. */
+async function readJsonBody(res: Response, operation: string): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    throw new InvalidStellarResponseError(operation);
+  }
+}
 
 export type SignedPayload = {
   signature: string;
@@ -54,8 +73,7 @@ export class StellarVerifierClient {
       throw new Error(`[audit] failed to fetch anchored merkle root: ${res.status}`);
     }
 
-    const body = (await res.json()) as { merkleRoot: string };
-    return body.merkleRoot;
+    return parseMerkleRootResponse(await readJsonBody(res, "merkle root lookup"));
   }
 
   async signExportManifest(payload: string): Promise<SignedPayload> {
@@ -70,7 +88,7 @@ export class StellarVerifierClient {
       throw new Error(`[audit] failed to sign export manifest: ${res.status}`);
     }
 
-    return (await res.json()) as SignedPayload;
+    return parseSignedPayload(await readJsonBody(res, "manifest signing"));
   }
 
   async verifyExportBundleRemote(bundle: AuditExportBundle): Promise<AuditExportVerifyReport> {
@@ -89,7 +107,7 @@ export class StellarVerifierClient {
       throw new Error(`[audit] failed to verify export bundle: ${res.status}`);
     }
 
-    return (await res.json()) as AuditExportVerifyReport;
+    return parseExportVerifyReport(await readJsonBody(res, "export verification"));
   }
 
   async fetchAnchoringHealth(): Promise<AnchoringHealthReport> {
@@ -105,7 +123,7 @@ export class StellarVerifierClient {
       throw new Error(`[audit] failed to fetch anchoring health: ${res.status}`);
     }
 
-    return (await res.json()) as AnchoringHealthReport;
+    return parseAnchoringHealth(await readJsonBody(res, "anchoring health"));
   }
 
   async anchorEntriesImmediately(entries: ImmediateAnchorEntry[]): Promise<BatchAnchorResult> {
@@ -120,6 +138,6 @@ export class StellarVerifierClient {
       throw new Error(`[audit] failed to anchor entries immediately: ${res.status}`);
     }
 
-    return (await res.json()) as BatchAnchorResult;
+    return parseBatchAnchorResult(await readJsonBody(res, "immediate anchoring"));
   }
 }

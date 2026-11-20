@@ -122,4 +122,35 @@ describe("ClinicSettingsForm", () => {
     expect(nameInput).toBeDisabled();
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
+
+  it("labels every input with a name and an autocomplete token", async () => {
+    mockSessionValue = mockSession;
+    mockFetchClinic.mockResolvedValue({
+      clinicId: "c1",
+      name: "Test Clinic",
+      address: "123 Main",
+      phone: "555-1234",
+      email: "test@clinic.com",
+      slug: "test-clinic",
+      status: "active",
+      ownerId: "u1",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    render(<ClinicSettingsForm />);
+
+    const phone = await screen.findByDisplayValue("555-1234");
+    expect(phone).toHaveAttribute("name", "phone");
+    expect(phone).toHaveAttribute("autocomplete", "tel");
+    expect(phone).toHaveAttribute("inputmode", "tel");
+
+    const email = screen.getByDisplayValue("test@clinic.com");
+    expect(email).toHaveAttribute("name", "email");
+    expect(email).toHaveAttribute("autocomplete", "email");
+    expect(email).toHaveAttribute("inputmode", "email");
+
+    expect(screen.getByDisplayValue("Test Clinic")).toHaveAttribute("autocomplete", "organization");
+    expect(screen.getByDisplayValue("123 Main")).toHaveAttribute("autocomplete", "street-address");
+  });
 });

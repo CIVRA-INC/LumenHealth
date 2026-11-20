@@ -8,6 +8,9 @@ export class LastOwnerError extends Error {
   }
 }
 
+/** Records never leave or enter the store by reference (callers cannot mutate stored state). */
+const copy = <T>(value: T): T => structuredClone(value);
+
 const isActiveOwner = (m: StaffMember) => m.role === "owner" && m.status === "active";
 
 @Injectable()
@@ -23,17 +26,18 @@ export class StaffRepository {
       );
       if (!hasOtherOwner) throw new LastOwnerError();
     }
-    this.store.set(member.staffId, member);
-    return member;
+    this.store.set(member.staffId, copy(member));
+    return copy(member);
   }
 
   findById(staffId: string): StaffMember | undefined {
-    return this.store.get(staffId);
+    const found = this.store.get(staffId);
+    return found ? copy(found) : undefined;
   }
 
   findByUserId(userId: string): StaffMember | undefined {
     for (const m of this.store.values()) {
-      if (m.userId === userId) return m;
+      if (m.userId === userId) return copy(m);
     }
     return undefined;
   }
@@ -46,7 +50,7 @@ export class StaffRepository {
     for (const m of this.store.values()) {
       if (m.clinicId !== clinicId) continue;
       if (filters?.status && m.status !== filters.status) continue;
-      results.push(m);
+      results.push(copy(m));
     }
     return results;
   }

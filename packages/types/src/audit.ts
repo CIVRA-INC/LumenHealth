@@ -145,7 +145,11 @@ export type AuditQuery = {
   limit?: number;
   /** Opaque cursor from a previous page's `nextCursor`; use instead of `page`. */
   cursor?: string;
-  /** Filter by anchor status: true = anchored entries only, false = unanchored only. */
+  /**
+   * Filter by anchor status: true = anchored entries only, false = unanchored only. Exposed over
+   * HTTP as `GET /audit?anchored=true|false` (anything else is a 400). `total` reflects the filter.
+   * Results are ordered newest first, ties broken by `auditId` (code-unit order).
+   */
   anchored?: boolean;
 };
 

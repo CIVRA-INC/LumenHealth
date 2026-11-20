@@ -11,10 +11,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
+    "@vitest/coverage-v8": "^4.1.7",
     "vitest": "^4.1.7"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
   }
 }
