@@ -122,26 +122,31 @@ describe("AuthController (e2e)", () => {
       expect(res.body.error).toBe("AUTH_INVALID_CREDENTIALS");
     });
 
-    it("returns 403 when the account is suspended", async () => {
+    it("returns 401 generic credentials error when the account is suspended", async () => {
       seedIdentity({ email: "suspended@clinic.test", status: "suspended" });
 
       const res = await server()
         .post("/api/v1/auth/login")
         .send({ email: "suspended@clinic.test", password: FIXTURE_PASSWORD_PLAINTEXT });
 
-      expect(res.status).toBe(403);
-      expect(res.body.error).toBe("AUTH_FORBIDDEN");
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe("AUTH_INVALID_CREDENTIALS");
     });
 
-    it("returns 423 when the account is locked", async () => {
+    it("returns the same 401 for a locked account as for an unknown email (no enumeration)", async () => {
       seedIdentity({ email: "locked@clinic.test", status: "locked" });
 
       const res = await server()
         .post("/api/v1/auth/login")
         .send({ email: "locked@clinic.test", password: FIXTURE_PASSWORD_PLAINTEXT });
 
-      expect(res.status).toBe(423);
-      expect(res.body.error).toBe("AUTH_ACCOUNT_LOCKED");
+      const unknown = await server()
+        .post("/api/v1/auth/login")
+        .send({ email: "nobody@clinic.test", password: FIXTURE_PASSWORD_PLAINTEXT });
+
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual(unknown.body);
+      expect(res.status).toBe(unknown.status);
     });
   });
 
