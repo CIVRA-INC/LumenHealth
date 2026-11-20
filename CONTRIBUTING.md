@@ -28,7 +28,7 @@ docs/           Architecture and domain documentation
 
 ## Local setup
 
-**Requirements:** Node.js 20+, npm 10+
+**Requirements:** Node.js 20, 22 or 24 (the versions CI tests), npm 10+
 
 ```bash
 git clone <repo>
@@ -65,6 +65,10 @@ npm run test -w apps/web
 
 ---
 
+## Coverage
+
+`npm run test:coverage -w apps/api` (and `apps/web`, `packages/types`) runs vitest with the v8 provider and fails below the `coverage.thresholds` in that workspace's `vitest.config.ts`. CI uploads the reports as `coverage-*` artifacts. The current floors are placeholders; raise them to a few points below the numbers CI reports.
+
 ## Architecture constraints
 
 Two automated checks enforce boundaries. Run them before opening a PR:
@@ -96,7 +100,7 @@ When a new milestone is scoped:
 1. Create `apps/api/src/modules/<name>/` with: `router.ts`, `service.ts`, `repository.ts`, `validators.ts`, `types.ts`, `__tests__/`
 2. Register the router in `apps/api/src/app.ts`
 3. Add shared types to `packages/types/src/`
-4. Write tests before opening a PR — CI will reject untested modules
+4. Write tests before opening a PR — CI fails when test coverage drops below the thresholds in each workspace's `vitest.config.ts` (see "Coverage" below)
 
 Do not create partial implementations or placeholder endpoints for future modules. Incomplete code in `main` confuses contributors and breaks CI.
 
