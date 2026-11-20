@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Clinic, UpdateClinicRequest } from "@lumen/types";
+import { UpdateClinicRequestSchema, type Clinic, type UpdateClinicRequest } from "@lumen/types";
 import { useAuthSession } from "../../auth/session-provider";
 import { fetchClinic, updateClinic } from "../api";
 
@@ -51,6 +51,14 @@ export function ClinicSettingsForm() {
       if (email !== clinic.email) updates.email = email;
 
       if (Object.keys(updates).length === 0) return;
+
+      // Same schema the API enforces, so the user sees the server's message.
+      const parsed = UpdateClinicRequestSchema.safeParse(updates);
+      if (!parsed.success) {
+        setErrorMessage(parsed.error.issues[0]?.message ?? "Invalid input");
+        setStatus("error");
+        return;
+      }
 
       setStatus("saving");
       setErrorMessage("");
