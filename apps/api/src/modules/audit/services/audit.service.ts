@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { randomUUID, createHash } from 'crypto';
-import { computeEntriesDigest, isCriticalAuditAction } from "@lumen/types";
+import { randomUUID } from 'crypto';
+import {
+  canonicalize,
+  computeEntriesDigest,
+  hashAuditEntry,
+  isCriticalAuditAction,
+  verifyMerkleProof,
+} from "@lumen/types";
 import type {
   AuditAction,
   AuditEntry,
@@ -9,40 +15,13 @@ import type {
   AuditQuery,
   AuditVerifyResponse,
   BatchAnchorResult,
+  HashableAuditEntry,
+  MerkleProofStep,
   UserRole,
 } from "@lumen/types";
 import { AuditRepository } from "../repositories/audit.repository.js";
 import { StellarVerifierClient } from "./stellar-verifier.client.js";
 import { RetentionService } from "./retention.service.js";
-
-function canonicalize(data: unknown): string {
-  if (data === null || typeof data !== "object") return JSON.stringify(data);
-  if (Array.isArray(data)) return `[${data.map(canonicalize).join(",")}]`;
-  const sortedKeys = Object.keys(data).sort();
-  return `{${sortedKeys
-    .filter((k) => (data as Record<string, unknown>)[k] !== undefined)
-    .map((k) => `${JSON.stringify(k)}:${canonicalize((data as Record<string, unknown>)[k])}`)
-    .join(",")}}`;
-}
-
-function sha256Hash(data: unknown): string {
-  const hash = createHash("sha256");
-  hash.update(canonicalize(data));
-  return hash.digest("hex");
-}
-
-function hashAuditEntry(entry: Omit<AuditEntry, "sha256Hash" | "stellarTxHash" | "merkleRoot" | "anchoredAt" | "merkleProof" | "anchorMode">): string {
-  return sha256Hash(entry);
-}
-
-function verifyMerkleProof(hash: string, proof: { direction: 'left' | 'right', hash: string }[], root: string): boolean {
-  let currentHash = hash;
-  for (const step of proof) {
-    const pair = step.direction === 'left' ? [step.hash, currentHash] : [currentHash, step.hash];
-    currentHash = sha256Hash(pair);
-  }
-  return currentHash === root;
-}
 
 export type RecordAuditParams = {
   clinicId: string;
@@ -59,11 +38,16 @@ export type RecordAuditParams = {
 
 @Injectable()
 export class AuditService {
+  private readonly chainService: ChainService;
+
   constructor(
     private readonly auditRepository: AuditRepository,
     private readonly stellarVerifierClient: StellarVerifierClient,
-    private readonly retentionService: RetentionService
-  ) {}
+    private readonly retentionService: RetentionService,
+    chainService?: ChainService,
+  ) {
+    this.chainService = chainService ?? new ChainService(auditRepository);
+  }
 
   recordAudit(params: RecordAuditParams): AuditEntry {
     const chain = this.chainService.getStateForClinic(params.clinicId);
@@ -223,7 +207,7 @@ export class AuditService {
       };
     }
 
-    if (!verifyMerkleProof(recomputedHash, merkleProof as unknown as { direction: 'left' | 'right'; hash: string }[], chainRoot)) {
+    if (!verifyMerkleProof(recomputedHash, merkleProof as MerkleProofStep[], chainRoot)) {
       return {
         auditId,
         status: "tampered",
