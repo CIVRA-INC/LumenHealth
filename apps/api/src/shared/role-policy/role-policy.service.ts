@@ -11,7 +11,16 @@ export class RolePolicyService {
     system: [],
   };
 
+  private readonly assignableRoles: Partial<Record<UserRole, UserRole[]>> = {
+    owner: ["admin", "clinician", "cashier"],
+    admin: ["clinician", "cashier"],
+  };
+
   getRolePolicy(role: UserRole): RolePolicy {
     return { role, permissions: this.rolePolicies[role] };
+  }
+
+  canAssignRole(actorRole: UserRole, targetRole: UserRole): boolean {
+    return (this.assignableRoles[actorRole] ?? []).includes(targetRole);
   }
 }

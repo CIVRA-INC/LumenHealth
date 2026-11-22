@@ -20,7 +20,7 @@ export class ClinicService {
 
   createClinic(req: CreateClinicRequest, ownerId: string, clinicId: string): Clinic {
     const now = new Date().toISOString();
-    const baseSlug = generateSlug(req.name);
+    const baseSlug = generateSlug(req.name, clinicId);
     const slug = this.uniqueSlug(baseSlug);
 
     const clinic: Clinic = {
@@ -54,16 +54,22 @@ export class ClinicService {
     const clinic = this.getClinic(clinicId, callerClinicId);
     if (!clinic) return null;
 
-    const updated: Clinic = {
-      ...clinic,
-      ...(patch.name ? { name: patch.name.trim() } : {}),
-      ...(patch.address ? { address: patch.address.trim() } : {}),
-      ...(patch.phone ? { phone: patch.phone.trim() } : {}),
-      ...(patch.email ? { email: patch.email.trim() } : {}),
-      updatedAt: new Date().toISOString(),
-    };
+    const next: Clinic = { ...clinic };
+    let changed = false;
+    for (const key of ["name", "address", "phone", "email"] as const) {
+      const value = patch[key];
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (trimmed !== clinic[key]) {
+          next[key] = trimmed;
+          changed = true;
+        }
+      }
+    }
 
-    return this.clinicRepository.save(updated);
+    if (!changed) return clinic;
+    next.updatedAt = new Date().toISOString();
+    return this.clinicRepository.save(next);
   }
 
   archiveClinic(clinicId: string, callerClinicId: string, callerActorId: string, callerRole: UserRole): Clinic | null {

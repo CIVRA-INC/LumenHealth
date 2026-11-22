@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { StaffMember, StaffStatus } from "@lumen/types";
+import type { StaffMember, StaffStatus, UserRole } from "@lumen/types";
 
 export class LastOwnerError extends Error {
   constructor() {
@@ -44,14 +44,21 @@ export class StaffRepository {
 
   listByClinic(
     clinicId: string,
-    filters?: { status?: StaffStatus },
+    filters?: { status?: StaffStatus; role?: UserRole; q?: string },
   ): StaffMember[] {
+    const q = filters?.q?.trim().toLowerCase();
     const results: StaffMember[] = [];
     for (const m of this.store.values()) {
       if (m.clinicId !== clinicId) continue;
       if (filters?.status && m.status !== filters.status) continue;
+      if (filters?.role && m.role !== filters.role) continue;
+      if (q) {
+        const haystack = `${m.name} ${m.email}`.toLowerCase();
+        if (!haystack.includes(q)) continue;
+      }
       results.push(copy(m));
     }
+    results.sort((a, b) => a.joinedAt.localeCompare(b.joinedAt) || a.staffId.localeCompare(b.staffId));
     return results;
   }
 
