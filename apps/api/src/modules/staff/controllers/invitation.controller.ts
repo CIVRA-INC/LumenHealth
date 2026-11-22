@@ -32,7 +32,7 @@ export class InvitationController {
   @RequirePermissions('staff:write')
   @UsePipes(invitationValidationPipe)
   send(@Body() body: SendInvitationDto, @AuthContext() auth: AuthContextType, @Res() res: Response) {
-    const result = this.invitationService.sendInvitation(body, auth.clinicId, auth.userId);
+    const result = this.invitationService.sendInvitation(body, auth.clinicId, auth.userId, auth.role);
 
     if ("error" in result) {
       throw new HttpException(result, INVITATION_ERROR_STATUS[result.error] ?? HttpStatus.BAD_REQUEST);
