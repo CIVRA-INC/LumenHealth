@@ -1,8 +1,9 @@
 import { uuidParamPipe } from '../../../shared/validation/id-params.js';
-import { Controller, Post, Get, Delete, Body, Res, Param, HttpException, HttpStatus, UseGuards, Query, UsePipes } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Res, Param, HttpException, HttpStatus, UseGuards, Query, UsePipes, Ip, Headers } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { Response } from 'express';
-import type { InvitationError, InvitationStatus } from '@lumen/types';
-import { SendInvitationDto, AcceptInvitationDto } from '../dto/invitation.dto.js';
+import type { InvitationStatus } from '@lumen/types';
+import { SendInvitationDto, AcceptInvitationDto, ListInvitationsQueryDto } from '../dto/invitation.dto.js';
 import { invitationValidationPipe } from '../pipes/invitation-validation.pipe.js';
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
 import { PermissionsGuard } from '../../../shared/guards/permissions.guard.js';
@@ -10,6 +11,7 @@ import { RequirePermissions } from '../../../shared/decorators/permissions.decor
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
 import { InvitationService } from '../services/invitation.service.js';
+import { limited } from '../../auth/rate-limit/rate-limiter.js';
 
 const INVITATION_ERROR_STATUS: Record<InvitationError["error"], HttpStatus> = {
   INVITATION_NOT_FOUND: HttpStatus.NOT_FOUND,
@@ -31,8 +33,14 @@ export class InvitationController {
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
   @UsePipes(invitationValidationPipe)
-  send(@Body() body: SendInvitationDto, @AuthContext() auth: AuthContextType, @Res() res: Response) {
-    const result = this.invitationService.sendInvitation(body, auth.clinicId, auth.userId, auth.role);
+  send(
+    @Body() body: SendInvitationDto,
+    @AuthContext() auth: AuthContextType,
+    @Headers('x-request-id') reqId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const requestId = reqId ?? randomUUID();
+    const result = this.invitationService.sendInvitation(body, auth.clinicId, auth.userId, requestId);
 
     if ("error" in result) {
       throw new HttpException(result, INVITATION_ERROR_STATUS[result.error] ?? HttpStatus.BAD_REQUEST);
@@ -43,7 +51,11 @@ export class InvitationController {
 
   @Post('accept')
   @UsePipes(invitationValidationPipe)
-  async accept(@Body() body: AcceptInvitationDto, @Res() res: Response) {
+  async accept(@Body() body: AcceptInvitationDto, @Ip() ip: string, @Res() res: Response) {
+    if (limited(`invitation-accept:ip:${ip ?? "unknown"}`, 10) || limited(`invitation-accept:token:${body.token}`, 5)) {
+      throw new HttpException({ error: "AUTH_RATE_LIMITED", message: "too many invitation accept attempts" }, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     const result = await this.invitationService.acceptInvitation(body.token, body.password, body.name);
 
     if ("error" in result) {
@@ -56,7 +68,12 @@ export class InvitationController {
   @Get()
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:read')
-  list(@Query('status') statusFilter: InvitationStatus | undefined, @AuthContext() auth: AuthContextType, @Res() res: Response) {
+  list(
+    @Query(invitationValidationPipe) query: ListInvitationsQueryDto,
+    @AuthContext() auth: AuthContextType,
+    @Res() res: Response,
+  ) {
+    const statusFilter = query.status as InvitationStatus | undefined;
     const invitations = this.invitationService.listInvitations(auth.clinicId, statusFilter ? { status: statusFilter } : undefined);
     return res.json({ invitations });
   }
@@ -64,8 +81,14 @@ export class InvitationController {
   @Delete(':invitationId')
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')
-  revoke(@Param('invitationId', uuidParamPipe()) invitationId: string, @AuthContext() auth: AuthContextType, @Res() res: Response) {
-    const result = this.invitationService.revokeInvitation(invitationId, auth.clinicId);
+  revoke(
+    @Param('invitationId', uuidParamPipe()) invitationId: string,
+    @AuthContext() auth: AuthContextType,
+    @Headers('x-request-id') reqId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const requestId = reqId ?? randomUUID();
+    const result = this.invitationService.revokeInvitation(invitationId, auth.clinicId, requestId, auth.userId);
 
     if ("error" in result) {
       throw new HttpException(result, INVITATION_ERROR_STATUS[result.error] ?? HttpStatus.BAD_REQUEST);
