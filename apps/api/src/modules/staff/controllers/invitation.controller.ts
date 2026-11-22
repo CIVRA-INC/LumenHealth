@@ -1,7 +1,7 @@
 import { uuidParamPipe } from '../../../shared/validation/id-params.js';
 import { Controller, Post, Get, Delete, Body, Res, Param, HttpException, HttpStatus, UseGuards, Query, UsePipes } from '@nestjs/common';
 import type { Response } from 'express';
-import type { InvitationStatus } from '@lumen/types';
+import type { InvitationError, InvitationStatus } from '@lumen/types';
 import { SendInvitationDto, AcceptInvitationDto } from '../dto/invitation.dto.js';
 import { invitationValidationPipe } from '../pipes/invitation-validation.pipe.js';
 import { AuthGuard } from '../../auth/guards/auth.guard.js';
@@ -10,6 +10,18 @@ import { RequirePermissions } from '../../../shared/decorators/permissions.decor
 import { AuthContext } from '../../../shared/decorators/auth-context.decorator.js';
 import type { AuthContextType } from '../../../shared/types/auth-context.js';
 import { InvitationService } from '../services/invitation.service.js';
+
+const INVITATION_ERROR_STATUS: Record<InvitationError["error"], HttpStatus> = {
+  INVITATION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  INVITATION_EXPIRED: HttpStatus.GONE,
+  INVITATION_ALREADY_PENDING: HttpStatus.CONFLICT,
+  INVITATION_ALREADY_ACCEPTED: HttpStatus.CONFLICT,
+  INVITATION_REVOKED: HttpStatus.CONFLICT,
+  INVITATION_INVALID_INPUT: HttpStatus.BAD_REQUEST,
+  STAFF_ALREADY_EXISTS: HttpStatus.CONFLICT,
+  STAFF_ACCESS_DENIED: HttpStatus.FORBIDDEN,
+  VALIDATION_FAILED: HttpStatus.BAD_REQUEST,
+};
 
 @Controller('staff/invitations')
 export class InvitationController {
@@ -23,8 +35,7 @@ export class InvitationController {
     const result = this.invitationService.sendInvitation(body, auth.clinicId, auth.userId);
 
     if ("error" in result) {
-      const status = result.error === "INVITATION_ALREADY_PENDING" || result.error === "STAFF_ALREADY_EXISTS" ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST;
-      throw new HttpException(result, status);
+      throw new HttpException(result, INVITATION_ERROR_STATUS[result.error] ?? HttpStatus.BAD_REQUEST);
     }
 
     return res.status(HttpStatus.CREATED).json(result);
@@ -36,11 +47,7 @@ export class InvitationController {
     const result = await this.invitationService.acceptInvitation(body.token, body.password, body.name);
 
     if ("error" in result) {
-      const status =
-        result.error === "INVITATION_NOT_FOUND" ? HttpStatus.NOT_FOUND :
-        result.error === "INVITATION_EXPIRED" ? HttpStatus.GONE :
-        HttpStatus.CONFLICT;
-      throw new HttpException(result, status);
+      throw new HttpException(result, INVITATION_ERROR_STATUS[result.error] ?? HttpStatus.BAD_REQUEST);
     }
 
     return res.status(HttpStatus.CREATED).json(result);
@@ -61,8 +68,7 @@ export class InvitationController {
     const result = this.invitationService.revokeInvitation(invitationId, auth.clinicId);
 
     if ("error" in result) {
-      const status = result.error === "INVITATION_NOT_FOUND" ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
-      throw new HttpException(result, status);
+      throw new HttpException(result, INVITATION_ERROR_STATUS[result.error] ?? HttpStatus.BAD_REQUEST);
     }
 
     return res.json(result);

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from "crypto";
-import type { StaffMember, UpdateStaffRoleRequest, UserRole } from "@lumen/types";
+import type { StaffError, StaffMember, StaffStatus, UpdateStaffRoleRequest, UserRole } from "@lumen/types";
 import { LastOwnerError, StaffRepository } from "../repositories/staff.repository.js";
 import { AuditService } from "../../audit/services/audit.service.js";
 import { paginateByCursor } from "../../../shared/pagination/cursor.js";
@@ -12,14 +12,17 @@ export class StaffService {
     private readonly auditService: AuditService
   ) {}
 
-  listStaff(clinicId: string): StaffMember[] {
-    return this.staffRepository.listByClinic(clinicId);
+  listStaff(
+    clinicId: string,
+    filters?: { status?: StaffStatus; role?: UserRole; q?: string },
+  ): StaffMember[] {
+    const status = filters?.status ?? "active";
+    return this.staffRepository.listByClinic(clinicId, { ...filters, status });
   }
 
-  listStaffPage(clinicId: string, opts: { cursor?: string; limit?: number } = {}) {
-    const sorted = this.staffRepository
-      .listByClinic(clinicId)
-      .sort((a, b) => `${b.joinedAt}|${b.staffId}`.localeCompare(`${a.joinedAt}|${a.staffId}`));
+  listStaffPage(clinicId: string, opts: { cursor?: string; limit?: number; status?: StaffStatus; role?: UserRole; q?: string } = {}) {
+    const status = opts.status ?? "active";
+    const sorted = this.staffRepository.listByClinic(clinicId, { status, role: opts.role, q: opts.q });
     return paginateByCursor(sorted, (m) => `${m.joinedAt}|${m.staffId}`, opts.cursor, opts.limit);
   }
 
@@ -29,7 +32,7 @@ export class StaffService {
     callerClinicId: string,
     callerUserId: string,
     callerRole: UserRole,
-  ): StaffMember | { error: string; message: string } {
+  ): StaffMember | StaffError {
     const member = this.staffRepository.findById(staffId);
 
     if (!member || member.clinicId !== callerClinicId) {

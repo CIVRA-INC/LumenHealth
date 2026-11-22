@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
-import type { Invitation, SendInvitationRequest, UserRole, InvitationStatus } from '@lumen/types';
+import type { Invitation, InvitationError, SendInvitationRequest, UserRole, InvitationStatus } from '@lumen/types';
 import { InvitationRepository } from '../repositories/invitation.repository.js';
 import { staffStore } from '../repositories/staff.repository.js';
 import { identityStore } from '../../auth/repositories/identity.repository.js';
@@ -18,7 +18,7 @@ export class InvitationService {
     body: SendInvitationRequest,
     clinicId: string,
     invitedBy: string,
-  ): { invitation: Invitation } | { error: string; message: string } {
+  ): { invitation: Invitation } | InvitationError {
     const existing = this.invitationRepository.findPendingByEmail(clinicId, body.email);
     if (existing) {
       return {
@@ -67,7 +67,7 @@ export class InvitationService {
     token: string,
     password: string,
     _name: string,
-  ): Promise<{ ok: true; userId: string } | { error: string; message: string }> {
+  ): Promise<{ ok: true; userId: string } | InvitationError> {
     // Claim is synchronous, so concurrent accepts cannot both pass.
     const claimed = this.invitationRepository.claim(token);
     if ('error' in claimed) {
@@ -124,7 +124,7 @@ export class InvitationService {
   revokeInvitation(
     invitationId: string,
     clinicId: string,
-  ): { ok: true } | { error: string; message: string } {
+  ): { ok: true } | InvitationError {
     const invitation = this.invitationRepository.findById(invitationId);
 
     if (!invitation || invitation.clinicId !== clinicId) {

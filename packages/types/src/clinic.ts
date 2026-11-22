@@ -18,9 +18,7 @@ export type Clinic = {
 
 export type ClinicErrorCode =
   | "CLINIC_NOT_FOUND"
-  | "CLINIC_SLUG_TAKEN"
-  | "CLINIC_INVALID_INPUT"
-  | "CLINIC_ACCESS_DENIED";
+  | "CLINIC_INVALID_INPUT";
 
 export type ClinicError = {
   error: ClinicErrorCode;
