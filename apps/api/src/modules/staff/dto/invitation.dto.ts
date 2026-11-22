@@ -1,7 +1,8 @@
-import { IsString, IsEmail, MinLength, Matches, IsIn } from 'class-validator';
-import type { UserRole } from '@lumen/types';
+import { IsString, IsEmail, MinLength, Matches, IsIn, IsOptional, MaxLength } from 'class-validator';
+import type { InvitationStatus, UserRole } from '@lumen/types';
 
 const ASSIGNABLE_ROLES = ["admin", "clinician", "cashier"];
+export const INVITATION_STATUSES: InvitationStatus[] = ["pending", "accepted", "expired", "revoked"];
 
 /**
  * Error code returned when one of these DTOs fails validation.
@@ -32,11 +33,21 @@ export class AcceptInvitationDto {
 
   @IsString({ message: "name must be at least 2 characters" })
   @MinLength(2, { message: "name must be at least 2 characters" })
+  @MaxLength(120, { message: "name must be 120 characters or fewer" })
   name!: string;
 
   @IsString({ message: "password is required" })
   @MinLength(8, { message: "password must be at least 8 characters" })
+  @MaxLength(72, { message: "password must be 72 characters or fewer" })
   @Matches(/[A-Z]/, { message: "password must contain at least one uppercase letter" })
   @Matches(/[0-9]/, { message: "password must contain at least one number" })
   password!: string;
+}
+
+export class ListInvitationsQueryDto {
+  static readonly validationErrorCode = VALIDATION_ERROR_CODE;
+
+  @IsOptional()
+  @IsIn(INVITATION_STATUSES, { message: `status must be one of: ${INVITATION_STATUSES.join(", ")}` })
+  status?: InvitationStatus;
 }

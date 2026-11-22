@@ -7,6 +7,9 @@ import { accessTokenSigner } from '../../modules/auth/services/token.service.js'
 import { identityStore } from '../../modules/auth/repositories/identity.repository.js';
 import { _resetAuthStateForTests } from '../../modules/auth/controllers/auth.controller.js';
 import { buildTwoClinicFixture } from '../../modules/auth/tests/fixtures.js';
+import { InvitationRepository } from '../../modules/staff/repositories/invitation.repository.js';
+import { InvitationService } from '../../modules/staff/services/invitation.service.js';
+import { staffStore } from '../../modules/staff/repositories/staff.repository.js';
 
 function buildTestApp(): Express {
   const app = express();
@@ -149,5 +152,62 @@ describe('resolveAuthContext — clinicId enforcement', () => {
   it('rejects a request with no Authorization header', async () => {
     const { status } = await request(app, 'GET', '/me');
     expect(status).toBe(401);
+  });
+});
+
+describe('invitation cross-clinic privacy (#1469)', () => {
+  beforeEach(() => {
+    _resetAuthStateForTests();
+    identityStore._reset();
+    staffStore._reset();
+  });
+
+  it('does not reveal an email registered in another clinic when sending an invite', () => {
+    const { a, b } = buildTwoClinicFixture();
+    identityStore.save({
+      userId: a.userId,
+      clinicId: a.clinicId,
+      email: 'shared@other.test',
+      passwordHash: 'hash',
+      role: 'clinician',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    });
+
+    const service = new InvitationService(new InvitationRepository());
+    const result = service.sendInvitation(
+      { email: 'shared@other.test', role: 'clinician' } as any,
+      b.clinicId,
+      b.userId,
+      'req-1',
+    );
+
+    expect('invitation' in result).toBe(true);
+    if ('invitation' in result) {
+      expect(result.invitation.clinicId).toBe(b.clinicId);
+      expect(result.invitation.email).toBe('shared@other.test');
+    }
+  });
+
+  it('still returns STAFF_ALREADY_EXISTS for an email already registered in the same clinic', () => {
+    const { a } = buildTwoClinicFixture();
+    identityStore.save({
+      userId: a.userId,
+      clinicId: a.clinicId,
+      email: 'same@clinic.test',
+      passwordHash: 'hash',
+      role: 'clinician',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    });
+
+    const service = new InvitationService(new InvitationRepository());
+    const result = service.sendInvitation(
+      { email: 'same@clinic.test', role: 'clinician' } as any,
+      a.clinicId,
+      a.userId,
+    );
+
+    expect(result).toMatchObject({ error: 'STAFF_ALREADY_EXISTS' });
   });
 });

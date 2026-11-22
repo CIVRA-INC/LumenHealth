@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { randomBytes, randomUUID } from 'crypto';
+import { randomBytes, randomUUID, createHash } from 'crypto';
 import bcrypt from 'bcryptjs';
 import type { Invitation, SendInvitationRequest, UserRole, InvitationStatus } from '@lumen/types';
 import { InvitationRepository } from '../repositories/invitation.repository.js';
 import { staffStore } from '../repositories/staff.repository.js';
-import { identityStore } from '../../auth/repositories/identity.repository.js';
+import { identityStore, DuplicateEmailError } from '../../auth/repositories/identity.repository.js';
 import { paginateByCursor } from '../../../shared/pagination/cursor.js';
 import { authLogger } from '../../../shared/logger/index.js';
 
@@ -18,6 +18,7 @@ export class InvitationService {
     body: SendInvitationRequest,
     clinicId: string,
     invitedBy: string,
+    requestId?: string,
   ): { invitation: Invitation } | { error: string; message: string } {
     const existing = this.invitationRepository.findPendingByEmail(clinicId, body.email);
     if (existing) {
@@ -28,7 +29,7 @@ export class InvitationService {
     }
 
     const existingIdentity = identityStore.findByEmail(body.email);
-    if (existingIdentity) {
+    if (existingIdentity && existingIdentity.clinicId === clinicId) {
       return {
         error: 'STAFF_ALREADY_EXISTS',
         message: 'this email is already registered as staff',
@@ -56,8 +57,12 @@ export class InvitationService {
 
     authLogger.info('invitation.sent', {
       clinicId,
-      requestId: invitation.invitationId,
-      meta: { email: invitation.email },
+      requestId: requestId ?? randomUUID(),
+      meta: {
+        invitationId: invitation.invitationId,
+        role: invitation.role,
+        emailHash: createHash('sha256').update(invitation.email.toLowerCase()).digest('hex').slice(0, 16),
+      },
     });
 
     return { invitation };
@@ -84,15 +89,22 @@ export class InvitationService {
     const passwordHash = await bcrypt.hash(password, 12);
     const userId = randomUUID();
 
-    identityStore.save({
-      userId,
-      clinicId: invitation.clinicId,
-      email: invitation.email,
-      passwordHash,
-      role: invitation.role,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    });
+    try {
+      identityStore.save({
+        userId,
+        clinicId: invitation.clinicId,
+        email: invitation.email,
+        passwordHash,
+        role: invitation.role,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      if (err instanceof DuplicateEmailError) {
+        return { error: 'INVITATION_ALREADY_ACCEPTED', message: 'invitation could not be accepted' };
+      }
+      throw err;
+    }
 
     const now = new Date().toISOString();
     staffStore.save({
@@ -105,6 +117,12 @@ export class InvitationService {
       status: 'active',
       joinedAt: now,
       updatedAt: now,
+    });
+
+    authLogger.info('invitation.accepted', {
+      clinicId: invitation.clinicId,
+      userId,
+      meta: { invitationId: invitation.invitationId, role: invitation.role },
     });
 
     return { ok: true, userId };
@@ -124,6 +142,8 @@ export class InvitationService {
   revokeInvitation(
     invitationId: string,
     clinicId: string,
+    requestId?: string,
+    actorId?: string,
   ): { ok: true } | { error: string; message: string } {
     const invitation = this.invitationRepository.findById(invitationId);
 
@@ -138,6 +158,12 @@ export class InvitationService {
     }
 
     this.invitationRepository.save({ ...invitation, status: 'revoked' });
+    authLogger.info('invitation.revoked', {
+      clinicId,
+      requestId: requestId ?? randomUUID(),
+      userId: actorId,
+      meta: { invitationId, role: invitation.role },
+    });
     return { ok: true };
   }
 }
