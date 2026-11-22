@@ -78,6 +78,24 @@ export class InvitationController {
     return res.json({ invitations });
   }
 
+  @Post(':invitationId/resend')
+  @UseGuards(AuthGuard, PermissionsGuard)
+  @RequirePermissions('staff:write')
+  resend(
+    @Param('invitationId', uuidParamPipe()) invitationId: string,
+    @AuthContext() auth: AuthContextType,
+    @Res() res: Response,
+  ) {
+    if (limited(`invitation-resend:${invitationId}`, 5)) {
+      throw new HttpException({ error: "AUTH_RATE_LIMITED", message: "too many resend attempts" }, HttpStatus.TOO_MANY_REQUESTS);
+    }
+    const result = this.invitationService.resendInvitation(invitationId, auth.clinicId);
+    if ("error" in result) {
+      throw new HttpException(result, INVITATION_ERROR_STATUS[result.error] ?? HttpStatus.BAD_REQUEST);
+    }
+    return res.status(HttpStatus.OK).json(result);
+  }
+
   @Delete(':invitationId')
   @UseGuards(AuthGuard, PermissionsGuard)
   @RequirePermissions('staff:write')

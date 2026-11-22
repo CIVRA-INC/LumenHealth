@@ -91,3 +91,53 @@ describe("InvitationController (e2e)", () => {
     });
   });
 });
+
+  describe("POST /api/v1/staff/invitations/:id/resend — #1458", () => {
+    it("resends expired invitation with new token and fresh expiry; old token fails", async () => {
+      const { a } = buildTwoClinicFixture();
+      const sent = await request.default(app.getHttpServer())
+        .post('/api/v1/staff/invitations')
+        .set('Authorization', `Bearer ${a.token}`)
+        .send(VALID_INVITE);
+      const inv = sent.body.invitation;
+      const oldToken = inv.token;
+      invitationStore.save({ ...invitationStore.findById(inv.invitationId)!, expiresAt: new Date(Date.now() - 1000).toISOString(), status: 'pending' });
+
+      const res = await request.default(app.getHttpServer())
+        .post(`/api/v1/staff/invitations/${inv.invitationId}/resend`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send();
+      expect(res.status).toBe(200);
+      expect(res.body.invitation.token).toBeTruthy();
+      expect(res.body.invitation.token).not.toBe(oldToken);
+      expect(new Date(res.body.invitation.expiresAt).getTime()).toBeGreaterThan(Date.now());
+
+      const oldAccept = await request.default(app.getHttpServer())
+        .post('/api/v1/staff/invitations/accept')
+        .send({ token: oldToken, password: "SecurePass1!", name: "Dr. Okafor" });
+      expect(oldAccept.status).toBe(404);
+      expect(oldAccept.body.error).toBe("INVITATION_NOT_FOUND");
+    });
+
+    it("returns 409 for accepted/revoked and 404 for cross-clinic", async () => {
+      const { a, b } = buildTwoClinicFixture();
+      const sent = await request.default(app.getHttpServer())
+        .post('/api/v1/staff/invitations')
+        .set('Authorization', `Bearer ${a.token}`)
+        .send(VALID_INVITE);
+      const inv = sent.body.invitation;
+
+      const cross = await request.default(app.getHttpServer())
+        .post(`/api/v1/staff/invitations/${inv.invitationId}/resend`)
+        .set('Authorization', `Bearer ${b.token}`)
+        .send();
+      expect(cross.status).toBe(404);
+
+      invitationStore.save({ ...invitationStore.findById(inv.invitationId)!, status: 'revoked' });
+      const revoked = await request.default(app.getHttpServer())
+        .post(`/api/v1/staff/invitations/${inv.invitationId}/resend`)
+        .set('Authorization', `Bearer ${a.token}`)
+        .send();
+      expect(revoked.status).toBe(409);
+    });
+  });
