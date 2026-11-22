@@ -1,22 +1,54 @@
-# Auth RBAC Baseline (rougepandaq)
+# Auth RBAC
 
-Covers: #500, #501, #502, #503
+This document describes the current role-based access control model in `apps/api`.
 
-## RBAC Model (First Pass)
-- `clinic_admin`: full clinic management and contributor invite authority.
-- `clinician`: patient-care actions within assigned clinic scope.
-- `staff`: operational access with no privilege elevation rights.
+## Source of truth
 
-## Ownership Bootstrap Rule
-- First verified account for a clinic becomes `clinic_admin`.
-- Subsequent accounts require invitation or explicit role assignment.
+- Role/permission types: `packages/types/src/auth.ts` (`UserRole`, `Permission`, `RolePolicy`)
+- Permission matrix: `apps/api/src/shared/role-policy/role-policy.service.ts`
+- Permission guard: `apps/api/src/shared/guards/permissions.guard.ts`
+- Permission decorator: `apps/api/src/shared/decorators/permissions.decorator.ts`
+- Clinic scope guard: `apps/api/src/modules/clinic/guards/clinic-scope.guard.ts`
 
-## Authorization Decision Logging
-- Log denied checks with actor role, target resource, and policy reason.
-- Log elevated checks where admin-level paths are exercised.
+## Roles
 
-## Shared Fixtures
-- `rbac_admin_fixture`
-- `rbac_clinician_fixture`
-- `rbac_staff_fixture`
-- Include expected allow/deny policy assertions per fixture.
+`UserRole` values are defined in `@lumen/types`:
+
+| Role | Description |
+|---|---|
+| `owner` | Clinic owner; highest clinic privilege. |
+| `admin` | Administrative staff; permissions per policy matrix. |
+| `clinician` | Clinical staff with patient-care access. |
+| `cashier` | Billing-focused staff. |
+| `system` | Internal/system actor; no user-facing permission grants by default. |
+
+## Permission matrix
+
+The matrix below mirrors `RolePolicyService.rolePolicies`.
+
+| Permission | owner | admin | clinician | cashier | system |
+|---|---:|---:|---:|---:|---:|
+| `auth:read` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `auth:write` | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `billing:read` | ✅ | ✅ | ❌ | ✅ | ❌ |
+| `billing:write` | ✅ | ✅ | ❌ | ✅ | ❌ |
+| `patient:read` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `patient:write` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `clinic:read` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `clinic:write` | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `staff:read` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `staff:write` | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+## Enforcement notes
+
+- `PermissionsGuard` reads required permissions from `@RequirePermissions(...)` metadata and checks the caller role through `RolePolicyService`. Missing auth context returns `401 AUTH_UNAUTHORIZED`; insufficient permissions return `403 AUTH_FORBIDDEN`.
+- `ClinicScopeGuard` enforces clinic isolation for routes that declare clinic scope.
+- Some routes may also include route-specific checks; when adding/changing authorization, prefer `RolePolicyService` + guards as the single source of truth.
+
+## Ownership bootstrap
+
+Clinic ownership bootstrap is an application flow concern. The first verified/created clinic owner should receive the `owner` role; subsequent staff should be invited/assigned through staff/invitation flows with appropriate permission checks.
+
+## Authorization logging
+
+Authorization denials and elevated/admin actions should be logged with actor role, clinic/user identifiers where appropriate, target resource, and decision reason, following existing auth/audit logging patterns.
