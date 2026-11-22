@@ -7,12 +7,19 @@ import { staffStore } from '../repositories/staff.repository.js';
 import { identityStore } from '../../auth/repositories/identity.repository.js';
 import { paginateByCursor } from '../../../shared/pagination/cursor.js';
 import { authLogger } from '../../../shared/logger/index.js';
+import { RolePolicyService } from '../../../shared/role-policy/role-policy.service.js';
 
 const EXPIRY_HOURS = 72;
 
 @Injectable()
 export class InvitationService {
-  constructor(private readonly invitationRepository: InvitationRepository) {}
+  private readonly rolePolicy: RolePolicyService;
+  constructor(
+    private readonly invitationRepository: InvitationRepository,
+    rolePolicy?: RolePolicyService,
+  ) {
+    this.rolePolicy = rolePolicy ?? new RolePolicyService();
+  }
 
   sendInvitation(
     body: SendInvitationRequest,

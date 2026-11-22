@@ -4,13 +4,19 @@ import type { StaffMember, UpdateStaffRoleRequest, UserRole } from "@lumen/types
 import { LastOwnerError, StaffRepository } from "../repositories/staff.repository.js";
 import { AuditService } from "../../audit/services/audit.service.js";
 import { paginateByCursor } from "../../../shared/pagination/cursor.js";
+import { RolePolicyService } from "../../../shared/role-policy/role-policy.service.js";
 
 @Injectable()
 export class StaffService {
+  private readonly rolePolicy: RolePolicyService;
+
   constructor(
     private readonly staffRepository: StaffRepository,
-    private readonly auditService: AuditService
-  ) {}
+    private readonly auditService: AuditService,
+    rolePolicy?: RolePolicyService,
+  ) {
+    this.rolePolicy = rolePolicy ?? new RolePolicyService();
+  }
 
   listStaff(clinicId: string): StaffMember[] {
     return this.staffRepository.listByClinic(clinicId);
@@ -38,6 +44,10 @@ export class StaffService {
 
     if (member.userId === callerUserId) {
       return { error: "STAFF_CANNOT_SELF_UPDATE", message: "you cannot change your own role" };
+    }
+
+    if (!this.rolePolicy.canAssignRole(callerRole, body.role as UserRole)) {
+      return { error: "STAFF_ACCESS_DENIED", message: "insufficient role to assign requested role" };
     }
 
     const previousRole = member.role;

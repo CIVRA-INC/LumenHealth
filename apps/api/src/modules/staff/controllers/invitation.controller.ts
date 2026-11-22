@@ -20,7 +20,7 @@ export class InvitationController {
   @RequirePermissions('staff:write')
   @UsePipes(invitationValidationPipe)
   send(@Body() body: SendInvitationDto, @AuthContext() auth: AuthContextType, @Res() res: Response) {
-    const result = this.invitationService.sendInvitation(body, auth.clinicId, auth.userId);
+    const result = this.invitationService.sendInvitation(body, auth.clinicId, auth.userId, auth.role);
 
     if ("error" in result) {
       const status = result.error === "INVITATION_ALREADY_PENDING" || result.error === "STAFF_ALREADY_EXISTS" ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST;
