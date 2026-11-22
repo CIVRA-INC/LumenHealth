@@ -9,7 +9,8 @@ export type SessionRecord = {
   refreshToken: string;
   /** One family per login; reuse of a rotated token revokes the whole family. */
   familyId?: string;
-  expiresAt: number;
+  accessExpiresAt: number;
+  refreshExpiresAt: number;
   createdAt: string;
 };
 
@@ -95,19 +96,23 @@ export const sessionStore = {
     for (const sessionId of [...(familyIndex.get(familyId) ?? [])]) this.delete(sessionId);
   },
 
+  revokeByUserId(userId: string): void {
+    for (const sessionId of [...(userIndex.get(userId) ?? [])]) this.delete(sessionId);
+  },
+
   isValid(sessionId: string): boolean {
     const session = store.get(sessionId);
     if (!session) return false;
-    if (Math.floor(Date.now() / 1000) < session.expiresAt) return true;
+    if (Math.floor(Date.now() / 1000) < session.accessExpiresAt) return true;
     this.delete(sessionId); // expired sessions disappear on access
     return false;
   },
 
-  /** Fallback sweep; expired sessions are also dropped lazily by isValid. */
+  /** Fallback sweep; sessions whose refresh window has closed are dropped. */
   purgeExpired(): void {
     const now = Math.floor(Date.now() / 1000);
     for (const [id, session] of store) {
-      if (session.expiresAt <= now) this.delete(id);
+      if (session.refreshExpiresAt <= now) this.delete(id);
     }
   },
 
@@ -122,12 +127,14 @@ export const sessionStore = {
 };
 
 export function makeSession(
-  fields: Omit<SessionRecord, "expiresAt" | "createdAt">,
-  ttlSeconds = 900
+  fields: Omit<SessionRecord, "accessExpiresAt" | "refreshExpiresAt" | "createdAt">,
+  ttls: { accessTtlSeconds?: number; refreshTtlSeconds?: number } = {},
 ): SessionRecord {
+  const now = Math.floor(Date.now() / 1000);
   return {
     ...fields,
-    expiresAt: Math.floor(Date.now() / 1000) + ttlSeconds,
+    accessExpiresAt: now + (ttls.accessTtlSeconds ?? 900),
+    refreshExpiresAt: now + (ttls.refreshTtlSeconds ?? 604800),
     createdAt: new Date().toISOString(),
   };
 }

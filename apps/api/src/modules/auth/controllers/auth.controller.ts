@@ -1,11 +1,18 @@
-import { Controller, Post, Get, Body, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
 import type { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import type { LoginRequest, LoginResponse, MeResponse, PasswordResetConfirmBody, PasswordResetRequestBody, RefreshRequest, VerifyConfirmBody, VerifyRequestBody } from '@lumen/types';
 
+import { authConfig } from '@lumen/config';
+import { hashAuditEntry } from '@lumen/types';
+
 import { identityStore } from '../repositories/identity.repository.js';
+import { checkClinicAccess } from '../services/clinic-access.service.js';
 import { makeSession, sessionStore } from '../repositories/session.repository.js';
+import { clinicStore } from '../../clinic/repositories/clinic.repository.js';
+import { staffStore } from '../../staff/repositories/staff.repository.js';
+import { auditStore } from '../../audit/repositories/audit.repository.js';
 import { oneTimeTokens } from '../repositories/one-time-token.repository.js';
 import { accessTokenSigner } from '../services/token.service.js';
 import { accountStatusError } from '../services/account-status.service.js';
@@ -89,6 +96,14 @@ export class AuthController {
       });
       throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid email or password" }, authErrorStatus("AUTH_INVALID_CREDENTIALS"));
     }
+
+    const clinicAccess = checkClinicAccess(identity.clinicId);
+    if (clinicAccess) {
+      await performDummyPasswordCompare(body.password);
+      incrementMetric("auth_login_failure_total");
+      authLogger.warn("auth.login.failure", { requestId, userId: identity.userId, clinicId: identity.clinicId, meta: { reason: clinicAccess.body.message } });
+      throw new HttpException(clinicAccess.body, clinicAccess.status);
+    }
     
     const passwordMatch = await bcrypt.compare(body.password, identity.passwordHash);
     if (!passwordMatch) {
@@ -99,7 +114,10 @@ export class AuthController {
     
     const accessToken = accessTokenSigner.sign({ sub: identity.userId, clinicId: identity.clinicId, role: identity.role });
     const refreshToken = randomUUID();
-    sessionStore.save(makeSession({ sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken }));
+    sessionStore.save(makeSession(
+      { sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken },
+      { accessTtlSeconds: authConfig.accessTokenTtl, refreshTtlSeconds: authConfig.refreshTokenTtl },
+    ));
     incrementMetric("auth_login_success_total");
     authLogger.info("auth.login.success", { requestId, userId: identity.userId, clinicId: identity.clinicId });
     const payload: LoginResponse = { session: { userId: identity.userId, clinicId: identity.clinicId, role: identity.role, accessToken, refreshToken } };
@@ -162,16 +180,30 @@ export class AuthController {
       incrementMetric("auth_refresh_failure_total");
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid refresh token" }, authErrorStatus("AUTH_TOKEN_INVALID"));
     }
+    if (Math.floor(Date.now() / 1000) >= existing.refreshExpiresAt) {
+      sessionStore.delete(existing.sessionId);
+      incrementMetric("auth_refresh_failure_total");
+      authLogger.warn("auth.token.expired", { requestId, userId: existing.userId, clinicId: existing.clinicId, meta: { reason: "refresh_expired" } });
+      throw new HttpException({ error: "AUTH_TOKEN_EXPIRED", message: "refresh token expired" }, authErrorStatus("AUTH_TOKEN_EXPIRED"));
+    }
     sessionStore.revokeByRefreshToken(refreshToken);
     const identity = identityStore.findById(existing.userId);
     if (!identity || accountStatusError(identity.status)) {
       incrementMetric("auth_refresh_failure_total");
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid refresh token" }, authErrorStatus("AUTH_TOKEN_INVALID"));
     }
+    const clinicAccess = checkClinicAccess(identity.clinicId);
+    if (clinicAccess) {
+      incrementMetric("auth_refresh_failure_total");
+      throw new HttpException(clinicAccess.body, clinicAccess.status);
+    }
     const role = identity.role;
     const nextAccess = accessTokenSigner.sign({ sub: existing.userId, clinicId: existing.clinicId, role });
     const nextRefresh = randomUUID();
-    sessionStore.save(makeSession({ sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh, familyId: existing.familyId }));
+    sessionStore.save(makeSession(
+      { sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh, familyId: existing.familyId },
+      { accessTtlSeconds: authConfig.accessTokenTtl, refreshTtlSeconds: authConfig.refreshTokenTtl },
+    ));
     incrementMetric("auth_refresh_success_total");
     authLogger.info("auth.token.refreshed", { requestId, userId: existing.userId, clinicId: existing.clinicId });
     return res.json({ ok: true, accessToken: nextAccess, refreshToken: nextRefresh });
@@ -242,6 +274,65 @@ export class AuthController {
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid or expired verification token" }, HttpStatus.UNAUTHORIZED);
     }
     return res.json({ ok: true, email: verify.meta?.email, userId: verify.userId });
+  }
+
+  @Delete('me')
+  @UseGuards(AuthGuard)
+  async deleteMe(@AuthContext() auth: AuthContextType, @Body() body: { password?: string }, @Res() res: Response) {
+    const password = body?.password;
+    if (!password) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "password is required" }, HttpStatus.BAD_REQUEST);
+    }
+
+    const identity = identityStore.findById(auth.userId);
+    if (!identity) {
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "user not found" }, HttpStatus.UNAUTHORIZED);
+    }
+
+    const passwordMatch = await bcrypt.compare(password, identity.passwordHash);
+    if (!passwordMatch) {
+      throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid email or password" }, authErrorStatus("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    const clinic = clinicStore.findById(identity.clinicId);
+    if (clinic?.status === "active") {
+      const staffMembers = staffStore.listByClinic(identity.clinicId);
+      const activeOwners = staffMembers.filter((m) => m.role === "owner" && m.status === "active");
+      const isCallerActiveOwner = activeOwners.some((m) => m.userId === identity.userId);
+      if (isCallerActiveOwner && activeOwners.length === 1) {
+        throw new HttpException({ error: "OWNER_REQUIRED", message: "clinic must retain at least one active owner" }, HttpStatus.CONFLICT);
+      }
+    }
+
+    const staffMember = staffStore.findByUserId(identity.userId);
+    if (staffMember) {
+      try {
+        staffStore.save({ ...staffMember, status: "deactivated", updatedAt: new Date().toISOString() });
+      } catch {
+        staffStore.delete(staffMember.staffId);
+      }
+    }
+
+    sessionStore.revokeByUserId(identity.userId);
+    identityStore.delete(identity.userId);
+
+    const clinicEntries = auditStore.findAllInRange(identity.clinicId).filter((e) => e.sequence !== undefined).sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+    const last = clinicEntries[clinicEntries.length - 1];
+    const unhashed = {
+      auditId: randomUUID(),
+      clinicId: identity.clinicId,
+      action: "staff.deactivated" as const,
+      actorId: identity.userId,
+      actorRole: identity.role,
+      targetId: identity.userId,
+      targetType: "staff" as const,
+      createdAt: new Date().toISOString(),
+      sequence: (last?.sequence ?? 0) + 1,
+      prevHash: last?.sha256Hash,
+    };
+    auditStore.save({ ...unhashed, sha256Hash: hashAuditEntry(unhashed) });
+
+    return res.status(204).send();
   }
 
   @Get('metrics')

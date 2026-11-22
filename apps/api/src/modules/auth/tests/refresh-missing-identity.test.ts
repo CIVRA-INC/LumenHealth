@@ -20,7 +20,8 @@ describe("refresh with a missing identity", () => {
       clinicId: "c1",
       accessToken: "a",
       refreshToken: "r",
-      expiresAt: Math.floor(Date.now() / 1000) + 900,
+      accessExpiresAt: Math.floor(Date.now() / 1000) + 900,
+      refreshExpiresAt: Math.floor(Date.now() / 1000) + 604800,
       createdAt: new Date().toISOString(),
     });
     sessionStore.revokeByRefreshToken("r");

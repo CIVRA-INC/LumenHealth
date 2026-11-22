@@ -38,8 +38,12 @@ describe("session store", () => {
     expect(sessionStore.findByRefreshToken("r2")).toBeUndefined();
   });
 
-  it("drops expired sessions on access", () => {
-    sessionStore.save({ ...makeSession({ ...base, sessionId: "s1", accessToken: "a1", refreshToken: "r1" }), expiresAt: 1 });
+  it("drops access-expired sessions on access", () => {
+    sessionStore.save({
+      ...makeSession({ ...base, sessionId: "s1", accessToken: "a1", refreshToken: "r1" }),
+      accessExpiresAt: 1,
+      refreshExpiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
     expect(sessionStore.isValid("s1")).toBe(false);
     expect(sessionStore.findBySessionId("s1")).toBeUndefined();
   });

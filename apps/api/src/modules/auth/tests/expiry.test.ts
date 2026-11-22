@@ -4,13 +4,18 @@ import { sessionStore, type SessionRecord } from "../repositories/session.reposi
 
 const T0 = new Date("2026-01-01T00:00:00.000Z");
 
-const session = (sessionId: string, expiresAt: number): SessionRecord => ({
+const session = (
+  sessionId: string,
+  accessExpiresAt: number,
+  refreshExpiresAt = accessExpiresAt,
+): SessionRecord => ({
   sessionId,
   userId: "u1",
   clinicId: "c1",
   accessToken: `access-${sessionId}`,
   refreshToken: `refresh-${sessionId}`,
-  expiresAt,
+  accessExpiresAt,
+  refreshExpiresAt,
   createdAt: T0.toISOString(),
 });
 
