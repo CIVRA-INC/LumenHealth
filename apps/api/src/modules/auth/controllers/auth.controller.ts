@@ -1,10 +1,14 @@
-import { Controller, Post, Get, Patch, Delete, Param, Body, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
 import type { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import type { LoginRequest, LoginResponse, MeResponse, PasswordResetConfirmBody, PasswordResetRequestBody, RefreshRequest, VerifyConfirmBody, VerifyRequestBody } from '@lumen/types';
 
+import { authConfig } from '@lumen/config';
+import { hashAuditEntry } from '@lumen/types';
+
 import { identityStore } from '../repositories/identity.repository.js';
+import { checkClinicAccess } from '../services/clinic-access.service.js';
 import { makeSession, sessionStore } from '../repositories/session.repository.js';
 import { staffStore } from '../../staff/repositories/staff.repository.js';
 import { oneTimeTokens } from '../repositories/one-time-token.repository.js';
@@ -90,6 +94,14 @@ export class AuthController {
         meta: { reason: loginBlockReason(identity.status) },
       });
       throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid email or password" }, authErrorStatus("AUTH_INVALID_CREDENTIALS"));
+    }
+
+    const clinicAccess = checkClinicAccess(identity.clinicId);
+    if (clinicAccess) {
+      await performDummyPasswordCompare(body.password);
+      incrementMetric("auth_login_failure_total");
+      authLogger.warn("auth.login.failure", { requestId, userId: identity.userId, clinicId: identity.clinicId, meta: { reason: clinicAccess.body.message } });
+      throw new HttpException(clinicAccess.body, clinicAccess.status);
     }
     
     const passwordMatch = await bcrypt.compare(body.password, identity.passwordHash);
@@ -204,11 +216,22 @@ export class AuthController {
       incrementMetric("auth_refresh_failure_total");
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid refresh token" }, authErrorStatus("AUTH_TOKEN_INVALID"));
     }
+    if (Math.floor(Date.now() / 1000) >= existing.refreshExpiresAt) {
+      sessionStore.delete(existing.sessionId);
+      incrementMetric("auth_refresh_failure_total");
+      authLogger.warn("auth.token.expired", { requestId, userId: existing.userId, clinicId: existing.clinicId, meta: { reason: "refresh_expired" } });
+      throw new HttpException({ error: "AUTH_TOKEN_EXPIRED", message: "refresh token expired" }, authErrorStatus("AUTH_TOKEN_EXPIRED"));
+    }
     sessionStore.revokeByRefreshToken(refreshToken);
     const identity = identityStore.findById(existing.userId);
     if (!identity || accountStatusError(identity.status)) {
       incrementMetric("auth_refresh_failure_total");
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid refresh token" }, authErrorStatus("AUTH_TOKEN_INVALID"));
+    }
+    const clinicAccess = checkClinicAccess(identity.clinicId);
+    if (clinicAccess) {
+      incrementMetric("auth_refresh_failure_total");
+      throw new HttpException(clinicAccess.body, clinicAccess.status);
     }
     const role = identity.role;
     const nextAccess = accessTokenSigner.sign({ sub: existing.userId, clinicId: existing.clinicId, role });

@@ -42,6 +42,10 @@ export class StaffRepository {
     return undefined;
   }
 
+  delete(staffId: string): void {
+    this.store.delete(staffId);
+  }
+
   listByClinic(
     clinicId: string,
     filters?: { status?: StaffStatus; role?: UserRole; q?: string },

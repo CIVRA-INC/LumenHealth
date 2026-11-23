@@ -36,6 +36,22 @@ export const identityStore = {
     emailIndex.set(emailLower, identity.userId);
   },
 
+  updateRole(userId: string, role: AuthIdentity["role"]): AuthIdentity | undefined {
+    const existing = store.get(userId);
+    if (!existing) return undefined;
+    const updated: AuthIdentity = { ...existing, role };
+    store.set(userId, copy(updated));
+    return copy(updated);
+  },
+
+  delete(userId: string): AuthIdentity | undefined {
+    const existing = store.get(userId);
+    if (!existing) return undefined;
+    emailIndex.delete(existing.email.toLowerCase());
+    store.delete(userId);
+    return copy(existing);
+  },
+
   _reset(): void {
     store.clear();
     emailIndex.clear();

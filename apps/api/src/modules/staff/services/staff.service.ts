@@ -5,6 +5,8 @@ import { LastOwnerError, StaffRepository } from "../repositories/staff.repositor
 import { AuditService } from "../../audit/services/audit.service.js";
 import { paginateByCursor } from "../../../shared/pagination/cursor.js";
 import { RolePolicyService } from "../../../shared/role-policy/role-policy.service.js";
+import { identityStore } from "../../auth/repositories/identity.repository.js";
+import { sessionStore } from "../../auth/repositories/session.repository.js";
 
 @Injectable()
 export class StaffService {
@@ -67,6 +69,9 @@ export class StaffService {
       if (err instanceof LastOwnerError) return { error: "STAFF_LAST_OWNER", message: err.message };
       throw err;
     }
+
+    identityStore.updateRole(member.userId, saved.role);
+    sessionStore.revokeByUserId(member.userId);
 
     this.auditService.recordAudit({
       clinicId: callerClinicId,
