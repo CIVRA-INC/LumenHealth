@@ -94,6 +94,7 @@ export type MeResponse = {
   clinicId: string;
   role: UserRole;
   email: string;
+  name: string;
 };
 
 // ── Events ───────────────────────────────────────────────────────────────────

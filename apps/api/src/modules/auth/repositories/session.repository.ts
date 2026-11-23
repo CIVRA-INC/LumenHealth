@@ -11,6 +11,9 @@ export type SessionRecord = {
   familyId?: string;
   expiresAt: number;
   createdAt: string;
+  userAgent?: string;
+  ip?: string;
+  lastUsedAt?: string;
 };
 
 export const hashRefreshToken = (token: string): string => createHash("sha256").update(token).digest("hex");
@@ -65,6 +68,14 @@ export const sessionStore = {
 
   listByUser(userId: string): SessionRecord[] {
     return [...(userIndex.get(userId) ?? [])].flatMap((id) => store.get(id) ?? []);
+  },
+
+  listByUserId(userId: string): SessionRecord[] {
+    return this.listByUser(userId);
+  },
+
+  deleteAllForUser(userId: string): void {
+    for (const sessionId of [...(userIndex.get(userId) ?? [])]) this.delete(sessionId);
   },
 
   delete(sessionId: string): void {
@@ -127,6 +138,7 @@ export function makeSession(
 ): SessionRecord {
   return {
     ...fields,
+    lastUsedAt: fields.lastUsedAt ?? new Date().toISOString(),
     expiresAt: Math.floor(Date.now() / 1000) + ttlSeconds,
     createdAt: new Date().toISOString(),
   };

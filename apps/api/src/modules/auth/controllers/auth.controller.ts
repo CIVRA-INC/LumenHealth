@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Param, Body, Res, HttpException, HttpStatus, UseGuards, Headers, Ip } from '@nestjs/common';
 import type { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
@@ -6,6 +6,7 @@ import type { LoginRequest, LoginResponse, MeResponse, PasswordResetConfirmBody,
 
 import { identityStore } from '../repositories/identity.repository.js';
 import { makeSession, sessionStore } from '../repositories/session.repository.js';
+import { staffStore } from '../../staff/repositories/staff.repository.js';
 import { oneTimeTokens } from '../repositories/one-time-token.repository.js';
 import { accessTokenSigner } from '../services/token.service.js';
 import { accountStatusError } from '../services/account-status.service.js';
@@ -46,6 +47,7 @@ export class AuthController {
   async login(
     @Body() body: Partial<LoginRequest>,
     @Headers('x-request-id') reqId: string,
+    @Headers('user-agent') userAgent: string,
     @Ip() ip: string,
     @Res() res: Response
   ) {
@@ -99,7 +101,7 @@ export class AuthController {
     
     const accessToken = accessTokenSigner.sign({ sub: identity.userId, clinicId: identity.clinicId, role: identity.role });
     const refreshToken = randomUUID();
-    sessionStore.save(makeSession({ sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken }));
+    sessionStore.save(makeSession({ sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken, userAgent, ip, lastUsedAt: new Date().toISOString() }));
     incrementMetric("auth_login_success_total");
     authLogger.info("auth.login.success", { requestId, userId: identity.userId, clinicId: identity.clinicId });
     const payload: LoginResponse = { session: { userId: identity.userId, clinicId: identity.clinicId, role: identity.role, accessToken, refreshToken } };
@@ -126,6 +128,46 @@ export class AuthController {
       clinicId: identity.clinicId,
       role: identity.role,
       email: identity.email,
+      name: identity.name ?? "",
+    };
+    return res.json(payload);
+  }
+
+  @Patch('me')
+  @UseGuards(AuthGuard)
+  updateMe(@AuthContext() auth: AuthContextType, @Body() body: Record<string, unknown>, @Res() res: Response) {
+    const allowed = new Set(["name"]);
+    for (const key of Object.keys(body ?? {})) {
+      if (!allowed.has(key)) {
+        throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: `field ${key} cannot be changed` }, HttpStatus.BAD_REQUEST);
+      }
+    }
+    const rawName = body?.name;
+    if (typeof rawName !== "string") {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "name is required" }, HttpStatus.BAD_REQUEST);
+    }
+    const name = rawName.trim();
+    if (name.length < 2 || name.length > 120) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "name must be 2-120 characters" }, HttpStatus.BAD_REQUEST);
+    }
+
+    const identity = identityStore.findById(auth.userId);
+    if (!identity) {
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "user not found" }, HttpStatus.UNAUTHORIZED);
+    }
+
+    identityStore.save({ ...identity, name });
+    const staffMember = staffStore.findByUserId(auth.userId);
+    if (staffMember) {
+      staffStore.save({ ...staffMember, name, updatedAt: new Date().toISOString() });
+    }
+
+    const payload: MeResponse = {
+      userId: identity.userId,
+      clinicId: identity.clinicId,
+      role: identity.role,
+      email: identity.email,
+      name,
     };
     return res.json(payload);
   }
@@ -140,7 +182,7 @@ export class AuthController {
   }
 
   @Post('refresh')
-  refresh(@Body() body: Partial<RefreshRequest>, @Headers('x-request-id') reqId: string, @Ip() ip: string, @Res() res: Response) {
+  refresh(@Body() body: Partial<RefreshRequest>, @Headers('x-request-id') reqId: string, @Headers('user-agent') userAgent: string, @Ip() ip: string, @Res() res: Response) {
     const requestId = reqId ?? randomUUID();
     if (limited(`refresh:${ip ?? "unknown"}`, 20)) {
       incrementMetric("auth_refresh_failure_total");
@@ -171,7 +213,7 @@ export class AuthController {
     const role = identity.role;
     const nextAccess = accessTokenSigner.sign({ sub: existing.userId, clinicId: existing.clinicId, role });
     const nextRefresh = randomUUID();
-    sessionStore.save(makeSession({ sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh, familyId: existing.familyId }));
+    sessionStore.save(makeSession({ sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh, familyId: existing.familyId, userAgent: userAgent ?? existing.userAgent, ip: ip ?? existing.ip, lastUsedAt: new Date().toISOString() }));
     incrementMetric("auth_refresh_success_total");
     authLogger.info("auth.token.refreshed", { requestId, userId: existing.userId, clinicId: existing.clinicId });
     return res.json({ ok: true, accessToken: nextAccess, refreshToken: nextRefresh });
@@ -242,6 +284,82 @@ export class AuthController {
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "invalid or expired verification token" }, HttpStatus.UNAUTHORIZED);
     }
     return res.json({ ok: true, email: verify.meta?.email, userId: verify.userId });
+  }
+
+  @Get('sessions')
+  @UseGuards(AuthGuard)
+  sessions(@AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const sessions = sessionStore.listByUserId(auth.userId).map((s) => ({
+      sessionId: s.sessionId,
+      userId: s.userId,
+      clinicId: s.clinicId,
+      createdAt: s.createdAt,
+      lastUsedAt: s.lastUsedAt ?? s.createdAt,
+      userAgent: s.userAgent,
+      ip: s.ip,
+    }));
+    return res.json({ ok: true, sessions });
+  }
+
+  @Delete('sessions/:sessionId')
+  @UseGuards(AuthGuard)
+  revokeSession(@AuthContext() auth: AuthContextType, @Param('sessionId') sessionId: string, @Res() res: Response) {
+    const session = sessionStore.findBySessionId(sessionId);
+    if (!session) {
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "session not found" }, HttpStatus.NOT_FOUND);
+    }
+    const sameUser = session.userId === auth.userId;
+    const ownerInClinic = auth.role === "owner" && session.clinicId === auth.clinicId;
+    if (!sameUser && !ownerInClinic) {
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "session not found" }, HttpStatus.NOT_FOUND);
+    }
+    sessionStore.delete(sessionId);
+    return res.json({ ok: true });
+  }
+
+  @Post('logout-all')
+  @UseGuards(AuthGuard)
+  logoutAll(@AuthContext() auth: AuthContextType, @Res() res: Response) {
+    sessionStore.deleteAllForUser(auth.userId);
+    return res.json({ ok: true });
+  }
+
+  @Post('change-password')
+  @UseGuards(AuthGuard)
+  async changePassword(@AuthContext() auth: AuthContextType, @Body() body: { currentPassword?: string; newPassword?: string }, @Ip() ip: string, @Res() res: Response) {
+    if (limited(`change-password:${auth.userId}`, 10)) {
+      throw new HttpException({ error: "AUTH_RATE_LIMITED", message: "too many requests" }, HttpStatus.TOO_MANY_REQUESTS);
+    }
+    const { currentPassword, newPassword } = body ?? {};
+    if (!currentPassword || !newPassword) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "currentPassword and newPassword are required" }, HttpStatus.BAD_REQUEST);
+    }
+    const identity = identityStore.findById(auth.userId);
+    if (!identity) {
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "user not found" }, HttpStatus.UNAUTHORIZED);
+    }
+    const currentMatch = await bcrypt.compare(currentPassword, identity.passwordHash);
+    if (!currentMatch) {
+      throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid current password" }, HttpStatus.UNAUTHORIZED);
+    }
+    if (await bcrypt.compare(newPassword, identity.passwordHash)) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "new password must differ from current password" }, HttpStatus.BAD_REQUEST);
+    }
+    const pwdErr = validatePassword(newPassword);
+    if (pwdErr) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: pwdErr }, HttpStatus.BAD_REQUEST);
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    identityStore.save({ ...identity, passwordHash });
+    const currentSession = sessionStore.findByAccessToken(auth.accessToken);
+    for (const session of sessionStore.listByUserId(auth.userId)) {
+      if (!currentSession || session.sessionId !== currentSession.sessionId) {
+        sessionStore.delete(session.sessionId);
+      }
+    }
+    incrementMetric("auth_password_change_total");
+    authLogger.info("auth.password.changed", { userId: auth.userId, clinicId: auth.clinicId, meta: { ip } });
+    return res.json({ ok: true });
   }
 
   @Get('metrics')

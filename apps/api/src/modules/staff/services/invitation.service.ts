@@ -25,6 +25,7 @@ export class InvitationService {
     body: SendInvitationRequest,
     clinicId: string,
     invitedBy: string,
+    requestId?: string,
   ): { invitation: Invitation } | InvitationError {
     const existing = this.invitationRepository.findPendingByEmail(clinicId, body.email);
     if (existing) {
@@ -77,7 +78,7 @@ export class InvitationService {
   async acceptInvitation(
     token: string,
     password: string,
-    _name: string,
+    name: string,
   ): Promise<{ ok: true; userId: string } | InvitationError> {
     // Claim is synchronous, so concurrent accepts cannot both pass.
     const claimed = this.invitationRepository.claim(token);
@@ -100,6 +101,7 @@ export class InvitationService {
         userId,
         clinicId: invitation.clinicId,
         email: invitation.email,
+        name: name.trim(),
         passwordHash,
         role: invitation.role,
         status: 'active',
@@ -117,7 +119,7 @@ export class InvitationService {
       staffId: randomUUID(),
       clinicId: invitation.clinicId,
       userId,
-      name: _name,
+      name: name.trim(),
       email: invitation.email,
       role: invitation.role,
       status: 'active',
@@ -148,6 +150,8 @@ export class InvitationService {
   revokeInvitation(
     invitationId: string,
     clinicId: string,
+    requestId?: string,
+    actorId?: string,
   ): { ok: true } | InvitationError {
     const invitation = this.invitationRepository.findById(invitationId);
 
@@ -169,5 +173,26 @@ export class InvitationService {
       meta: { invitationId, role: invitation.role },
     });
     return { ok: true };
+  }
+
+  resendInvitation(
+    invitationId: string,
+    clinicId: string,
+  ): { invitation: Invitation } | InvitationError {
+    const invitation = this.invitationRepository.findById(invitationId);
+    if (!invitation || invitation.clinicId !== clinicId) {
+      return { error: 'INVITATION_NOT_FOUND', message: 'invitation not found' };
+    }
+    if (invitation.status === 'accepted' || invitation.status === 'revoked') {
+      return { error: invitation.status === 'accepted' ? 'INVITATION_ALREADY_ACCEPTED' : 'INVITATION_REVOKED', message: `invitation is ${invitation.status}` };
+    }
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+    const token = randomBytes(32).toString('hex');
+    const updated = this.invitationRepository.rotateToken(invitationId, token, expiresAt);
+    if (!updated) {
+      return { error: 'INVITATION_NOT_FOUND', message: 'invitation not found' };
+    }
+    return { invitation: updated };
   }
 }

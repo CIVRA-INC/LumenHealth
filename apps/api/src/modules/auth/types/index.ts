@@ -6,6 +6,7 @@ export type AuthIdentity = {
   userId: string;
   clinicId: string;
   email: string;
+  name?: string;
   passwordHash: string;
   role: UserRole;
   status: AccountStatus;
