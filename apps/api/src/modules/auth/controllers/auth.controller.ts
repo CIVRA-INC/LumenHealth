@@ -10,9 +10,7 @@ import { hashAuditEntry } from '@lumen/types';
 import { identityStore } from '../repositories/identity.repository.js';
 import { checkClinicAccess } from '../services/clinic-access.service.js';
 import { makeSession, sessionStore } from '../repositories/session.repository.js';
-import { clinicStore } from '../../clinic/repositories/clinic.repository.js';
 import { staffStore } from '../../staff/repositories/staff.repository.js';
-import { auditStore } from '../../audit/repositories/audit.repository.js';
 import { oneTimeTokens } from '../repositories/one-time-token.repository.js';
 import { accessTokenSigner } from '../services/token.service.js';
 import { accountStatusError } from '../services/account-status.service.js';
@@ -53,6 +51,7 @@ export class AuthController {
   async login(
     @Body() body: Partial<LoginRequest>,
     @Headers('x-request-id') reqId: string,
+    @Headers('user-agent') userAgent: string,
     @Ip() ip: string,
     @Res() res: Response
   ) {
@@ -114,10 +113,7 @@ export class AuthController {
     
     const accessToken = accessTokenSigner.sign({ sub: identity.userId, clinicId: identity.clinicId, role: identity.role });
     const refreshToken = randomUUID();
-    sessionStore.save(makeSession(
-      { sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken },
-      { accessTtlSeconds: authConfig.accessTokenTtl, refreshTtlSeconds: authConfig.refreshTokenTtl },
-    ));
+    sessionStore.save(makeSession({ sessionId: accessToken, userId: identity.userId, clinicId: identity.clinicId, accessToken, refreshToken, userAgent, ip, lastUsedAt: new Date().toISOString() }));
     incrementMetric("auth_login_success_total");
     authLogger.info("auth.login.success", { requestId, userId: identity.userId, clinicId: identity.clinicId });
     const payload: LoginResponse = { session: { userId: identity.userId, clinicId: identity.clinicId, role: identity.role, accessToken, refreshToken } };
@@ -144,6 +140,46 @@ export class AuthController {
       clinicId: identity.clinicId,
       role: identity.role,
       email: identity.email,
+      name: identity.name ?? "",
+    };
+    return res.json(payload);
+  }
+
+  @Patch('me')
+  @UseGuards(AuthGuard)
+  updateMe(@AuthContext() auth: AuthContextType, @Body() body: Record<string, unknown>, @Res() res: Response) {
+    const allowed = new Set(["name"]);
+    for (const key of Object.keys(body ?? {})) {
+      if (!allowed.has(key)) {
+        throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: `field ${key} cannot be changed` }, HttpStatus.BAD_REQUEST);
+      }
+    }
+    const rawName = body?.name;
+    if (typeof rawName !== "string") {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "name is required" }, HttpStatus.BAD_REQUEST);
+    }
+    const name = rawName.trim();
+    if (name.length < 2 || name.length > 120) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "name must be 2-120 characters" }, HttpStatus.BAD_REQUEST);
+    }
+
+    const identity = identityStore.findById(auth.userId);
+    if (!identity) {
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "user not found" }, HttpStatus.UNAUTHORIZED);
+    }
+
+    identityStore.save({ ...identity, name });
+    const staffMember = staffStore.findByUserId(auth.userId);
+    if (staffMember) {
+      staffStore.save({ ...staffMember, name, updatedAt: new Date().toISOString() });
+    }
+
+    const payload: MeResponse = {
+      userId: identity.userId,
+      clinicId: identity.clinicId,
+      role: identity.role,
+      email: identity.email,
+      name,
     };
     return res.json(payload);
   }
@@ -158,7 +194,7 @@ export class AuthController {
   }
 
   @Post('refresh')
-  refresh(@Body() body: Partial<RefreshRequest>, @Headers('x-request-id') reqId: string, @Ip() ip: string, @Res() res: Response) {
+  refresh(@Body() body: Partial<RefreshRequest>, @Headers('x-request-id') reqId: string, @Headers('user-agent') userAgent: string, @Ip() ip: string, @Res() res: Response) {
     const requestId = reqId ?? randomUUID();
     if (limited(`refresh:${ip ?? "unknown"}`, 20)) {
       incrementMetric("auth_refresh_failure_total");
@@ -200,10 +236,7 @@ export class AuthController {
     const role = identity.role;
     const nextAccess = accessTokenSigner.sign({ sub: existing.userId, clinicId: existing.clinicId, role });
     const nextRefresh = randomUUID();
-    sessionStore.save(makeSession(
-      { sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh, familyId: existing.familyId },
-      { accessTtlSeconds: authConfig.accessTokenTtl, refreshTtlSeconds: authConfig.refreshTokenTtl },
-    ));
+    sessionStore.save(makeSession({ sessionId: nextAccess, userId: existing.userId, clinicId: existing.clinicId, accessToken: nextAccess, refreshToken: nextRefresh, familyId: existing.familyId, userAgent: userAgent ?? existing.userAgent, ip: ip ?? existing.ip, lastUsedAt: new Date().toISOString() }));
     incrementMetric("auth_refresh_success_total");
     authLogger.info("auth.token.refreshed", { requestId, userId: existing.userId, clinicId: existing.clinicId });
     return res.json({ ok: true, accessToken: nextAccess, refreshToken: nextRefresh });
@@ -276,63 +309,80 @@ export class AuthController {
     return res.json({ ok: true, email: verify.meta?.email, userId: verify.userId });
   }
 
-  @Delete('me')
+  @Get('sessions')
   @UseGuards(AuthGuard)
-  async deleteMe(@AuthContext() auth: AuthContextType, @Body() body: { password?: string }, @Res() res: Response) {
-    const password = body?.password;
-    if (!password) {
-      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "password is required" }, HttpStatus.BAD_REQUEST);
-    }
+  sessions(@AuthContext() auth: AuthContextType, @Res() res: Response) {
+    const sessions = sessionStore.listByUserId(auth.userId).map((s) => ({
+      sessionId: s.sessionId,
+      userId: s.userId,
+      clinicId: s.clinicId,
+      createdAt: s.createdAt,
+      lastUsedAt: s.lastUsedAt ?? s.createdAt,
+      userAgent: s.userAgent,
+      ip: s.ip,
+    }));
+    return res.json({ ok: true, sessions });
+  }
 
+  @Delete('sessions/:sessionId')
+  @UseGuards(AuthGuard)
+  revokeSession(@AuthContext() auth: AuthContextType, @Param('sessionId') sessionId: string, @Res() res: Response) {
+    const session = sessionStore.findBySessionId(sessionId);
+    if (!session) {
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "session not found" }, HttpStatus.NOT_FOUND);
+    }
+    const sameUser = session.userId === auth.userId;
+    const ownerInClinic = auth.role === "owner" && session.clinicId === auth.clinicId;
+    if (!sameUser && !ownerInClinic) {
+      throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "session not found" }, HttpStatus.NOT_FOUND);
+    }
+    sessionStore.delete(sessionId);
+    return res.json({ ok: true });
+  }
+
+  @Post('logout-all')
+  @UseGuards(AuthGuard)
+  logoutAll(@AuthContext() auth: AuthContextType, @Res() res: Response) {
+    sessionStore.deleteAllForUser(auth.userId);
+    return res.json({ ok: true });
+  }
+
+  @Post('change-password')
+  @UseGuards(AuthGuard)
+  async changePassword(@AuthContext() auth: AuthContextType, @Body() body: { currentPassword?: string; newPassword?: string }, @Ip() ip: string, @Res() res: Response) {
+    if (limited(`change-password:${auth.userId}`, 10)) {
+      throw new HttpException({ error: "AUTH_RATE_LIMITED", message: "too many requests" }, HttpStatus.TOO_MANY_REQUESTS);
+    }
+    const { currentPassword, newPassword } = body ?? {};
+    if (!currentPassword || !newPassword) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "currentPassword and newPassword are required" }, HttpStatus.BAD_REQUEST);
+    }
     const identity = identityStore.findById(auth.userId);
     if (!identity) {
       throw new HttpException({ error: "AUTH_TOKEN_INVALID", message: "user not found" }, HttpStatus.UNAUTHORIZED);
     }
-
-    const passwordMatch = await bcrypt.compare(password, identity.passwordHash);
-    if (!passwordMatch) {
-      throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid email or password" }, authErrorStatus("AUTH_INVALID_CREDENTIALS"));
+    const currentMatch = await bcrypt.compare(currentPassword, identity.passwordHash);
+    if (!currentMatch) {
+      throw new HttpException({ error: "AUTH_INVALID_CREDENTIALS", message: "invalid current password" }, HttpStatus.UNAUTHORIZED);
     }
-
-    const clinic = clinicStore.findById(identity.clinicId);
-    if (clinic?.status === "active") {
-      const staffMembers = staffStore.listByClinic(identity.clinicId);
-      const activeOwners = staffMembers.filter((m) => m.role === "owner" && m.status === "active");
-      const isCallerActiveOwner = activeOwners.some((m) => m.userId === identity.userId);
-      if (isCallerActiveOwner && activeOwners.length === 1) {
-        throw new HttpException({ error: "OWNER_REQUIRED", message: "clinic must retain at least one active owner" }, HttpStatus.CONFLICT);
+    if (await bcrypt.compare(newPassword, identity.passwordHash)) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: "new password must differ from current password" }, HttpStatus.BAD_REQUEST);
+    }
+    const pwdErr = validatePassword(newPassword);
+    if (pwdErr) {
+      throw new HttpException({ error: "AUTH_MISSING_CREDENTIALS", message: pwdErr }, HttpStatus.BAD_REQUEST);
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    identityStore.save({ ...identity, passwordHash });
+    const currentSession = sessionStore.findByAccessToken(auth.accessToken);
+    for (const session of sessionStore.listByUserId(auth.userId)) {
+      if (!currentSession || session.sessionId !== currentSession.sessionId) {
+        sessionStore.delete(session.sessionId);
       }
     }
-
-    const staffMember = staffStore.findByUserId(identity.userId);
-    if (staffMember) {
-      try {
-        staffStore.save({ ...staffMember, status: "deactivated", updatedAt: new Date().toISOString() });
-      } catch {
-        staffStore.delete(staffMember.staffId);
-      }
-    }
-
-    sessionStore.revokeByUserId(identity.userId);
-    identityStore.delete(identity.userId);
-
-    const clinicEntries = auditStore.findAllInRange(identity.clinicId).filter((e) => e.sequence !== undefined).sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
-    const last = clinicEntries[clinicEntries.length - 1];
-    const unhashed = {
-      auditId: randomUUID(),
-      clinicId: identity.clinicId,
-      action: "staff.deactivated" as const,
-      actorId: identity.userId,
-      actorRole: identity.role,
-      targetId: identity.userId,
-      targetType: "staff" as const,
-      createdAt: new Date().toISOString(),
-      sequence: (last?.sequence ?? 0) + 1,
-      prevHash: last?.sha256Hash,
-    };
-    auditStore.save({ ...unhashed, sha256Hash: hashAuditEntry(unhashed) });
-
-    return res.status(204).send();
+    incrementMetric("auth_password_change_total");
+    authLogger.info("auth.password.changed", { userId: auth.userId, clinicId: auth.clinicId, meta: { ip } });
+    return res.json({ ok: true });
   }
 
   @Get('metrics')

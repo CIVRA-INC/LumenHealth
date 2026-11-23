@@ -23,6 +23,18 @@ export class InvitationRepository {
     return copy(inv);
   }
 
+  rotateToken(invitationId: string, newToken: string, expiresAt: string): Invitation | undefined {
+    const existing = this.store.get(invitationId);
+    if (!existing) return undefined;
+    for (const [hash, id] of this.tokenIndex.entries()) {
+      if (id === invitationId) this.tokenIndex.delete(hash);
+    }
+    const updated: Invitation = { ...existing, token: hashToken(newToken), expiresAt, status: 'pending' };
+    this.store.set(invitationId, copy(updated));
+    this.tokenIndex.set(hashToken(newToken), invitationId);
+    return { ...copy(updated), token: newToken };
+  }
+
   /** The one pending, unexpired invitation for (clinic, email), if any. */
   findPendingByEmail(clinicId: string, email: string): Invitation | undefined {
     const now = Date.now();
