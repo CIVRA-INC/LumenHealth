@@ -1,2 +1,0 @@
-# Full typecheck before pushing; CI runs it too.
-npm run typecheck

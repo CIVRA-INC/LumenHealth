@@ -2,12 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": "src",
-    "sourceMap": true
+    "outDir": "dist",
+    "noEmit": false,
+    "sourceMap": true,
+    "incremental": true,
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "exclude": [
-    "src/**/*.test.ts",
-    "src/**/tests/**",
-    "src/**/__tests__/**",
-    "src/**/testing/**"
-  ]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/generated/**/*.d.ts"]
 }

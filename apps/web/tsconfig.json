@@ -1,31 +1,5 @@
 {
-  "extends": "../../tsconfig.react.json",
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "es2022"
-    ],
-    "allowJs": false,
-    "module": "esnext",
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
-  },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "extends": "@lumen/config/tsconfig/react.json",
+  "compilerOptions": { "types": ["vite/client", "node"] },
+  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"]
 }

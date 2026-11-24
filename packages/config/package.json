@@ -1,22 +1,21 @@
 {
   "name": "@lumen/config",
-  "version": "0.1.0",
   "private": true,
+  "version": "0.1.0",
+  "description": "Shared TypeScript and ESLint configuration",
   "type": "module",
-  "main": "dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./public": "./dist/public.js",
-    "./workspace-boundaries": "./dist/workspace-boundaries.js"
-  },
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "./eslint": "./eslint/index.js",
+    "./eslint/react": "./eslint/react.js",
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/node.json": "./tsconfig/node.json",
+    "./tsconfig/react.json": "./tsconfig/react.json"
   },
   "dependencies": {
-    "dotenv": "^17.2.3"
-  },
-  "devDependencies": {}
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "typescript-eslint": "^8.72.0"
+  }
 }

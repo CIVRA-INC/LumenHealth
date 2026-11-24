@@ -1,0 +1,213 @@
+/*
+ * LumenHealth design tokens: "Lumen Instrument".
+ *
+ * A precise clinical workspace. Pale warm stone as the desk, crisp white work surfaces with thin
+ * rules, deep evergreen for structure, and one chartreuse accent for the primary action and
+ * selection. The identity rests on four decisions:
+ *
+ *   1. Editorial display type (Fraunces) used only for page titles and patient names; Instrument Sans
+ *      for everything that is read; Geist Mono for identifiers, measurements and timestamps.
+ *   2. Evergreen navigation with a chartreuse selection mark. On light surfaces chartreuse is a
+ *      FILL (the primary button, a selected row tint) with near-black text, never a thin line or text,
+ *      because it does not have the contrast for that.
+ *   3. Thin 1px rules and hairline separators instead of shadows and boxes; shadows only on layers
+ *      that float.
+ *   4. A day ruler (hourly ticks, a "now" needle) as the product's recurring technical motif.
+ *
+ * Components consume these tokens through Tailwind utilities (bg-stone, text-ink-600, border-rule…).
+ */
+@import '@fontsource-variable/fraunces/opsz.css';
+@import '@fontsource-variable/instrument-sans/index.css';
+@import '@fontsource-variable/geist-mono/index.css';
+
+@theme static {
+  --font-sans:
+    'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces Variable', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Scale. 14px body; 13px in dense tables and lists. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 0.875rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.125rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.3125rem;
+  --text-md: 0.9375rem;
+  --text-md--line-height: 1.5rem;
+  /* Long-form reading and writing: the clinical note, addenda. */
+  --text-prose: 1rem;
+  --text-prose--line-height: 1.7rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.875rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2.5rem;
+  --text-3xl--line-height: 2.75rem;
+
+  /* Ink: warm near-black with a trace of green. Every step from 400 up meets 4.5:1 on stone. */
+  --color-ink-950: #101311;
+  --color-ink-900: #181c19;
+  --color-ink-800: #262b27;
+  --color-ink-700: #3a413c;
+  --color-ink-600: #444b45;
+  --color-ink-500: #545b55;
+  --color-ink-400: #636a64;
+  --color-ink-300: #a7aca5;
+  --color-ink-200: #d3d6d0;
+  --color-ink-100: #e4e6e1;
+  --color-ink-50: #f0f1ee;
+
+  /* Desk and sheets. */
+  --color-stone: #f2efe8;
+  --color-stone-deep: #e9e5db;
+  --color-surface: #ffffff;
+  --color-sunken: #f7f5f0;
+  --color-rule: #dedacf;
+  --color-rule-soft: #eae7de;
+  --color-rule-strong: #c4bfb1;
+
+  /* Evergreen: navigation and structural emphasis. */
+  --color-green-950: #0c1713;
+  --color-green-900: #11221b;
+  --color-green-800: #193027;
+  --color-green-700: #234536;
+  --color-green-600: #2f5b47;
+  --color-green-500: #3f7a60;
+  --color-green-300: #8fb3a1;
+  --color-green-200: #bcd3c7;
+  --color-green-100: #dbe8e0;
+  --color-green-50: #edf4f0;
+
+  /* Chartreuse: primary action and selection. A fill with dark text only. */
+  --color-lime-50: #f7fce0;
+  --color-lime-100: #eef9bd;
+  --color-lime-200: #e1f48c;
+  --color-lime-300: #d4ee5c;
+  --color-lime-400: #c6e63a;
+  --color-lime-500: #b3d12b;
+  --color-lime-600: #94ac1f;
+
+  /* Semantic: reserved for meaningful health and operational state. */
+  --color-success-50: #e6f3ec;
+  --color-success-600: #1b7f4b;
+  --color-success-700: #14633a;
+  --color-warning-50: #fbf0d9;
+  --color-warning-100: #f3deaa;
+  --color-warning-600: #96610a;
+  --color-warning-700: #744a05;
+  --color-danger-50: #fbe9e6;
+  --color-danger-100: #f3cbc5;
+  --color-danger-600: #b42b22;
+  --color-danger-700: #8f211a;
+
+  /* Radii: crisp. Controls 5, panels 6, floating layers 8. */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+
+  /* Elevation: floating layers only. */
+  --shadow-sm: 0 1px 2px rgb(16 19 17 / 0.07);
+  --shadow-md: 0 4px 12px -2px rgb(16 19 17 / 0.1);
+  --shadow-pop: 0 12px 32px -8px rgb(16 19 17 / 0.22), 0 2px 8px -2px rgb(16 19 17 / 0.1);
+
+  --animate-fade-in: fade-in 120ms ease-out;
+  --animate-pop-in: pop-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in-right: slide-in-right 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in-left: slide-in-left 200ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(3px) scale(0.99);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-stone);
+    color: var(--color-ink-900);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+  /* Keyboard focus: a deep-green ring on light surfaces. Dark surfaces override to chartreuse. */
+  :focus-visible {
+    outline: 2px solid var(--color-green-600);
+    outline-offset: 2px;
+  }
+  .on-dark :focus-visible {
+    outline-color: var(--color-lime-400);
+  }
+  ::selection {
+    background: var(--color-lime-200);
+  }
+  /* Editorial display face: page titles and patient names only. */
+  .display {
+    font-family: var(--font-display);
+    font-variation-settings: 'opsz' 72;
+    font-weight: 450;
+    letter-spacing: -0.022em;
+  }
+  /* Identifiers, measurements, timestamps: monospaced and tabular. */
+  .data {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

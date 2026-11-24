@@ -1,3 +1,0 @@
-# Fast checks on staged files only (set HUSKY=0 to skip, see CONTRIBUTING.md).
-npx lint-staged
-npm run check:boundaries

@@ -1,9 +1,15 @@
 node_modules
 dist
-.next
-.turbo
-.expo
 coverage
-package-lock.json
-*.tsbuildinfo
-next-env.d.ts
+pnpm-lock.yaml
+apps/api/src/generated
+apps/api/prisma/migrations
+apps/web/playwright-report
+apps/web/test-results
+
+# Legacy repository-management files carried over unchanged (see docs/PROJECT_STATE.md)
+.github/ISSUE_TEMPLATE
+.github/PULL_REQUEST_TEMPLATE.md
+.github/labels.yml
+.github/stale.yml
+.github/MAINTAINER_TRIAGE.md

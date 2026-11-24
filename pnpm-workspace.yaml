@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependencies permitted to run install scripts (everything else is blocked).
+allowBuilds:
+  '@prisma/engines': true
+  '@scarf/scarf': false
+  '@swc/core': true
+  esbuild: true
+  prisma: true
+
+# Keep a single @swc/core version, old enough to satisfy pnpm's minimum release age.
+overrides:
+  '@swc/core': 1.16.17

@@ -1,287 +1,68 @@
-# LumenHealth.
+# LumenHealth
 
-**LumenHealth** is a clinical operations platform designed to help healthcare facilities manage patients, staff workflows, encounters, and billing in a unified system.
+A multi-tenant electronic medical records (EMR) and hospital management platform, starting with the outpatient workflow:
 
-The platform combines web, mobile, and backend services with a dedicated Stellar integration layer for financial and billing workflows, enabling a modern healthcare system that is structured, auditable, and scalable.
+**patient registration → appointment or walk-in → queue → consultation → clinical documentation → diagnosis → prescription → discharge**
 
-LumenHealth is built as a monorepo to support fast iteration across clinical, administrative, and operational features.
+- **Multi-tenant by design.** Organisations and branches are isolated in the API _and_ in the database (row-level security).
+- **Careful clinical workflow.** Signed documentation is locked at the database; corrections are addenda; consequential actions need explicit confirmation.
+- **Auditable.** Every sensitive read and every change is recorded in an append-only audit trail.
+- **Cloud-first, offline-ready.** Globally unique ids and sync metadata from day one; a facility-local mode is a planned milestone.
 
----
+Current status, verified commands and next steps live in [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md). Product milestones are in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-## Overview
+## Quick start
 
-Healthcare systems often operate across fragmented tools — patient records in one system, scheduling in another, billing handled separately, and mobile workflows poorly integrated.
+Requirements: Node 22.12+ (24 recommended, see `.nvmrc`), pnpm 11, Docker.
 
-LumenHealth addresses this by providing a unified platform for:
-
-* clinic and staff management,
-* patient records and histories,
-* clinical encounters and workflows,
-* billing and payment processing,
-* mobile-first access for healthcare workers,
-* structured, auditable data across all operations.
-
-The system is designed to support both administrative and frontline clinical use cases.
-
----
-
-## Implementation Status
-
-| Area | Status |
-|---|---|
-| Authentication, sessions, roles | Shipped |
-| Clinic and staff management, invitations | Shipped |
-| Audit trail and anchoring (Stellar service) | Shipped |
-| Web app | In progress (auth, clinic settings, staff, audit, verify screens) |
-| Patient records | Planned |
-| Encounters and clinical workflows | Planned |
-| Billing | Planned |
-| Mobile app and offline support | Planned (workspace scaffold only) |
-
-## Core Modules
-
-## Authentication & Access Control
-
-LumenHealth begins with a secure authentication and role system.
-
-It supports:
-
-* staff login and identity verification,
-* role-based access (admin, clinician, support staff),
-* secure session management,
-* scoped permissions per clinic or organization.
-
-This forms the foundation for all clinical and administrative actions.
-
----
-
-## Clinic & Staff Management
-
-The platform supports structured clinic organization management.
-
-Capabilities include:
-
-* clinic onboarding,
-* staff assignment and roles,
-* multi-clinic support,
-* access scoping per facility,
-* administrative oversight tools.
-
-This ensures healthcare environments can be modeled accurately within the system.
-
----
-
-## Patient Records
-
-Patient data is central to LumenHealth.
-
-The system provides:
-
-* patient profiles,
-* medical history tracking,
-* visit records,
-* structured clinical data storage,
-* longitudinal patient context,
-* secure access controls.
-
-All patient data is designed to be consistent, traceable, and easy to extend.
-
----
-
-## Encounters & Clinical Workflows
-
-Encounters represent interactions between clinicians and patients.
-
-The system supports:
-
-* visit creation and updates,
-* diagnosis and notes,
-* treatment workflows,
-* structured encounter timelines,
-* follow-up tracking,
-* clinician collaboration.
-
-This creates a clear record of clinical activity over time.
-
----
-
-## Billing & Stellar Integration
-
-LumenHealth uses Stellar to support financial workflows within healthcare operations.
-
-The Stellar service enables:
-
-* billing event processing,
-* payment tracking,
-* transaction receipts,
-* audit-friendly financial records,
-* integration between clinical actions and billing events.
-
-This provides a transparent and programmable layer for healthcare billing workflows.
-
----
-
-## Mobile & Offline Support
-
-The mobile workspace is designed for frontline healthcare environments.
-
-It supports:
-
-* patient lookup and access,
-* encounter documentation,
-* offline-first workflows (future phase),
-* sync when connectivity is restored,
-* lightweight clinical data entry.
-
-This ensures clinicians can operate even in low-connectivity environments.
-
----
-
-## System Architecture
-
-LumenHealth is built as a strict monorepo with clear boundaries between services.
-
-| Layer              | Technology             |
-| ------------------ | ---------------------- |
-| API                | NestJS + TypeScript    |
-| Web                | Next.js App Router     |
-| Mobile             | React Native workspace |
-| Blockchain/Billing | Stellar service        |
-| Shared Config      | @lumen/config          |
-| Shared Types       | @lumen/types           |
-
----
-
-## Repository Structure
-
-```text id="lm8x2k"
-lumenhealth/
-│
-├── apps/
-│   ├── api/                # Core backend services
-│   ├── web/                # Admin + clinic web app
-│   ├── mobile/             # Clinical mobile workspace
-│   └── stellar-service/    # Billing + Stellar integration
-│
-├── packages/
-│   ├── config/             # Shared runtime rules
-│   └── types/              # Shared domain contracts
-│
-└── docs/
+```bash
+pnpm bootstrap   # .env, dependencies, PostgreSQL in Docker, migrations, synthetic demo data
+pnpm dev         # contracts watcher + API (:4000) + web (:5173)
 ```
 
----
+Open <http://localhost:5173> and sign in with a demo account (password `LumenDemo!2026`, development only):
 
-## MVP Delivery Plan
+| Account                    | Role                                       |
+| -------------------------- | ------------------------------------------ |
+| `frontdesk@lumen.test`     | Front desk: register, book, check in       |
+| `nurse.adeyemi@lumen.test` | Nurse: queue, vitals                       |
+| `dr.okafor@lumen.test`     | Clinician (also a member of another org)   |
+| `dr.bello@lumen.test`      | Clinician (has a consultation in progress) |
+| `admin@lumen.test`         | Administrator: staff, audit log            |
+| `admin@harbour.test`       | Administrator of a second organisation     |
+| `frontdesk@harbour.test`   | Front desk of the second organisation      |
 
-The platform is being rebuilt in structured clinical milestones:
+All demo data is synthetic. API documentation: <http://localhost:4000/api/docs>.
 
-1. Authentication and access control
-2. Clinic and staff management
-3. Patient records system
-4. Clinical encounter workflows
-5. Billing and Stellar integration layer
-6. Mobile clinical workflows and offline readiness
-7. Production hardening and auditability
+## Repository layout
 
-Each milestone builds directly on the previous one to ensure safe clinical progression.
-
----
-
-## Getting Started
-
-### Requirements
-
-* Node.js 20+
-* npm 10+
-
----
-
-### Installation
-
-```bash id="v9k1sd"
-npm install
+```
+apps/api            NestJS modular monolith (REST /api/v1, Prisma, PostgreSQL)
+apps/web            React + Vite workspace application
+packages/contracts  Shared zod schemas, permissions, state machines (the API contract)
+packages/ui         Design system: tokens and accessible components
+packages/config     Shared TypeScript and ESLint configuration
+infrastructure      Docker assets (PostgreSQL roles and databases)
+docs                Architecture, decisions, development guides, project state
 ```
 
----
+## Everyday commands
 
-### Run development environment
+| Command                                   | What it does                                             |
+| ----------------------------------------- | -------------------------------------------------------- |
+| `pnpm dev`                                | Run everything with hot reload                           |
+| `pnpm check`                              | Format check, lint, types, tests, build (what CI runs)   |
+| `pnpm test`                               | Unit and integration tests (needs `pnpm db:up`)          |
+| `pnpm test:e2e`                           | Playwright journeys against a disposable database        |
+| `pnpm db:up` / `pnpm db:down`             | Start / stop local PostgreSQL                            |
+| `pnpm db:migrate` / `pnpm db:seed`        | Apply migrations / load demo data                        |
+| `pnpm db:reset`                           | Drop and rebuild the dev database (guarded; `--dry-run`) |
+| `pnpm shots`                              | Screenshots from a clean, isolated review database       |
+| `pnpm --filter @lumen/api openapi:export` | Regenerate `docs/api/openapi.json`                       |
 
-```bash id="q2m0lx"
-npm run dev
-```
+More in [`docs/development/`](docs/development/setup.md).
 
----
+## Safety notes
 
-### Architecture validation
-
-Before contributing:
-
-```bash id="p3z7aa"
-npm run check:architecture
-npm run check:boundaries
-```
-
----
-
-## Environment Setup
-
-Create a root `.env` from the provided template before running services locally.
-
-Each workspace may also define:
-
-```text id="envlm1"
-apps/api/.env.example
-apps/web/.env.example
-apps/mobile/.env.example
-apps/stellar-service/.env.example
-```
-
----
-
-## Documentation
-
-* Documentation index (by audience): [`docs/README.md`](docs/README.md)
-* API reference (endpoints, environment variables, scripts): [`apps/api/README.md`](apps/api/README.md)
-* Contributor Guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-* Contract versioning: [`CONTRACT_VERSIONING.md`](CONTRACT_VERSIONING.md)
-* Architecture decisions: [`docs/adr/`](docs/adr/)
-* Security and key rotation: [`docs/auth-threat-model.md`](docs/auth-threat-model.md), [`docs/stellar-key-rotation.md`](docs/stellar-key-rotation.md)
-
----
-
-## Contribution Model
-
-LumenHealth is structured for milestone-driven development.
-
-To maintain clarity and safety:
-
-* keep changes within a single milestone scope
-* use shared types for cross-app data
-* avoid duplicating logic across apps
-* respect service boundaries (API vs Stellar vs UI)
-* ensure clinical workflows remain consistent and traceable
-
----
-
-## Current State
-
-This repository is a foundational reset designed for structured MVP development.
-
-Shipped: authentication and sessions, clinic and staff management, the audit trail and the
-Stellar anchoring service, on top of the shared config and types packages. See the Implementation
-Status table above for what is still planned.
-
----
-
-## Vision
-
-LumenHealth aims to become a unified clinical operations platform that connects patients, clinicians, and healthcare administrators through structured workflows, reliable data systems, and transparent financial processing.
-
-The long-term goal is a healthcare infrastructure layer that is modular, auditable, and adaptable across different clinical environments.
-
----
-
-## License
-
-MIT
+- Everything here is for development and evaluation. **No real patient data** belongs in a development database, and no compliance or certification is claimed (see [privacy and compliance](docs/architecture/privacy-and-compliance.md)).
+- Payments are **not implemented yet**; the provider boundary is designed in [`docs/architecture/payments.md`](docs/architecture/payments.md). Stellar support is not live.

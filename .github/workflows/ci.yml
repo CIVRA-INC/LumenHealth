@@ -1,116 +1,110 @@
 name: CI
 
-# One workflow owns the build, lint, typecheck and test gates. Every task is run
-# through turbo (task graph + cache); a new workspace needs no edit here.
-
 on:
   push:
-    branches:
-      - main
-      - develop
-      - "release/**"
-      - "feat/**"
-      - "fix/**"
+    branches: [develop, main]
   pull_request:
-    branches:
-      - main
-      - develop
-      - "release/**"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 env:
-  NEXT_TELEMETRY_DISABLED: "1"
-  # Remote cache: set TURBO_TOKEN (secret) and TURBO_TEAM (variable) to enable.
-  # Without them turbo falls back to the local .turbo cache restored below.
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+  # Matches docker-compose.yml. Development credentials for the CI service container only.
+  DATABASE_URL: postgresql://lumen_app:lumen_app_dev_password@localhost:5432/lumenhealth
+  MIGRATION_DATABASE_URL: postgresql://lumen:lumen_dev_password@localhost:5432/lumenhealth
+  TEST_DATABASE_URL: postgresql://lumen_app:lumen_app_dev_password@localhost:5432/lumenhealth_test
+  TEST_MIGRATION_DATABASE_URL: postgresql://lumen:lumen_dev_password@localhost:5432/lumenhealth_test
+  E2E_DATABASE_URL: postgresql://lumen_app:lumen_app_dev_password@localhost:5432/lumenhealth_e2e
+  E2E_MIGRATION_DATABASE_URL: postgresql://lumen:lumen_dev_password@localhost:5432/lumenhealth_e2e
 
 jobs:
-  install:
-    name: Install
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - name: Build shared packages
-        run: npm run build -w packages/config && npm run build -w packages/types
-      - name: Architecture checks
-        run: npm run check:architecture
-      - name: Environment variable docs
-        run: npm run check:env-docs
-      - name: Lint
-        run: npm run lint -w apps/api
-      - name: Test
-        run: npm run test -w apps/api
-      - name: Build
-        run: npm run build -w apps/api
-
-  checks:
-    name: ${{ matrix.task }}
-    needs: install
+  quality:
+    name: Format, lint, types, build
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        task: [lint, typecheck, test, build]
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
-      - name: Restore node_modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Restore turbo cache
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-${{ matrix.task }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ matrix.task }}-
-      - name: Run ${{ matrix.task }}
-        run: npx turbo run ${{ matrix.task }} --cache-dir=.turbo
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
 
-  architecture:
-    name: Architecture checks
-    needs: install
+  test:
+    name: Migrations and tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: lumen
+          POSTGRES_PASSWORD: lumen_dev_password
+          POSTGRES_DB: lumenhealth
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U lumen -d lumenhealth"
+          --health-interval 3s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
-      - name: Restore node_modules
-        uses: actions/cache@v4
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create roles and databases
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          PGPASSWORD=lumen_dev_password psql -h localhost -U lumen -d postgres -v ON_ERROR_STOP=1 -f infrastructure/docker/postgres/init.sql
+      - name: Migrations apply cleanly to an empty database
+        run: pnpm --filter @lumen/api exec prisma migrate deploy
+      - name: Schema is valid
+        run: pnpm --filter @lumen/api exec prisma validate
+      - name: Unit and integration tests
+        run: pnpm test
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: lumen
+          POSTGRES_PASSWORD: lumen_dev_password
+          POSTGRES_DB: lumenhealth
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U lumen -d lumenhealth"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-          key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - run: npm run check:boundaries
-      - run: npm run check:architecture
-      - name: Dependency versions
-        run: npm run check:versions
-      - name: Markdown links
-        run: npm run check:links
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create roles and databases
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          PGPASSWORD=lumen_dev_password psql -h localhost -U lumen -d postgres -v ON_ERROR_STOP=1 -f infrastructure/docker/postgres/init.sql
+      - run: pnpm build:contracts
+      - run: pnpm --filter @lumen/web exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@lumen/ui/styles.css';
+
+/* Workspace packages sit behind symlinks, which Tailwind does not scan on its own. */
+@source '../../../../packages/ui/src';

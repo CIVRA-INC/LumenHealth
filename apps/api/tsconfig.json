@@ -1,12 +1,13 @@
 {
-  "extends": "../../tsconfig.node.json",
+  "extends": "@lumen/config/tsconfig/node.json",
   "compilerOptions": {
+    "rootDir": ".",
     "outDir": "dist",
+    "noEmit": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "useDefineForClassFields": false
+    "isolatedModules": false,
+    "incremental": false
   },
-  "include": [
-    "src/**/*.ts"
-  ]
+  "include": ["src", "prisma", "test", "prisma.config.ts", "vitest.config.mts"]
 }
