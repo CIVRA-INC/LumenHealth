@@ -10,6 +10,8 @@ allowBuilds:
   esbuild: true
   prisma: true
 
-# Keep a single @swc/core version, old enough to satisfy pnpm's minimum release age.
 overrides:
-  '@swc/core': 1.16.17
+  body-parser: ^2.4.0
+  multer: ^2.5.0
+  effect: ^3.22.1
+  minimatch: ^11.0.1

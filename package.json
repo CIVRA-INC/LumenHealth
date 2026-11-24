@@ -4,13 +4,6 @@
   "version": "0.1.0",
   "description": "LumenHealth — multi-tenant EMR and hospital management platform",
   "packageManager": "pnpm@11.15.1",
-  "pnpm": {
-  "overrides": {
-    "body-parser": "^2.4.0",
-    "multer": "^2.5.0",
-    "effect": "^3.22.1"
-  }
-  },
   "engines": {
     "node": ">=22.12"
   },
