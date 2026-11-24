@@ -18,7 +18,7 @@
     "db:seed": "node --env-file-if-exists=../../.env --import tsx prisma/seed.ts",
     "db:reset": "node --env-file-if-exists=../../.env --import tsx prisma/reset-dev.ts",
     "openapi:export": "node --env-file-if-exists=../../.env dist/scripts/export-openapi.js",
-    "e2e:prepare": "pnpm db:generate && node --env-file-if-exists=../../.env --import tsx prisma/e2e-prepare.ts"
+    "e2e:prepare": "pnpm db:generate && node --env-file-if-exists=../../.env --import tsx prisma/e2e-prepare.ts",
     "visual:prepare": "node --env-file-if-exists=../../.env --import tsx prisma/visual-prepare.ts"
   },
   "dependencies": {
