@@ -1,0 +1,25 @@
+# Local development dependencies only. The application itself runs on the host (pnpm dev).
+name: lumenhealth
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      # Development-only credentials. Production secrets never live in this file.
+      POSTGRES_USER: lumen
+      POSTGRES_PASSWORD: lumen_dev_password
+      POSTGRES_DB: lumenhealth
+    ports:
+      - '5432:5432'
+    volumes:
+      - lumen_pgdata:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lumen -d lumenhealth']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  lumen_pgdata:
