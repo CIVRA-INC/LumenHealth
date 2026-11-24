@@ -1,4 +1,4 @@
-# LumenHealth
+# LumenHealth.
 
 A multi-tenant electronic medical records (EMR) and hospital management platform, starting with the outpatient workflow:
 
