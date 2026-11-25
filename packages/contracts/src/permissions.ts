@@ -87,3 +87,26 @@ export function permissionsForRole(role: Role): readonly Permission[] {
 export function roleHasPermission(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }
+
+// ── Platform level ────────────────────────────────────────────────────────────
+// Platform permissions are a separate namespace from organisation permissions. No organisation role
+// grants any of them, and no platform role grants clinical or organisation-scoped access.
+
+export const PLATFORM_PERMISSIONS = [
+  'platform.organizations.read',
+  'platform.organizations.manage',
+  'platform.invitations.manage',
+] as const;
+export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[number];
+
+export const PLATFORM_ROLES = ['PLATFORM_ADMIN'] as const;
+export const platformRoleSchema = z.enum(PLATFORM_ROLES);
+export type PlatformRole = z.infer<typeof platformRoleSchema>;
+
+export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, readonly PlatformPermission[]> = {
+  PLATFORM_ADMIN: PLATFORM_PERMISSIONS,
+};
+
+export function permissionsForPlatformRole(role: PlatformRole): readonly PlatformPermission[] {
+  return PLATFORM_ROLE_PERMISSIONS[role];
+}

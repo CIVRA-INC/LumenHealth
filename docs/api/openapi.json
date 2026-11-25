@@ -273,6 +273,369 @@
         "tags": ["Administration"]
       }
     },
+    "/api/v1/admin/invitations": {
+      "get": {
+        "operationId": "AdminInvitationsController_list_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Administration"]
+      },
+      "post": {
+        "operationId": "AdminInvitationsController_invite_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["ORG_ADMIN", "CLINICIAN", "NURSE", "FRONT_DESK"]
+                  },
+                  "branchIds": {
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  }
+                },
+                "required": ["email", "fullName", "role", "branchIds"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Administration"]
+      }
+    },
+    "/api/v1/admin/invitations/{id}/resend": {
+      "post": {
+        "operationId": "AdminInvitationsController_resend_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Administration"]
+      }
+    },
+    "/api/v1/admin/invitations/{id}/revoke": {
+      "post": {
+        "operationId": "AdminInvitationsController_revoke_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Administration"]
+      }
+    },
+    "/api/v1/invitations/inspect": {
+      "post": {
+        "operationId": "InvitationsController_inspect_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 200
+                  }
+                },
+                "required": ["token"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Invitations"]
+      }
+    },
+    "/api/v1/invitations/accept": {
+      "post": {
+        "operationId": "InvitationsController_accept_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 200
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": ["token", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": ["Invitations"]
+      }
+    },
+    "/api/v1/platform/organizations": {
+      "get": {
+        "operationId": "PlatformController_list_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Platform"]
+      },
+      "post": {
+        "operationId": "PlatformController_register_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "timezone": {
+                    "default": "Africa/Lagos",
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 64
+                  },
+                  "branch": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "code": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9-]{2,12}$"
+                      }
+                    },
+                    "required": ["name", "code"]
+                  },
+                  "admin": {
+                    "type": "object",
+                    "properties": {
+                      "fullName": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                      },
+                      "email": {
+                        "type": "string",
+                        "maxLength": 254,
+                        "format": "email",
+                        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      }
+                    },
+                    "required": ["fullName", "email"]
+                  }
+                },
+                "required": ["name", "branch", "admin"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": ["Platform"]
+      }
+    },
+    "/api/v1/platform/organizations/{id}": {
+      "get": {
+        "operationId": "PlatformController_detail_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Platform"]
+      }
+    },
+    "/api/v1/platform/organizations/{id}/status": {
+      "patch": {
+        "operationId": "PlatformController_setStatus_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["ACTIVE", "SUSPENDED"]
+                  }
+                },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Platform"]
+      }
+    },
+    "/api/v1/platform/invitations": {
+      "get": {
+        "operationId": "PlatformController_listInvitations_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Platform"]
+      }
+    },
+    "/api/v1/platform/invitations/{id}/resend": {
+      "post": {
+        "operationId": "PlatformController_resend_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Platform"]
+      }
+    },
+    "/api/v1/platform/invitations/{id}/revoke": {
+      "post": {
+        "operationId": "PlatformController_revoke_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["Platform"]
+      }
+    },
     "/api/v1/branches": {
       "get": {
         "operationId": "OrganizationsController_branches_v1",

@@ -74,6 +74,8 @@ export const ERROR_CODES = {
   passwordChangeRequired: 'PASSWORD_CHANGE_REQUIRED',
   accountLocked: 'ACCOUNT_LOCKED',
   rateLimited: 'RATE_LIMITED',
+  invitationUnavailable: 'INVITATION_UNAVAILABLE',
+  organizationSuspended: 'ORGANIZATION_SUSPENDED',
   internal: 'INTERNAL_ERROR',
 } as const;
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

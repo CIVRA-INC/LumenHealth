@@ -5,11 +5,60 @@ function page<M extends Record<string, unknown>>(load: () => Promise<M>, name: k
   return async () => ({ Component: (await load())[name] as React.ComponentType });
 }
 import { AppShell } from './app-shell';
-import { RequireAuth, RequirePermission } from './guards';
+import {
+  RequireAuth,
+  RequirePermission,
+  RequirePlatform,
+  RequirePlatformPermission,
+} from './guards';
+import { AcceptInvitationPage } from '../features/auth/accept-invitation-page';
 import { LoginPage } from '../features/auth/login-page';
+import { PlatformShell } from '../features/platform/platform-shell';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/accept-invitation', element: <AcceptInvitationPage /> },
+  {
+    path: '/platform',
+    element: <RequirePlatform />,
+    children: [
+      {
+        element: <PlatformShell />,
+        children: [
+          {
+            element: <RequirePlatformPermission permission="platform.organizations.read" />,
+            children: [
+              {
+                index: true,
+                lazy: page(() => import('../features/platform/hospitals-page'), 'HospitalsPage'),
+              },
+              {
+                path: 'hospitals/:organizationId',
+                lazy: page(
+                  () => import('../features/platform/hospital-detail-page'),
+                  'HospitalDetailPage',
+                ),
+              },
+              {
+                path: 'invitations',
+                lazy: page(
+                  () => import('../features/platform/platform-invitations-page'),
+                  'PlatformInvitationsPage',
+                ),
+              },
+            ],
+          },
+          {
+            path: 'account',
+            lazy: page(
+              () => import('../features/platform/platform-account-page'),
+              'PlatformAccountPage',
+            ),
+          },
+        ],
+      },
+    ],
+  },
   {
     element: <RequireAuth />,
     children: [
@@ -94,6 +143,15 @@ export const router = createBrowserRouter([
               {
                 path: 'admin/users',
                 lazy: page(() => import('../features/admin/users-page'), 'UsersPage'),
+              },
+            ],
+          },
+          {
+            element: <RequirePermission permission="users.read" />,
+            children: [
+              {
+                path: 'admin/invitations',
+                lazy: page(() => import('../features/admin/invitations-page'), 'InvitationsPage'),
               },
             ],
           },

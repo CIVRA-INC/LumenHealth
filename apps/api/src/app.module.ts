@@ -9,6 +9,12 @@ import { loadConfig } from './config/env';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { DashboardController } from './modules/dashboard/dashboard.controller';
+import { EmailModule } from './modules/email/email.module';
+import { AdminInvitationsController } from './modules/invitations/admin-invitations.controller';
+import { InvitationsController } from './modules/invitations/invitations.controller';
+import { InvitationsService } from './modules/invitations/invitations.service';
+import { PlatformController } from './modules/platform/platform.controller';
+import { PlatformService } from './modules/platform/platform.service';
 import { EncountersController } from './modules/encounters/encounters.controller';
 import { EncountersService } from './modules/encounters/encounters.service';
 import { HealthController } from './modules/health/health.controller';
@@ -31,6 +37,7 @@ const config = loadConfig();
     ConfigModule,
     DatabaseModule,
     AuditModule,
+    EmailModule,
     LoggerModule.forRoot({
       pinoHttp: {
         level: config.LOG_LEVEL,
@@ -71,6 +78,9 @@ const config = loadConfig();
     HealthController,
     AuthController,
     UsersAdminController,
+    AdminInvitationsController,
+    InvitationsController,
+    PlatformController,
     OrganizationsController,
     PatientsController,
     SchedulingController,
@@ -81,6 +91,8 @@ const config = loadConfig();
     PasswordService,
     SessionService,
     AuthService,
+    InvitationsService,
+    PlatformService,
     PatientsService,
     SchedulingService,
     EncountersService,

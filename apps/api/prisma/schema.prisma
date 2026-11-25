@@ -30,6 +30,28 @@ enum Role {
   FRONT_DESK
 }
 
+/// Platform-level privilege. Separate from Role (organisation-level); never derived from it.
+enum PlatformRole {
+  PLATFORM_ADMIN
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+enum InvitationDelivery {
+  PENDING
+  SENT
+  FAILED
+}
+
 enum UserStatus {
   ACTIVE
   DISABLED
@@ -129,14 +151,18 @@ enum AuditOutcome {
 // ── Organisations and access ──────────────────────────────────────────────────
 
 model Organization {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  name      String
-  slug      String   @unique
+  id          String             @id @default(uuid(7)) @db.Uuid
+  name        String
+  slug        String             @unique
   /// IANA time zone used to decide what "today" means for this organisation.
-  timezone  String   @default("Africa/Lagos")
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  timezone    String             @default("Africa/Lagos")
+  /// A suspended organisation's staff cannot sign in and their sessions are revoked. Data is retained.
+  status      OrganizationStatus @default(ACTIVE)
+  suspendedAt DateTime?          @db.Timestamptz(3)
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
 
+  invitations  Invitation[]
   branches     Branch[]
   departments  Department[]
   memberships  Membership[]
@@ -165,6 +191,7 @@ model Branch {
   appointments     Appointment[]
   encounters       Encounter[]
   patients         Patient[]
+  invitationAccess InvitationBranch[]
 
   @@unique([organizationId, code])
   @@unique([id, organizationId])
@@ -189,22 +216,26 @@ model Department {
 
 /// A person who can sign in. Global: one user may belong to several organisations.
 model User {
-  id                  String     @id @default(uuid(7)) @db.Uuid
+  id                  String        @id @default(uuid(7)) @db.Uuid
   /// Always stored lower-case.
-  email               String     @unique
+  email               String        @unique
   passwordHash        String
   fullName            String
-  status              UserStatus @default(ACTIVE)
-  mustChangePassword  Boolean    @default(false)
-  failedLoginAttempts Int        @default(0)
-  lockedUntil         DateTime?  @db.Timestamptz(3)
-  lastLoginAt         DateTime?  @db.Timestamptz(3)
-  passwordChangedAt   DateTime?  @db.Timestamptz(3)
-  createdAt           DateTime   @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime   @updatedAt @db.Timestamptz(3)
+  status              UserStatus    @default(ACTIVE)
+  /// Set only for platform operators. They hold no organisation membership by default.
+  platformRole        PlatformRole?
+  mustChangePassword  Boolean       @default(false)
+  failedLoginAttempts Int           @default(0)
+  lockedUntil         DateTime?     @db.Timestamptz(3)
+  lastLoginAt         DateTime?     @db.Timestamptz(3)
+  passwordChangedAt   DateTime?     @db.Timestamptz(3)
+  createdAt           DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @db.Timestamptz(3)
 
-  memberships Membership[]
-  sessions    Session[]
+  memberships         Membership[]
+  sessions            Session[]
+  invitationsSent     Invitation[] @relation("InvitationInviter")
+  invitationsAccepted Invitation[] @relation("InvitationAcceptor")
 
   @@map("users")
 }
@@ -244,25 +275,73 @@ model MembershipBranch {
 
 /// Server-side session. The browser only ever holds an opaque random token; we store its hash.
 model Session {
-  id           String     @id @default(uuid(7)) @db.Uuid
-  tokenHash    String     @unique
-  userId       String     @db.Uuid
-  membershipId String     @db.Uuid
-  branchId     String     @db.Uuid
-  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
-  lastSeenAt   DateTime   @default(now()) @db.Timestamptz(3)
+  id           String      @id @default(uuid(7)) @db.Uuid
+  tokenHash    String      @unique
+  userId       String      @db.Uuid
+  /// Null (together with branchId) for a platform-operator session: it has no organisation scope.
+  membershipId String?     @db.Uuid
+  branchId     String?     @db.Uuid
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+  lastSeenAt   DateTime    @default(now()) @db.Timestamptz(3)
   /// Absolute expiry. The idle timeout is enforced separately from lastSeenAt.
-  expiresAt    DateTime   @db.Timestamptz(3)
-  revokedAt    DateTime?  @db.Timestamptz(3)
+  expiresAt    DateTime    @db.Timestamptz(3)
+  revokedAt    DateTime?   @db.Timestamptz(3)
   ipAddress    String?
   userAgent    String?
-  user         User       @relation(fields: [userId], references: [id])
-  membership   Membership @relation(fields: [membershipId], references: [id])
-  branch       Branch     @relation(fields: [branchId], references: [id])
+  user         User        @relation(fields: [userId], references: [id])
+  membership   Membership? @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  branch       Branch?     @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+/// An offer to join one organisation in one role. Only the SHA-256 of the emailed token is stored.
+/// Not row-level-secured (acceptance happens before any session exists); every query filters on
+/// organizationId and the token hash is the only public handle. See docs/adr/0011.
+model Invitation {
+  id               String             @id @default(uuid(7)) @db.Uuid
+  organizationId   String             @db.Uuid
+  /// Always stored lower-case.
+  email            String
+  fullName         String
+  role             Role
+  status           InvitationStatus   @default(PENDING)
+  tokenHash        String             @unique
+  expiresAt        DateTime           @db.Timestamptz(3)
+  invitedByUserId  String             @db.Uuid
+  deliveryStatus   InvitationDelivery @default(PENDING)
+  /// A short, non-sensitive reason (never a provider response body).
+  deliveryError    String?
+  lastSentAt       DateTime?          @db.Timestamptz(3)
+  sendCount        Int                @default(0)
+  acceptedAt       DateTime?          @db.Timestamptz(3)
+  acceptedByUserId String?            @db.Uuid
+  revokedAt        DateTime?          @db.Timestamptz(3)
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @db.Timestamptz(3)
+  organization     Organization       @relation(fields: [organizationId], references: [id])
+  invitedBy        User               @relation("InvitationInviter", fields: [invitedByUserId], references: [id])
+  acceptedBy       User?              @relation("InvitationAcceptor", fields: [acceptedByUserId], references: [id])
+
+  branches InvitationBranch[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, status, createdAt])
+  @@index([email])
+  @@map("invitations")
+}
+
+model InvitationBranch {
+  invitationId   String     @db.Uuid
+  branchId       String     @db.Uuid
+  organizationId String     @db.Uuid
+  invitation     Invitation @relation(fields: [invitationId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  branch         Branch     @relation(fields: [branchId, organizationId], references: [id, organizationId])
+
+  @@id([invitationId, branchId])
+  @@map("invitation_branches")
 }
 
 // ── Patient registry ──────────────────────────────────────────────────────────

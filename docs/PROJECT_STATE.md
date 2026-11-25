@@ -4,7 +4,7 @@
 > and the working tree. Update it at the end of every session with what actually exists and what
 > was actually verified.
 
-**Last updated:** 2026-10-27 (session 7: audit of session 6, host guard on disposable databases) · **Branch:** `greenfield/foundation` (cut from `develop` @ `8130fb9`)
+**Last updated:** 2026-11-25 (session 8: multi-hospital onboarding) · **Branch:** `feat/multi-hospital-onboarding` (from `revamp/foundation`, uncommitted)
 
 ## Summary
 
@@ -12,6 +12,20 @@ Stage 0 (foundation), Stage 1 (shell, identity, tenancy, dashboard) and Stage 2 
 are implemented end to end and verified. Stage 3 (payments) has its boundary designed and documented
 but **no payment code exists yet**; Stellar support is **not** live. Stage 4 (pilot readiness) is
 partly started (backup drill, accessibility checks) and has a checklist in the roadmap.
+
+## Session 8: Multi-hospital onboarding (implemented and tested locally; NOT deployed)
+
+Design: [ADR 0011](adr/0011-platform-administration-and-invitations.md). Operations: [development/onboarding.md](development/onboarding.md).
+
+**Before:** roles were organisation-only; sessions required a membership and branch; users were created with a shared temporary password; no email infrastructure, no invitation model, no organisation lifecycle.
+
+**Added:** migration `20261125100000_multi_hospital_onboarding` (additive); `users.platformRole`, `organizations.status`, nullable platform sessions, `invitations`/`invitation_branches`; `PlatformContext` + `@RequirePlatformPermissions`; `/platform/*` (hospitals, status, invitations), `/admin/invitations`, public `/invitations/{inspect,accept}`; `EmailService` (smtp/log/memory/disabled); bootstrap command `dist/scripts/bootstrap-platform-admin.js`; web: `/platform` area, `/accept-invitation`, `/admin/invitations`, staff invite dialog (replaces the temporary-password dialog).
+
+**Verified (actually run):** API 133 tests (new: 31 onboarding, 5 bootstrap under the restricted `lumen_app` role, 2 rate-limit, 2 env), covering bootstrap refusal/idempotence/concurrency, platform vs organisation authorization, hospital creation (atomic), admin and staff invitation + acceptance, expired/revoked/reused/concurrent acceptance, existing user joining a second organisation, cross-organisation denial, branch and role limits, suspension ending sessions, token never stored or audited, truthful delivery failure, RLS on audit rows. Web: 8 new tests for the acceptance page. A real-browser walk-through (platform sign-in with forced password change → register hospital → emailed link → accept → hospital admin sees only their hospital) was done against the local development database, which now has the migration applied, one platform admin (`platform@lumen.test`) and a "Riverside Specialist Hospital" test tenant (local only, synthetic).
+
+**Not verified:** a real SMTP provider; production; Playwright coverage of the new screens (existing 26 e2e unchanged); accessibility scan of the new pages; the BMAX Docker procedure (written, not run).
+
+**Exact next action:** owner reviews the policy decisions listed in ADR 0011, chooses an SMTP provider, then follows the "Safe deployment order" in `development/onboarding.md`.
 
 ## Session 7: Independent audit of session 6 (verified from code and runs, nothing committed)
 

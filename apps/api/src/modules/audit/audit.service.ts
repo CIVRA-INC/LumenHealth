@@ -15,7 +15,7 @@ export interface AuditEntry {
   resourceId?: string;
   patientId?: string;
   outcome?: 'SUCCESS' | 'DENIED' | 'FAILURE';
-  /** Identifiers and counts only. Never clinical content, credentials or free-text patient data. */
+  /** Identifiers and counts only. Never clinical content, credentials, tokens or free-text patient data. */
   metadata?: Record<string, string | number | boolean | string[] | null>;
 }
 
@@ -80,4 +80,44 @@ export class AuditService {
       ],
     });
   }
+
+  /**
+   * Platform-level and cross-organisation events. When the event concerns one organisation the row is
+   * attributed to it (so that organisation's audit log shows it); otherwise it is unscoped.
+   * Inside a transaction pass `tx` whose organisation context is already set to `organizationId`.
+   */
+  async recordPlatform(
+    actor: PlatformActor,
+    entry: AuditEntry,
+    organizationId: string | null,
+    tx?: Tx,
+  ): Promise<void> {
+    const data: Prisma.AuditEventCreateManyInput = {
+      organizationId,
+      actorUserId: actor.userId,
+      action: entry.action,
+      resourceType: entry.resourceType,
+      resourceId: entry.resourceId,
+      outcome: entry.outcome ?? 'SUCCESS',
+      metadata: entry.metadata,
+      ipAddress: actor.ip,
+      userAgent: actor.userAgent?.slice(0, 300),
+      requestId: actor.requestId,
+    };
+    if (tx) {
+      await tx.auditEvent.createMany({ data: [data] });
+    } else if (organizationId) {
+      await this.prisma.tenant(organizationId, (t) => t.auditEvent.createMany({ data: [data] }));
+    } else {
+      await this.prisma.auditEvent.createMany({ data: [data] });
+    }
+  }
+}
+
+/** Who performed a platform-level action. */
+export interface PlatformActor {
+  userId?: string;
+  ip?: string;
+  userAgent?: string;
+  requestId?: string;
 }

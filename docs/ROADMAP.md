@@ -53,6 +53,13 @@ Guarded `db:reset`, repeatable disposable databases for e2e, visual review and A
 demo logins, setup and testing documentation. Remaining before Milestone 3: the owner resets the development database,
 commits the foundation branch in coherent commits and opens the PR so CI runs for the first time.
 
+## Milestone 2f: Multi-hospital onboarding ✅ (session 8; not yet deployed)
+
+Platform administrator, bootstrap command, hospital registration, invitation-based staff onboarding, organisation
+suspension. Acceptance met in tests (see PROJECT_STATE); **pending before production:** owner review of the policy
+decisions in ADR 0011, SMTP provider choice, applying the migration with a verified backup, and a staging run with
+a real mail provider.
+
 ## Milestone 3: Payment foundations ⬜ (next)
 
 Acceptance criteria:

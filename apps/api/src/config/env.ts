@@ -29,6 +29,24 @@ export const envSchema = z
     /** Disable rate limiting only in automated tests. */
     RATE_LIMIT_ENABLED: booleanString.default(true),
     SWAGGER_ENABLED: booleanString.default(true),
+    /**
+     * Public origin of the web app; invitation links are built from it (never from request headers).
+     * Optional so an existing deployment still boots: without it, invitations are created but reported undelivered.
+     */
+    APP_BASE_URL: z.url().optional(),
+    INVITATION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(168),
+    /**
+     * How invitation email is delivered. `smtp` for production; `log` prints the link to the server log and
+     * is refused in production; `memory` keeps messages in-process for automated tests; `disabled` sends
+     * nothing and every invitation is reported as undelivered.
+     */
+    EMAIL_DRIVER: z.enum(['smtp', 'log', 'memory', 'disabled']).default('disabled'),
+    EMAIL_FROM: z.string().min(3).default('LumenHealth <no-reply@localhost>'),
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_SECURE: booleanString.default(false),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !env.SESSION_COOKIE_SECURE) {
@@ -36,6 +54,34 @@ export const envSchema = z
         code: 'custom',
         path: ['SESSION_COOKIE_SECURE'],
         message: 'Must be true in production (cookies are only sent over HTTPS)',
+      });
+    }
+    if (env.EMAIL_DRIVER === 'smtp' && !env.SMTP_HOST) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SMTP_HOST'],
+        message: 'Required when EMAIL_DRIVER=smtp',
+      });
+    }
+    if (
+      env.NODE_ENV === 'production' &&
+      (env.EMAIL_DRIVER === 'log' || env.EMAIL_DRIVER === 'memory')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['EMAIL_DRIVER'],
+        message: 'log and memory drivers expose invitation links and are not allowed in production',
+      });
+    }
+    if (
+      env.NODE_ENV === 'production' &&
+      env.APP_BASE_URL &&
+      new URL(env.APP_BASE_URL).protocol !== 'https:'
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['APP_BASE_URL'],
+        message: 'Must be an https URL in production',
       });
     }
   });

@@ -2,7 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   ERROR_CODES,
   permissionsForRole,
+  permissionsForPlatformRole,
+  type AnySessionView,
   type ChangePasswordInput,
+  type PlatformSessionView,
   type LoginInput,
   type SessionView,
   type SwitchContextInput,
@@ -14,10 +17,10 @@ import {
   UnauthenticatedError,
   ValidationError,
 } from '../../common/errors';
-import type { RequestContext } from '../../common/request-context';
+import type { PlatformContext, RequestContext } from '../../common/request-context';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../database/prisma.service';
-import { AuditService } from '../audit/audit.service';
+import { AuditService, type AuditEntry } from '../audit/audit.service';
 import { PasswordService } from './password.service';
 import { SessionService } from './session.service';
 
@@ -44,7 +47,7 @@ export class AuthService {
   async login(
     input: LoginInput,
     client: ClientInfo,
-  ): Promise<{ token: string; expiresAt: Date; view: SessionView }> {
+  ): Promise<{ token: string; expiresAt: Date; view: AnySessionView }> {
     const email = input.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
 
@@ -101,8 +104,28 @@ export class AuthService {
       throw new UnauthenticatedError(GENERIC_FAILURE);
     }
 
+    // Platform operators have platform-level access instead of an organisation scope. Platform access
+    // is read only from users.platformRole, never inferred from an organisation role.
+    if (user.platformRole) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
+      });
+      const session = await this.sessions.createPlatform({
+        userId: user.id,
+        ip: client.ip,
+        userAgent: client.userAgent,
+      });
+      await this.audit.recordPlatform(
+        { userId: user.id, ...client },
+        { action: 'auth.login', resourceType: 'session', metadata: { scope: 'platform' } },
+        null,
+      );
+      return { ...session, view: this.platformView(user, user.platformRole) };
+    }
+
     const membership = await this.prisma.membership.findFirst({
-      where: { userId: user.id, status: 'ACTIVE' },
+      where: { userId: user.id, status: 'ACTIVE', organization: { status: 'ACTIVE' } },
       orderBy: { createdAt: 'asc' },
       include: { branches: { include: { branch: true } } },
     });
@@ -139,13 +162,41 @@ export class AuthService {
     return { ...session, view: await this.view(ctx) };
   }
 
-  async logout(ctx: RequestContext): Promise<void> {
+  async logout(ctx: RequestContext | PlatformContext): Promise<void> {
     await this.sessions.revoke(ctx.sessionId);
-    await this.audit.recordStandalone(ctx, {
+    await this.auditFor(ctx, {
       action: 'auth.logout',
       resourceType: 'session',
       resourceId: ctx.sessionId,
     });
+  }
+
+  private auditFor(ctx: RequestContext | PlatformContext, entry: AuditEntry): Promise<void> {
+    return 'organizationId' in ctx
+      ? this.audit.recordStandalone(ctx, entry)
+      : this.audit.recordPlatform(ctx, entry, null);
+  }
+
+  private platformView(
+    user: { id: string; email: string; fullName: string; mustChangePassword: boolean },
+    role: PlatformSessionView['platformRole'],
+  ): PlatformSessionView {
+    return {
+      scope: 'PLATFORM',
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        mustChangePassword: user.mustChangePassword,
+      },
+      platformRole: role,
+      permissions: [...permissionsForPlatformRole(role)],
+    };
+  }
+
+  async viewPlatform(ctx: PlatformContext): Promise<PlatformSessionView> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ctx.userId } });
+    return this.platformView(user, ctx.platformRole);
   }
 
   async view(ctx: RequestContext): Promise<SessionView> {
@@ -168,6 +219,7 @@ export class AuthService {
     const active = branches.find((b) => b.id === ctx.branchId);
     if (!active) throw new NotFoundError('Branch');
     return {
+      scope: 'ORGANIZATION',
       user: {
         id: user.id,
         email: user.email,
@@ -198,7 +250,12 @@ export class AuthService {
 
     if (input.organizationId && input.organizationId !== ctx.organizationId) {
       const target = await this.prisma.membership.findFirst({
-        where: { userId: ctx.userId, organizationId: input.organizationId, status: 'ACTIVE' },
+        where: {
+          userId: ctx.userId,
+          organizationId: input.organizationId,
+          status: 'ACTIVE',
+          organization: { status: 'ACTIVE' },
+        },
         include: { branches: { include: { branch: true } } },
       });
       if (!target) throw new ForbiddenError('You do not belong to that organisation');
@@ -238,10 +295,13 @@ export class AuthService {
     return this.view(next);
   }
 
-  async changePassword(ctx: RequestContext, input: ChangePasswordInput): Promise<void> {
+  async changePassword(
+    ctx: RequestContext | PlatformContext,
+    input: ChangePasswordInput,
+  ): Promise<void> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ctx.userId } });
     if (!(await this.passwords.verify(user.passwordHash, input.currentPassword))) {
-      await this.audit.recordStandalone(ctx, {
+      await this.auditFor(ctx, {
         action: 'auth.change_password',
         resourceType: 'user',
         resourceId: ctx.userId,
@@ -268,7 +328,7 @@ export class AuthService {
     });
     // Every other device is signed out after a password change.
     await this.sessions.revokeAllForUser(ctx.userId, ctx.sessionId);
-    await this.audit.recordStandalone(ctx, {
+    await this.auditFor(ctx, {
       action: 'auth.change_password',
       resourceType: 'user',
       resourceId: ctx.userId,

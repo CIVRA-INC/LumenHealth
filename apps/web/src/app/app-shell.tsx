@@ -49,6 +49,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: 'Administration',
     items: [
       { to: '/admin/users', label: 'Staff', permission: 'users.read' },
+      { to: '/admin/invitations', label: 'Invitations', permission: 'users.read' },
       { to: '/admin/audit', label: 'Audit log', permission: 'audit.read' },
     ],
   },

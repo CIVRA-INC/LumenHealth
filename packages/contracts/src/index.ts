@@ -7,3 +7,4 @@ export * from './scheduling';
 export * from './encounters';
 export * from './dashboard';
 export * from './time';
+export * from './onboarding';
