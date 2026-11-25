@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Permission, Role } from './permissions';
+import type { Permission, PlatformPermission, PlatformRole, Role } from './permissions';
 
 export const MIN_PASSWORD_LENGTH = 12;
 
@@ -40,6 +40,7 @@ export interface MembershipSummary {
 
 /** The authenticated principal plus its active organisation and branch. */
 export interface SessionView {
+  scope: 'ORGANIZATION';
   user: { id: string; email: string; fullName: string; mustChangePassword: boolean };
   organization: { id: string; name: string; timezone: string };
   role: Role;
@@ -50,3 +51,16 @@ export interface SessionView {
   /** Other organisations the user belongs to. */
   memberships: MembershipSummary[];
 }
+
+/**
+ * A platform operator's session. It has no organisation, branch or membership: platform access is a
+ * property of the user, not of any hospital.
+ */
+export interface PlatformSessionView {
+  scope: 'PLATFORM';
+  user: { id: string; email: string; fullName: string; mustChangePassword: boolean };
+  platformRole: PlatformRole;
+  permissions: PlatformPermission[];
+}
+
+export type AnySessionView = SessionView | PlatformSessionView;

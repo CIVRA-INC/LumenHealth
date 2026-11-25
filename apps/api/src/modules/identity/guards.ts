@@ -6,13 +6,15 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Permission } from '@lumen/contracts';
+import type { Permission, PlatformPermission } from '@lumen/contracts';
 import { ERROR_CODES } from '@lumen/contracts';
 import {
   ALLOW_PASSWORD_CHANGE,
+  ANY_PRINCIPAL,
   IS_AUTHENTICATED,
   IS_PUBLIC,
   REQUIRED_PERMISSIONS,
+  REQUIRED_PLATFORM_PERMISSIONS,
 } from '../../common/decorators';
 import { DomainError, ForbiddenError, UnauthenticatedError } from '../../common/errors';
 import type { AuthedRequest } from '../../common/request-context';
@@ -60,13 +62,16 @@ export class AuthGuard implements CanActivate {
     ];
     if (!token) throw new UnauthenticatedError();
 
-    const ctx = await this.sessions.resolve(token);
-    if (!ctx) throw new UnauthenticatedError('Your session has expired. Please sign in again.');
+    const principal = await this.sessions.resolvePrincipal(token);
+    if (!principal)
+      throw new UnauthenticatedError('Your session has expired. Please sign in again.');
 
+    const ctx = principal.kind === 'organization' ? principal.ctx : principal.platform;
     ctx.ip = req.ip;
     ctx.userAgent = req.headers['user-agent'];
     ctx.requestId = String(req.id ?? '');
-    req.ctx = ctx;
+    if (principal.kind === 'organization') req.ctx = principal.ctx;
+    else req.platform = principal.platform;
 
     if (
       ctx.mustChangePassword &&
@@ -103,10 +108,29 @@ export class PermissionsGuard implements CanActivate {
       REQUIRED_PERMISSIONS,
       targets,
     );
+    const requiredPlatform = this.reflector.getAllAndOverride<PlatformPermission[] | undefined>(
+      REQUIRED_PLATFORM_PERMISSIONS,
+      targets,
+    );
     const authenticatedOnly = this.reflector.getAllAndOverride<boolean>(IS_AUTHENTICATED, targets);
+    const anyPrincipal = this.reflector.getAllAndOverride<boolean>(ANY_PRINCIPAL, targets);
     const req = context.switchToHttp().getRequest<AuthedRequest>();
+
+    // Platform routes: an explicit platform permission is required. An organisation session never
+    // qualifies, however privileged its role, and platform sessions never reach organisation routes.
+    if (requiredPlatform?.length) {
+      const platform = req.platform;
+      if (!platform) {
+        if (req.ctx) await this.denyPlatformAttempt(req, requiredPlatform);
+        throw req.ctx ? new ForbiddenError() : new UnauthenticatedError();
+      }
+      if (requiredPlatform.every((p) => platform.permissions.includes(p))) return true;
+      throw new ForbiddenError();
+    }
+    if (anyPrincipal && (req.ctx || req.platform)) return true;
+
     const ctx = req.ctx;
-    if (!ctx) throw new UnauthenticatedError();
+    if (!ctx) throw req.platform ? new ForbiddenError() : new UnauthenticatedError();
 
     if (!required?.length) {
       if (authenticatedOnly) return true;
@@ -128,5 +152,16 @@ export class PermissionsGuard implements CanActivate {
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to record denied access'));
     throw new ForbiddenError();
+  }
+
+  private async denyPlatformAttempt(req: AuthedRequest, required: PlatformPermission[]) {
+    await this.audit
+      .recordStandalone(req.ctx!, {
+        action: 'access.denied',
+        resourceType: 'route',
+        outcome: 'DENIED',
+        metadata: { method: req.method, path: req.route?.path ?? req.path, missing: required },
+      })
+      .catch((err: unknown) => this.logger.warn({ err }, 'Failed to record denied access'));
   }
 }

@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import type { Permission, Role } from '@lumen/contracts';
+import type { Permission, PlatformPermission, PlatformRole, Role } from '@lumen/contracts';
 
 /** The authenticated principal and its active tenant scope, derived server-side from the session. */
 export interface RequestContext {
@@ -22,4 +22,20 @@ export interface RequestContext {
 
 export interface AuthedRequest extends Request {
   ctx?: RequestContext;
+  platform?: PlatformContext;
+}
+
+/**
+ * A platform operator's principal. It deliberately shares nothing with {@link RequestContext}: there is
+ * no organisation, membership or branch, so platform code cannot reach tenant data by accident.
+ */
+export interface PlatformContext {
+  userId: string;
+  sessionId: string;
+  platformRole: PlatformRole;
+  permissions: readonly PlatformPermission[];
+  mustChangePassword: boolean;
+  ip?: string;
+  userAgent?: string;
+  requestId?: string;
 }

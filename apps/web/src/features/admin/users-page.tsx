@@ -1,10 +1,8 @@
 import {
-  createUserSchema,
   ROLES,
   ROLE_LABELS,
   STAFF_SORTS,
   type BranchSummary,
-  type CreateUserInput,
   type OrgUserView,
   type Page as PageOf,
   type Role,
@@ -19,51 +17,23 @@ import {
   FilterBar,
   FilterSelect,
   FormField,
-  IconButton,
   SearchField,
   Select,
   StatusIndicator,
   TableToolbar,
-  TextField,
   toast,
   type Column,
 } from '@lumen/ui';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
 import { Page, PageHeader } from '../../components/page';
-import { ApiError, api } from '../../lib/api';
+import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/errors';
 import { formatDateTime } from '../../lib/format';
 import { useCan, useRequiredSession } from '../../lib/session';
+import { InviteStaffDialog } from './invite-staff-dialog';
 import { useTableState } from '../../lib/table-state';
 import { useSearchInput } from '../../lib/use-search-input';
-
-function generatePassphrase(): string {
-  const words = [
-    'amber',
-    'harbor',
-    'violet',
-    'meadow',
-    'copper',
-    'lantern',
-    'river',
-    'maple',
-    'falcon',
-    'quartz',
-    'willow',
-    'ember',
-    'cedar',
-    'silver',
-    'orchid',
-    'granite',
-  ];
-  const pick = () => words[crypto.getRandomValues(new Uint32Array(1))[0]! % words.length]!;
-  const number = String((crypto.getRandomValues(new Uint32Array(1))[0]! % 90) + 10);
-  return `${pick()}-${pick()}-${pick()}-${number}`;
-}
 
 function BranchPicker({
   branches,
@@ -100,121 +70,6 @@ function useBranches() {
     queryFn: () => api.get<BranchSummary[]>('/branches'),
     staleTime: 60_000,
   });
-}
-
-function AddUserDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const client = useQueryClient();
-  const branches = useBranches();
-  const form = useForm<CreateUserInput>({
-    resolver: zodResolver(createUserSchema),
-    defaultValues: {
-      email: '',
-      fullName: '',
-      role: 'FRONT_DESK',
-      branchIds: [],
-      temporaryPassword: generatePassphrase() + '-Aa',
-    },
-  });
-  const { errors } = form.formState;
-  const create = useMutation({
-    mutationFn: (v: CreateUserInput) => api.post<OrgUserView>('/admin/users', v),
-    onSuccess: async (user) => {
-      await client.invalidateQueries({ queryKey: ['admin', 'users'] });
-      toast.success(`${user.fullName} added`, {
-        description: 'Share the temporary password securely. They must change it at first sign-in.',
-      });
-      form.reset({
-        email: '',
-        fullName: '',
-        role: 'FRONT_DESK',
-        branchIds: [],
-        temporaryPassword: generatePassphrase() + '-Aa',
-      });
-      onOpenChange(false);
-    },
-    onError: (error) => {
-      if (error instanceof ApiError)
-        for (const [path, message] of Object.entries(error.fieldErrors))
-          form.setError(path as keyof CreateUserInput, { message });
-    },
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        title="Add staff member"
-        description="They’ll sign in with the temporary password and choose their own."
-        footer={
-          <>
-            <Button onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button
-              variant="primary"
-              loading={create.isPending}
-              onClick={form.handleSubmit((v) => create.mutate(v))}
-            >
-              Add staff member
-            </Button>
-          </>
-        }
-      >
-        <form noValidate className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-          {create.isError && !(create.error instanceof ApiError && create.error.status === 400) && (
-            <Alert tone="danger">{errorMessage(create.error)}</Alert>
-          )}
-          <FormField label="Full name" required error={errors.fullName?.message}>
-            <TextField autoComplete="off" {...form.register('fullName')} />
-          </FormField>
-          <FormField label="Work email" required error={errors.email?.message}>
-            <TextField type="email" autoComplete="off" {...form.register('email')} />
-          </FormField>
-          <FormField label="Role" required error={errors.role?.message}>
-            <Select {...form.register('role')}>
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABELS[r]}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Branches" required error={errors.branchIds?.message}>
-            <Controller
-              control={form.control}
-              name="branchIds"
-              render={({ field }) => (
-                <BranchPicker
-                  branches={branches.data ?? []}
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              )}
-            />
-          </FormField>
-          <FormField label="Temporary password" required error={errors.temporaryPassword?.message}>
-            <div className="flex gap-2">
-              <TextField
-                autoComplete="off"
-                spellCheck={false}
-                {...form.register('temporaryPassword')}
-              />
-              <IconButton
-                variant="secondary"
-                label="Generate a new password"
-                onClick={() => form.setValue('temporaryPassword', generatePassphrase() + '-Aa')}
-              >
-                <RefreshCw />
-              </IconButton>
-            </div>
-          </FormField>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 function EditUserDialog({ user, onClose }: { user: OrgUserView | null; onClose: () => void }) {
@@ -311,7 +166,7 @@ const TABLE = {
 export function UsersPage() {
   const tz = useRequiredSession().organization.timezone;
   const canManage = useCan('users.manage');
-  const [addOpen, setAddOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState<OrgUserView | null>(null);
   const { state, update, activeFilterCount } = useTableState<StaffSort>(TABLE);
   const [text, setText] = useSearchInput(state.q, (q) =>
@@ -405,8 +260,8 @@ export function UsersPage() {
         }
         actions={
           canManage && (
-            <Button variant="primary" onClick={() => setAddOpen(true)}>
-              Add staff member
+            <Button variant="primary" onClick={() => setInviteOpen(true)}>
+              Invite staff member
             </Button>
           )
         }
@@ -513,7 +368,7 @@ export function UsersPage() {
             : undefined
         }
       />
-      {canManage && <AddUserDialog open={addOpen} onOpenChange={setAddOpen} />}
+      {canManage && <InviteStaffDialog open={inviteOpen} onOpenChange={setInviteOpen} />}
       <EditUserDialog user={editing} onClose={() => setEditing(null)} />
     </Page>
   );

@@ -3,12 +3,19 @@ import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import {
+  type AnySessionView,
   changePasswordSchema,
   loginSchema,
   switchContextSchema,
   type SessionView,
 } from '@lumen/contracts';
-import { AllowPendingPasswordChange, Authenticated, Ctx, Public } from '../../common/decorators';
+import {
+  AllowPendingPasswordChange,
+  AnyPrincipal,
+  Authenticated,
+  Ctx,
+  Public,
+} from '../../common/decorators';
 import type { AuthedRequest, RequestContext } from '../../common/request-context';
 import { parse, ZodApiBody } from '../../common/zod';
 import { Inject } from '@nestjs/common';
@@ -42,7 +49,7 @@ export class AuthController {
     @Body() body: unknown,
     @Req() req: AuthedRequest,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<SessionView> {
+  ): Promise<AnySessionView> {
     const input = parse(loginSchema, body);
     const { token, expiresAt, view } = await this.auth.login(input, {
       ip: req.ip,
@@ -54,22 +61,22 @@ export class AuthController {
   }
 
   @Post('logout')
-  @Authenticated()
+  @AnyPrincipal()
   @AllowPendingPasswordChange()
   @HttpCode(204)
   async logout(
-    @Ctx() ctx: RequestContext,
+    @Req() req: AuthedRequest,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    await this.auth.logout(ctx);
+    await this.auth.logout((req.ctx ?? req.platform)!);
     res.clearCookie(this.config.SESSION_COOKIE_NAME, this.cookieOptions());
   }
 
   @Get('session')
-  @Authenticated()
+  @AnyPrincipal()
   @AllowPendingPasswordChange()
-  session(@Ctx() ctx: RequestContext): Promise<SessionView> {
-    return this.auth.view(ctx);
+  session(@Req() req: AuthedRequest): Promise<AnySessionView> {
+    return req.platform ? this.auth.viewPlatform(req.platform) : this.auth.view(req.ctx!);
   }
 
   @Post('switch-context')
@@ -81,12 +88,12 @@ export class AuthController {
   }
 
   @Post('change-password')
-  @Authenticated()
+  @AnyPrincipal()
   @AllowPendingPasswordChange()
   @HttpCode(204)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ZodApiBody(changePasswordSchema)
-  async changePassword(@Ctx() ctx: RequestContext, @Body() body: unknown): Promise<void> {
-    await this.auth.changePassword(ctx, parse(changePasswordSchema, body));
+  async changePassword(@Req() req: AuthedRequest, @Body() body: unknown): Promise<void> {
+    await this.auth.changePassword((req.ctx ?? req.platform)!, parse(changePasswordSchema, body));
   }
 }

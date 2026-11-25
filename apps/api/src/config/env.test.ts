@@ -29,3 +29,34 @@ describe('environment validation', () => {
     ).toEqual(['https://a.example', 'https://b.example']);
   });
 });
+
+describe('email and invitation configuration', () => {
+  const base = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://x:y@localhost/db',
+    SESSION_COOKIE_SECURE: 'true',
+    APP_BASE_URL: 'https://app.example.com',
+  };
+
+  it('refuses drivers that expose invitation links in production', () => {
+    expect(() => loadConfig({ ...base, EMAIL_DRIVER: 'log' })).toThrow(/not allowed in production/);
+    expect(() => loadConfig({ ...base, EMAIL_DRIVER: 'memory' })).toThrow(
+      /not allowed in production/,
+    );
+  });
+
+  it('requires an SMTP host for the smtp driver and an https base URL in production', () => {
+    expect(() => loadConfig({ ...base, EMAIL_DRIVER: 'smtp' })).toThrow(/SMTP_HOST/);
+    expect(() =>
+      loadConfig({
+        ...base,
+        EMAIL_DRIVER: 'smtp',
+        SMTP_HOST: 'mail',
+        APP_BASE_URL: 'http://app.example.com',
+      }),
+    ).toThrow(/https/);
+    expect(loadConfig({ ...base, EMAIL_DRIVER: 'smtp', SMTP_HOST: 'mail' }).EMAIL_DRIVER).toBe(
+      'smtp',
+    );
+  });
+});
