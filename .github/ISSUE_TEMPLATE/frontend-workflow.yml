@@ -1,0 +1,35 @@
+name: Frontend Workflow Work
+description: Capture web or mobile-facing workflow work with UX, contract, and permission details.
+title: "[frontend] "
+labels:
+  - frontend
+  - enhancement
+body:
+  - type: textarea
+    id: user-flow
+    attributes:
+      label: User Flow
+      description: Describe the route, state transitions, and target users.
+    validations:
+      required: true
+  - type: textarea
+    id: contract-dependency
+    attributes:
+      label: API and Contract Dependency
+      description: Which API endpoints or shared contracts does this depend on?
+    validations:
+      required: true
+  - type: textarea
+    id: permissions
+    attributes:
+      label: Permission and Safety Constraints
+      description: Note role gating, privacy, and audit visibility requirements.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation Strategy
+      description: What manual and automated validation should be performed?
+    validations:
+      required: true

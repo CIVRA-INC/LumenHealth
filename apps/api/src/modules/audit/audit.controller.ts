@@ -1,75 +1,85 @@
-import { Request, Response, Router } from "express";
-import { authorize, Roles } from "../../middlewares/rbac.middleware";
-import { validateRequest } from "../../middlewares/validate.middleware";
-import { buildAuditLogFilters } from "./audit.service";
-import {
-  GetAuditLogsQueryDto,
-  getAuditLogsQuerySchema,
-} from "./audit.validation";
-import { AuditLogModel } from "./models/audit-log.model";
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { z } from 'zod';
+import { paginationQuerySchema, sortDirectionSchema, toPage, type Page } from '@lumen/contracts';
+import { Ctx, RequirePermissions } from '../../common/decorators';
+import type { RequestContext } from '../../common/request-context';
+import { parse } from '../../common/zod';
+import { PrismaService } from '../../database/prisma.service';
 
-const router = Router();
+const querySchema = paginationQuerySchema.extend({
+  patientId: z.uuid().optional(),
+  /** Matches the start of the action code, e.g. `patient.` or `encounter.finalize`. */
+  action: z.string().max(80).optional(),
+  outcome: z.enum(['SUCCESS', 'DENIED', 'FAILURE']).optional(),
+  /** Time order. Newest first by default. */
+  order: sortDirectionSchema.default('desc'),
+});
 
-type GetAuditLogsRequest = Request<Record<string, string>, unknown, unknown, Record<string, unknown>>;
+export interface AuditEventView {
+  id: string;
+  occurredAt: string;
+  action: string;
+  outcome: string;
+  resourceType: string;
+  resourceId: string | null;
+  patientId: string | null;
+  actor: { userId: string; fullName: string } | null;
+  ipAddress: string | null;
+}
 
-router.get(
-  "/",
-  authorize([Roles.CLINIC_ADMIN, Roles.SUPER_ADMIN]),
-  validateRequest({ query: getAuditLogsQuerySchema }),
-  async (req: GetAuditLogsRequest, res: Response) => {
-    const clinicId = req.user?.clinicId;
+@ApiTags('Audit')
+@Controller({ path: 'audit-events', version: '1' })
+export class AuditController {
+  constructor(private readonly prisma: PrismaService) {}
 
-    if (!clinicId) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Authentication required",
+  @Get()
+  @RequirePermissions('audit.read')
+  async list(
+    @Ctx() ctx: RequestContext,
+    @Query() rawQuery: unknown,
+  ): Promise<Page<AuditEventView>> {
+    const q = parse(querySchema, rawQuery);
+    const where = {
+      organizationId: ctx.organizationId,
+      ...(q.patientId ? { patientId: q.patientId } : {}),
+      ...(q.action ? { action: { startsWith: q.action } } : {}),
+      ...(q.outcome ? { outcome: q.outcome } : {}),
+    };
+    const { rows, total } = await this.prisma.tenant(ctx.organizationId, async (tx) => {
+      const rows = await tx.auditEvent.findMany({
+        where,
+        orderBy: [{ occurredAt: q.order }, { id: q.order }],
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
       });
-    }
-
-    const query = req.query as GetAuditLogsQueryDto;
-    const page = Number(query.page);
-    const limit = Number(query.limit);
-    const skip = (page - 1) * limit;
-    const filters = buildAuditLogFilters(clinicId, query);
-
-    const [logs, total] = await Promise.all([
-      AuditLogModel.find(filters).sort({ timestamp: -1 }).skip(skip).limit(limit).lean(),
-      AuditLogModel.countDocuments(filters),
-    ]);
-
-    if (query.format === "csv") {
-      const header = "timestamp,userId,action,resource,resourceId,ipAddress\n";
-      const rows = logs
-        .map((log) =>
-          [
-            new Date(log.timestamp).toISOString(),
-            log.userId,
-            log.action,
-            log.resource,
-            log.resourceId ?? "",
-            log.ipAddress,
-          ]
-            .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-            .join(","),
-        )
-        .join("\n");
-
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", 'attachment; filename="audit-logs.csv"');
-      return res.status(200).send(header + rows);
-    }
-
-    return res.json({
-      status: "success",
-      data: logs,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
-      },
+      return { rows, total: await tx.auditEvent.count({ where }) };
     });
-  },
-);
-
-export const auditRoutes = router;
+    const actorIds = [
+      ...new Set(rows.map((r) => r.actorUserId).filter((id): id is string => !!id)),
+    ];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: actorIds } },
+      select: { id: true, fullName: true },
+    });
+    const names = new Map(users.map((u) => [u.id, u.fullName]));
+    return toPage(
+      rows.map((r) => ({
+        id: r.id,
+        occurredAt: r.occurredAt.toISOString(),
+        action: r.action,
+        outcome: r.outcome,
+        resourceType: r.resourceType,
+        resourceId: r.resourceId,
+        patientId: r.patientId,
+        actor: r.actorUserId
+          ? { userId: r.actorUserId, fullName: names.get(r.actorUserId) ?? 'Unknown' }
+          : null,
+        ipAddress: r.ipAddress,
+      })),
+      total,
+      q.page,
+      q.pageSize,
+    );
+  }
+}

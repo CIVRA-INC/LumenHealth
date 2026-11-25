@@ -1,0 +1,35 @@
+name: Security or Compliance Change
+description: Use for auth, permissions, encryption, audit, or compliance-sensitive work.
+title: "[security] "
+labels:
+  - security
+  - enhancement
+body:
+  - type: textarea
+    id: threat
+    attributes:
+      label: Threat or Risk
+      description: Describe the abuse case, vulnerability, or compliance risk.
+    validations:
+      required: true
+  - type: textarea
+    id: controls
+    attributes:
+      label: Proposed Controls
+      description: Describe the mitigation, policy gate, or enforcement rule.
+    validations:
+      required: true
+  - type: textarea
+    id: audit
+    attributes:
+      label: Audit and Evidence Requirements
+      description: Explain what should be logged, redacted, or reviewed.
+    validations:
+      required: true
+  - type: textarea
+    id: rollout
+    attributes:
+      label: Rollout and Regression Risk
+      description: Note compatibility risks and rollout expectations.
+    validations:
+      required: true

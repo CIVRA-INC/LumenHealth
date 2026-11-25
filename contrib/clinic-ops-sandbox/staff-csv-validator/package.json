@@ -1,9 +1,0 @@
-{
-  "name": "staff-csv-validator",
-  "version": "1.0.0",
-  "private": true,
-  "type": "commonjs",
-  "scripts": {
-    "validate": "node validate-csv.js"
-  }
-}

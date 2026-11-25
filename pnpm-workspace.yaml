@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependencies permitted to run install scripts (everything else is blocked).
+allowBuilds:
+  '@prisma/engines': true
+  '@scarf/scarf': false
+  '@swc/core': true
+  esbuild: true
+  prisma: true
+
+overrides:
+  body-parser: ^2.4.0
+  multer: ^2.5.0
+  effect: ^3.22.1
+  minimatch: ^11.0.1

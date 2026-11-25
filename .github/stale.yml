@@ -1,0 +1,22 @@
+# Probot Stale configuration
+# Automatically marks and closes stale issues and pull requests
+
+daysUntilStale: 30
+daysUntilClose: 7
+
+staleLabel: stale
+
+exemptLabels:
+  - blocked
+  - pinned
+
+staleComment: >
+  This issue has been automatically marked as stale because it has not had
+  any recent activity in the last 30 days. It will be closed in 7 days if
+  no further activity occurs. If this is still relevant, please leave a
+  comment or remove the stale label to keep it open. Thank you!
+
+closeComment: >
+  This issue has been automatically closed due to inactivity. If you believe
+  this is still relevant, please re-open it or create a new issue with updated
+  context. Thank you for your contribution!

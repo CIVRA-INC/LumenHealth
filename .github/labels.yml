@@ -1,0 +1,36 @@
+labels:
+  - name: feature
+    color: "0075ca"
+    description: New feature or request
+
+  - name: bug
+    color: "d73a4a"
+    description: Something isn't working
+
+  - name: debt
+    color: "e4e669"
+    description: Technical debt that needs to be addressed
+
+  - name: security
+    color: "b60205"
+    description: Security vulnerability or improvement
+
+  - name: release
+    color: "0e8a16"
+    description: Related to a release or deployment
+
+  - name: sprint-1
+    color: "c5def5"
+    description: Scoped to Sprint 1
+
+  - name: blocked
+    color: "e11d48"
+    description: Blocked by another issue or dependency
+
+  - name: needs-review
+    color: "fbca04"
+    description: Awaiting review from a team member
+
+  - name: good-first-issue
+    color: "7057ff"
+    description: Good for newcomers and first-time contributors

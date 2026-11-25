@@ -1,0 +1,31 @@
+name: Security scan
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Retries guard against transient registry outages; a persistent failure still fails the build.
+      - name: Audit production dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if pnpm audit --prod --audit-level=high; then exit 0; fi
+            echo "audit attempt $attempt failed; retrying in 15s" >&2
+            sleep 15
+          done
+          exit 1

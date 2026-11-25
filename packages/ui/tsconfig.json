@@ -1,0 +1,5 @@
+{
+  "extends": "@lumen/config/tsconfig/react.json",
+  "compilerOptions": { "types": ["vite/client"] },
+  "include": ["src", "vitest.config.ts"]
+}

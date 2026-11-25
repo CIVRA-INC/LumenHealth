@@ -1,0 +1,112 @@
+import { createHash, randomBytes } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
+import { permissionsForRole, type Role } from '@lumen/contracts';
+import { APP_CONFIG, type AppConfig } from '../../config/env';
+import type { RequestContext } from '../../common/request-context';
+import { PrismaService } from '../../database/prisma.service';
+
+const TOUCH_INTERVAL_MS = 60_000;
+
+export function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+@Injectable()
+export class SessionService {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
+
+  /** Creates a session and returns the opaque token. Only its hash is stored. */
+  async create(input: {
+    userId: string;
+    membershipId: string;
+    branchId: string;
+    ip?: string;
+    userAgent?: string;
+  }): Promise<{ token: string; expiresAt: Date }> {
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + this.config.SESSION_ABSOLUTE_TIMEOUT_HOURS * 3_600_000);
+    await this.prisma.session.create({
+      data: {
+        tokenHash: hashToken(token),
+        userId: input.userId,
+        membershipId: input.membershipId,
+        branchId: input.branchId,
+        expiresAt,
+        ipAddress: input.ip,
+        userAgent: input.userAgent?.slice(0, 300),
+      },
+    });
+    return { token, expiresAt };
+  }
+
+  /** Resolves a token to a request context, or null if the session is unknown, expired or revoked. */
+  async resolve(token: string): Promise<RequestContext | null> {
+    const now = new Date();
+    const session = await this.prisma.session.findUnique({
+      where: { tokenHash: hashToken(token) },
+      include: {
+        user: true,
+        branch: true,
+        membership: {
+          include: { organization: true, branches: { include: { branch: true } } },
+        },
+      },
+    });
+    if (!session || session.revokedAt || session.expiresAt <= now) return null;
+    const idleMs = this.config.SESSION_IDLE_TIMEOUT_MINUTES * 60_000;
+    if (now.getTime() - session.lastSeenAt.getTime() > idleMs) return null;
+    if (session.user.status !== 'ACTIVE' || session.membership.status !== 'ACTIVE') return null;
+
+    const accessible = session.membership.branches
+      .filter((b) => b.branch.active)
+      .map((b) => b.branchId);
+    // A branch removed from the membership since sign-in must not remain usable.
+    if (!session.branch.active || !accessible.includes(session.branchId)) return null;
+
+    if (now.getTime() - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
+      await this.prisma.session.update({ where: { id: session.id }, data: { lastSeenAt: now } });
+    }
+
+    const role: Role = session.membership.role;
+    return {
+      userId: session.userId,
+      sessionId: session.id,
+      membershipId: session.membershipId,
+      organizationId: session.membership.organizationId,
+      timezone: session.membership.organization.timezone,
+      role,
+      permissions: permissionsForRole(role),
+      branchId: session.branchId,
+      accessibleBranchIds: accessible,
+      mustChangePassword: session.user.mustChangePassword,
+    };
+  }
+
+  async revoke(sessionId: string): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: { id: sessionId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async revokeAllForUser(userId: string, exceptSessionId?: string): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+        ...(exceptSessionId ? { id: { not: exceptSessionId } } : {}),
+      },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async revokeAllForMembership(membershipId: string): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: { membershipId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+}

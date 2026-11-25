@@ -1,20 +1,35 @@
 {
-  "name": "lumen-health",
+  "name": "lumenhealth",
   "private": true,
-  "packageManager": "npm@10.9.2",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "version": "0.1.0",
+  "description": "LumenHealth — multi-tenant EMR and hospital management platform",
+  "packageManager": "pnpm@11.15.1",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "start": "turbo run start",
-    "lint": "turbo run lint"
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "dev": "pnpm build:contracts && concurrently -k -n contracts,api,web -c gray,blue,green \"pnpm --filter @lumen/contracts dev\" \"pnpm --filter @lumen/api dev\" \"pnpm --filter @lumen/web dev\"",
+    "build:contracts": "pnpm --filter @lumen/contracts build",
+    "build": "pnpm build:contracts && pnpm -r --filter \"!@lumen/contracts\" build",
+    "typecheck": "pnpm build:contracts && pnpm -r --parallel typecheck",
+    "lint": "pnpm -r --parallel lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm build:contracts && pnpm -r test",
+    "test:e2e": "pnpm --filter @lumen/web test:e2e",
+    "shots": "pnpm --filter @lumen/web shots:stack",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @lumen/api db:migrate",
+    "db:seed": "pnpm --filter @lumen/api db:seed",
+    "db:reset": "pnpm --filter @lumen/api db:reset",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
-    "turbo": "latest",
-    "typescript": "latest",
-    "@types/node": "latest"
+    "concurrently": "^10.0.6",
+    "prettier": "^3.9.10",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "~6.0.3"
   }
 }

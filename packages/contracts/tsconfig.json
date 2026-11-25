@@ -1,0 +1,11 @@
+{
+  "extends": "@lumen/config/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src", "tsup.config.ts", "vitest.config.ts"]
+}
