@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://gateway.sandbox.name.ng/lumenhealth/api/:path*"
+    }
+  ]
+}
