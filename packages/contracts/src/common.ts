@@ -73,6 +73,8 @@ export const ERROR_CODES = {
   documentationIncomplete: 'DOCUMENTATION_INCOMPLETE',
   passwordChangeRequired: 'PASSWORD_CHANGE_REQUIRED',
   accountLocked: 'ACCOUNT_LOCKED',
+  staffCannotDeactivateSelf: 'STAFF_CANNOT_DEACTIVATE_SELF',
+  staffLastOwner: 'STAFF_LAST_OWNER',
   rateLimited: 'RATE_LIMITED',
   internal: 'INTERNAL_ERROR',
 } as const;

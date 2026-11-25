@@ -17,6 +17,8 @@ import { AuthService } from './modules/identity/auth.service';
 import { AuthGuard, OriginGuard, PermissionsGuard } from './modules/identity/guards';
 import { PasswordService } from './modules/identity/password.service';
 import { SessionService } from './modules/identity/session.service';
+import { StaffController } from './modules/identity/staff.controller';
+import { StaffService } from './modules/identity/staff.service';
 import { UsersAdminController } from './modules/identity/users-admin.controller';
 import { OrganizationsController } from './modules/organizations/organizations.controller';
 import { PatientsController } from './modules/patients/patients.controller';
@@ -71,6 +73,7 @@ const config = loadConfig();
     HealthController,
     AuthController,
     UsersAdminController,
+    StaffController,
     OrganizationsController,
     PatientsController,
     SchedulingController,
@@ -81,6 +84,7 @@ const config = loadConfig();
     PasswordService,
     SessionService,
     AuthService,
+    StaffService,
     PatientsService,
     SchedulingService,
     EncountersService,

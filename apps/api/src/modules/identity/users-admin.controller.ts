@@ -15,10 +15,9 @@ import type { RequestContext } from '../../common/request-context';
 import { parse, ZodApiBody } from '../../common/zod';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { toOrgUserView } from './org-user.view';
 import { PasswordService } from './password.service';
 import { SessionService } from './session.service';
-
-type MembershipWithUser = Awaited<ReturnType<UsersAdminController['loadMembership']>>;
 
 @ApiTags('Administration')
 @Controller({ path: 'admin/users', version: '1' })
@@ -29,19 +28,6 @@ export class UsersAdminController {
     private readonly sessions: SessionService,
     private readonly audit: AuditService,
   ) {}
-
-  private view(m: NonNullable<MembershipWithUser>): OrgUserView {
-    return {
-      membershipId: m.id,
-      userId: m.userId,
-      email: m.user.email,
-      fullName: m.user.fullName,
-      role: m.role,
-      status: m.status,
-      branches: m.branches.map((b) => ({ id: b.branchId, name: b.branch.name })),
-      lastLoginAt: m.user.lastLoginAt?.toISOString() ?? null,
-    };
-  }
 
   loadMembership(organizationId: string, id: string) {
     return this.prisma.membership.findFirst({
@@ -100,7 +86,7 @@ export class UsersAdminController {
       this.prisma.membership.count({ where }),
     ]);
     return toPage(
-      rows.map((m) => this.view(m)),
+      rows.map((m) => toOrgUserView(m)),
       total,
       q.page,
       q.pageSize,
@@ -154,7 +140,7 @@ export class UsersAdminController {
       resourceId: membership.id,
       metadata: { role: input.role, attachedExistingUser: !!existing },
     });
-    return this.view(membership);
+    return toOrgUserView(membership);
   }
 
   @Patch(':membershipId')
@@ -221,6 +207,6 @@ export class UsersAdminController {
         status: input.status ?? null,
       },
     });
-    return this.view(updated);
+    return toOrgUserView(updated);
   }
 }
